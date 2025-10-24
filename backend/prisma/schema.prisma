@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Új modellek és enum a diagram alapján
+
+model User {
+  id                    Int                 @id @default(autoincrement()) // user_id
+  email                 String              @unique
+  username              String              @unique
+  passwordHash          String
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  // Relációk
+  admin                 Admin?            
+  connectedApps         ConnectedApp[]
+  posts                 Post[]
+  comments              Comment[]
+  notifications         Notification[]      @relation("UserNotifications")
+  triggeredNotifications Notification[]     @relation("TriggeredNotifications")
+}
+
+model Admin {
+  id       Int  @id @default(autoincrement()) // admin_id
+  user     User @relation(fields: [userId], references: [id])
+  userId   Int  @unique
+  isAdmin  Boolean @default(true)
+}
+
+model ConnectedApp {
+  id           Int      @id @default(autoincrement()) // internal id
+  appId        String
+  accessToken  String?
+  connectedAt  DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id])
+  userId       Int
+}
+
+model Post {
+  id         Int      @id @default(autoincrement()) // post_id
+  text       String
+  likeAmount Int      @default(0)
+  hashtags   String?  // egyszerűsített: tárolható CSV-ként vagy JSON-ként, igény szerint változtatható
+  postedAt   DateTime @default(now())
+
+  author     User     @relation(fields: [authorId], references: [id])
+  authorId   Int
+
+  comments   Comment[]
+}
+
+model Comment {
+  id                Int      @id @default(autoincrement()) // comment_id
+  text              String
+  likeAmount        Int      @default(0)
+  commentedAt       DateTime @default(now())
+
+  author            User     @relation(fields: [authorId], references: [id])
+  authorId          Int
+
+  post              Post     @relation(fields: [postId], references: [id])
+  postId            Int
+
+  // önreferenciális kapcsolat (reply / previous comment)
+  previousComment   Comment? @relation("PreviousComment", fields: [previousCommentId], references: [id])
+  previousCommentId Int?
+  replies           Comment[] @relation("PreviousComment")
+}
+
+model Notification {
+  id              Int      @id @default(autoincrement()) // notification_id
+  type            String
+  read            Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  // Akihez tartozik a notification
+  user            User     @relation("UserNotifications", fields: [userId], references: [id])
+  userId          Int
+
+  // Opcionális: melyik user váltotta ki (triggered_by)
+  triggeredBy     User?    @relation("TriggeredNotifications", fields: [triggeredById], references: [id])
+  triggeredById   Int?
+}
+
