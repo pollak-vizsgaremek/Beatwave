@@ -1,0 +1,1 @@
+# [Figma design](https://www.figma.com/design/KXxdwBxpAXvfwqHfWlPWft/beatwave-webpage?node-id=0-1&t=tBSGW5SZpTxKd8fs-1)
