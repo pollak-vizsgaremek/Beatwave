@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
+
 interface InputProps {
-  labelTile: string;
+  labelTitle: string;
   inputType: string;
   inputName: string;
   inputPlaceHolder: string;
@@ -7,6 +9,14 @@ interface InputProps {
   labelClassName?: string;
   inputClassName?: string;
   forgotPwd?: boolean;
+  icon?: ReactNode;
 }
 
-export type { InputProps };
+interface ButtonProps {
+  labelTitle: string;
+  type?: "button" | "submit" | "reset";
+  disabled?: boolean;
+  className?: string;
+}
+
+export type { InputProps, ButtonProps };
