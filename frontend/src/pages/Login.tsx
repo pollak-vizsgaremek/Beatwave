@@ -1,12 +1,33 @@
+import Button from "../components/Button";
 import Input from "../components/Input";
+import { Mail, Lock } from "lucide-react";
+import { Link } from "react-router";
+import { useState } from "react";
+import MusicWave from "../components/MusicWave";
 
 const Login = () => {
+  const [variant, setVariant] = useState<"wave" | "typewriter">("wave");
+
+  const toggleVariant = () => {
+    setVariant((prev) => (prev === "wave" ? "typewriter" : "wave"));
+  };
+
   return (
     <div className="w-screen h-screen flex flex-row">
-      <div className="w-1/2"></div>
+      <div className="w-1/2 relative">
+        <MusicWave />
+      </div>
       <div className="w-1/2 flex items-center justify-center">
-        <div className="w-1/2 h-3/5 bg-linear-to-tl from-[#423686]/70 to-fuchsia-600/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30">
-          <h1 className="font-semibold text-5xl mt-10 text-white">
+        <div className="w-1/2 h-4/6 bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10">
+          <div className="absolute top-4 left-6 flex items-center gap-2">
+            {/* You can Replace this with an actual SVG logo if available */}
+            <div className="w-8 h-8 bg-linear-to-tr from-[#7c3aed] to-[#3b82f6] rounded-full"></div>
+            <span className="text-2xl font-bold text-white tracking-wide">
+              Beatwave
+            </span>
+          </div>
+
+          <h1 className="font-semibold text-5xl mt-8 text-white">
             Bejelentkezés
           </h1>
           <form
@@ -15,26 +36,32 @@ const Login = () => {
             className="mt-16 w-full flex flex-col items-center"
           >
             <Input
-              labelTile="Email"
+              labelTitle="Email"
               inputType="email"
               inputName="loginEmail"
               inputPlaceHolder="kisferenc3532@gmail.com"
+              icon={<Mail size={20} />}
             />
             <Input
-              labelTile="Jelszó"
+              labelTitle="Jelszó"
               inputType="password"
               inputName="loginPwd"
               inputPlaceHolder="•••••••"
               wrapperClassName="mt-8"
               forgotPwd={true}
+              icon={<Lock size={20} />}
             />
-            <button
-              className="mt-16 px-12 py-4 bg-[#C5E1ED] rounded-3xl text-black font-medium"
-              type="submit"
-              disabled
-            >
-              Bejelentkezés
-            </button>
+            <Button labelTitle="Bejelentkezés" type="submit" disabled={true} />
+
+            <p className="mt-6 text-white/80">
+              Nincs még fiókod?{" "}
+              <Link
+                to="/register"
+                className="text-white font-semibold hover:underline"
+              >
+                Regisztrálj
+              </Link>
+            </p>
           </form>
         </div>
       </div>

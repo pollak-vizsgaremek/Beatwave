@@ -5,7 +5,7 @@ import { Link } from "react-router";
 
 const Navigation = () => {
   return (
-    <div className="bg-gradient-to-b from-[#423686] to-[#100D20] flex gap-20 h-17 items-center justify-between">
+    <div className="bg-linear-to-b from-[#423686] to-[#100D20] flex gap-20 h-17 items-center justify-between">
       <Link to="/home" className="text-white text-2xl font-bold ml-10">
         Beatwave
       </Link>

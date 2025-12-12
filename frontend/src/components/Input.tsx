@@ -1,33 +1,61 @@
 import { type InputProps } from "../utils/Type";
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 const Input = ({
   wrapperClassName,
   labelClassName,
-  labelTile,
+  labelTitle,
   inputType,
   inputName,
   inputPlaceHolder,
   inputClassName,
   forgotPwd,
+  icon,
 }: InputProps) => {
-  forgotPwd = forgotPwd ?? false;
+  const [showPassword, setShowPassword] = useState(false);
+
+  const currentType =
+    inputType === "password" ? (showPassword ? "text" : "password") : inputType;
+
+  const togglePassword = () => {
+    setShowPassword((prev) => !prev);
+  };
 
   return (
-    <div className={`flex flex-col w-4/6 + ${wrapperClassName}`}>
-      <label className={`text-2xl font-semibold pl-2 pb-2 + ${labelClassName}`}>
-        {labelTile}
+    <div className={`flex flex-col w-4/6 ${wrapperClassName}`}>
+      <label className={`text-2xl font-semibold pl-2 pb-2 ${labelClassName}`}>
+        {labelTitle}
       </label>
-      <input
-        type={inputType}
-        name={inputName}
-        placeholder={inputPlaceHolder}
-        className={`bg-[#4B9FBE] placeholder:text-white text-black p-2 pl-3 rounded-3xl border border-[#13313D] hover:outline-2 focus:outline-2 + ${inputClassName}`}
-      />
-        {forgotPwd && (
-            <p className="text-sm hover:underline self-end mt-2 mr-2 hover:cursor-pointer">
-            Elfelejtetted a Jelszavad?
-            </p>
+      <div className="relative w-full">
+        {icon && (
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#13313D]">
+            {icon}
+          </div>
         )}
+        <input
+          type={currentType}
+          name={inputName}
+          placeholder={inputPlaceHolder}
+          className={`bg-[#4B9FBE] hover:bg-[#4B9FBE]/80 placeholder:text-white/70 text-black p-2 rounded-3xl border border-[#13313D] hover:outline-2 focus:outline-2 w-full ${
+            icon ? "pl-10" : "pl-3"
+          } ${inputType === "password" ? "pr-10" : ""} ${inputClassName}`}
+        />
+        {inputType === "password" && (
+          <button
+            type="button"
+            onClick={togglePassword}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#13313D] hover:text-black cursor-pointer z-10"
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </button>
+        )}
+      </div>
+      {forgotPwd && (
+        <p className="text-sm hover:underline self-end mt-2 mr-2 hover:cursor-pointer">
+          Elfelejtetted a Jelszavad?
+        </p>
+      )}
     </div>
   );
 };
