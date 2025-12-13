@@ -17,7 +17,7 @@ const Navigation = () => {
         inputType="text"
         inputName="search"
         inputPlaceHolder="Keresés..."
-        icon={<Search strokeWidth={3} size={30}/>}
+        icon={<Search strokeWidth={3} size={30} />}
         inputClassName="min-w-2/3"
       />
 

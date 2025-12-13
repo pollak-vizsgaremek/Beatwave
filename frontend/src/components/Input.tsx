@@ -26,9 +26,11 @@ const Input = ({
 
   return (
     <div className={`flex flex-col w-4/6 mt-6 ${wrapperClassName}`}>
-      <label className={`text-2xl font-semibold pl-2 pb-2 ${labelClassName}`}>
-        {labelTitle}
-      </label>
+      {labelTitle && (
+        <label className={`text-2xl font-semibold pl-2 pb-2 ${labelClassName}`}>
+          {labelTitle}
+        </label>
+      )}
       <div className="relative w-full">
         {icon && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#13313D]">

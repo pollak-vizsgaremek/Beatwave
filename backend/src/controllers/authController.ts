@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma";
+import jwt from "jsonwebtoken";
+import config from "../config/config";
 
 export const createUser = async (
   req: Request,
@@ -8,8 +10,8 @@ export const createUser = async (
   next: NextFunction
 ) => {
   try {
-    const pepper = process.env.PASSWORD_PEPPER!;
-    const rounds = Number(process.env.BCRYPT_ROUNDS) || 12;
+    const pepper = config.passwordPepper;
+    const rounds = config.bcryptRounds;
 
     const passwordHash = await bcrypt.hash(req.body.password + pepper, rounds);
 
@@ -41,18 +43,33 @@ export const authenticateUser = async (
     });
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Nem létező felhasználó" });
     }
 
-    const pepper = process.env.PASSWORD_PEPPER!;
+    const pepper = config.passwordPepper;
 
     const isValid = await bcrypt.compare(password + pepper, user.passwordHash);
 
     if (!isValid) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Hibás jelszó" });
     }
 
-    res.status(200).json({ message: "User authenticated successfully" });
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiresIn as any }
+    );
+
+    res.status(200).json({
+      message: "Sikeres bejelentkezés",
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
   } catch (error) {
     next(error);
   }
