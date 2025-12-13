@@ -50,7 +50,6 @@ const Register = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    // Clear error when user starts typing again
     if (error) setError(null);
   };
 
@@ -80,7 +79,6 @@ const Register = () => {
         throw new Error(data.error || "Registration failed");
       }
 
-      // Success! Redirect to login
       navigate("/login");
     } catch (err: any) {
       setError(err.message);
