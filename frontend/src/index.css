@@ -39,6 +39,15 @@
       opacity: 1;
     }
   }
+
+  /*  Colors */
+  --color-accent: #423686;
+  --color-accent-dark: #2C2453;
+  --color-border: #13313D;
+  --color-input-bg: #4B9FBE;
+  --color-input-hover: #5987AA;
+  --color-spotify-green: #1DB954;
+  --color-soundcloud-orange: #FF5500;
 }
 
 :root {
