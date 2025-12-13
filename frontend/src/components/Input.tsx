@@ -41,7 +41,7 @@ const Input = ({
           placeholder={inputPlaceHolder}
           value={value}
           onChange={onChange}
-          className={`bg-[#4B9FBE] hover:bg-[#4B9FBE]/80 placeholder:text-white/70 text-black p-2 rounded-3xl border border-[#13313D] hover:outline-2 focus:outline-2 w-full ${
+          className={`bg-input-bg hover:bg-input-hover placeholder:text-white/70 text-black p-2 rounded-3xl border border-border hover:outline-2 focus:outline-2 w-full ${
             icon ? "pl-10" : "pl-3"
           } ${inputType === "password" ? "pr-10" : ""} ${inputClassName}`}
         />
