@@ -2,18 +2,11 @@ import Button from "../components/Button";
 import Input from "../components/Input";
 import { Mail, Lock } from "lucide-react";
 import { Link } from "react-router";
-import { useState } from "react";
 import MusicWave from "../components/MusicWave";
 
 const Login = () => {
-  const [variant, setVariant] = useState<"wave" | "typewriter">("wave");
-
-  const toggleVariant = () => {
-    setVariant((prev) => (prev === "wave" ? "typewriter" : "wave"));
-  };
-
   return (
-    <div className="w-screen h-screen flex flex-row">
+    <div className="w-screen h-screen flex flex-row ">
       <div className="w-1/2 relative">
         <MusicWave />
       </div>
@@ -33,7 +26,7 @@ const Login = () => {
           <form
             action="login"
             method="post"
-            className="mt-16 w-full flex flex-col items-center"
+            className="mt-10 w-full flex flex-col items-center"
           >
             <Input
               labelTitle="Email"
@@ -47,11 +40,10 @@ const Login = () => {
               inputType="password"
               inputName="loginPwd"
               inputPlaceHolder="•••••••"
-              wrapperClassName="mt-8"
               forgotPwd={true}
               icon={<Lock size={20} />}
             />
-            <Button labelTitle="Bejelentkezés" type="submit" disabled={true} />
+            <Button labelTitle="Bejelentkezés" type="submit" />
 
             <p className="mt-6 text-white/80">
               Nincs még fiókod?{" "}
@@ -59,7 +51,7 @@ const Login = () => {
                 to="/register"
                 className="text-white font-semibold hover:underline"
               >
-                Regisztrálj
+                Regisztrálj!
               </Link>
             </p>
           </form>

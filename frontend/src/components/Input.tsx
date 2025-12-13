@@ -12,6 +12,8 @@ const Input = ({
   inputClassName,
   forgotPwd,
   icon,
+  value,
+  onChange,
 }: InputProps) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -23,7 +25,7 @@ const Input = ({
   };
 
   return (
-    <div className={`flex flex-col w-4/6 ${wrapperClassName}`}>
+    <div className={`flex flex-col w-4/6 mt-6 ${wrapperClassName}`}>
       <label className={`text-2xl font-semibold pl-2 pb-2 ${labelClassName}`}>
         {labelTitle}
       </label>
@@ -37,6 +39,8 @@ const Input = ({
           type={currentType}
           name={inputName}
           placeholder={inputPlaceHolder}
+          value={value}
+          onChange={onChange}
           className={`bg-[#4B9FBE] hover:bg-[#4B9FBE]/80 placeholder:text-white/70 text-black p-2 rounded-3xl border border-[#13313D] hover:outline-2 focus:outline-2 w-full ${
             icon ? "pl-10" : "pl-3"
           } ${inputType === "password" ? "pr-10" : ""} ${inputClassName}`}
