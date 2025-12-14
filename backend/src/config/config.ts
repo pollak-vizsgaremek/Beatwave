@@ -9,6 +9,11 @@ interface Config {
   passwordPepper: string;
   bcryptRounds: number;
   jwtExpiresIn: string;
+  databaseUrl: string;
+  databaseHost: string;
+  databaseUser: string;
+  databaseName: string;
+  databasePassword: string;
 }
 
 const config: Config = {
@@ -18,6 +23,11 @@ const config: Config = {
   passwordPepper: process.env.PASSWORD_PEPPER || "",
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS) || 12,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
+  databaseUrl: process.env.DATABASE_URL || "",
+  databaseHost: process.env.DATABASE_HOST || "",
+  databaseUser: process.env.DATABASE_USER || "",
+  databaseName: process.env.DATABASE_NAME || "",
+  databasePassword: process.env.DATABASE_PASSWORD || "",
 };
 
 export default config;

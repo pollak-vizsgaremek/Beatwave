@@ -1,11 +1,20 @@
-import Navigation from "./Navigation";
 import { Outlet } from "react-router";
 
-const ProtectedRoute = () => {
-  const isAuthenticated = true; // Replace with actual authentication logic
+import Navigation from "./Navigation";
+import { isTokenExpired } from "../utils/auth";
 
-  if (!isAuthenticated) {
-    return <div>Please log in to access this page.</div>;
+const ProtectedRoute = () => {
+  const token = localStorage.getItem("token");
+
+  // Check if token exists AND is valid (not expired)
+  if (!token || isTokenExpired(token)) {
+    // Clear any invalid/expired data
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    // Redirect to login
+    window.location.href = "/login";
+    return null;
   }
 
   return (

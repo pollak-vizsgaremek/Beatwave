@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
-import { prisma } from "../lib/prisma";
 import jwt from "jsonwebtoken";
+
+import { prisma } from "../lib/prisma";
 import config from "../config/config";
 
 export const createUser = async (
@@ -10,22 +11,46 @@ export const createUser = async (
   next: NextFunction
 ) => {
   try {
+    const { username, email, password } = req.body;
+
     const pepper = config.passwordPepper;
     const rounds = config.bcryptRounds;
 
-    const passwordHash = await bcrypt.hash(req.body.password + pepper, rounds);
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    const existingUser2 = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (existingUser || existingUser2) {
+      return res.status(409).json({ error: "User already exists" });
+    }
+
+    const passwordHash = await bcrypt.hash(password + pepper, rounds);
 
     const newUser = await prisma.user.create({
       data: {
-        username: req.body.username,
-        email: req.body.email,
+        username,
+        email,
         passwordHash,
       },
     });
 
     const { passwordHash: _, ...safeUser } = newUser;
     res.status(201).json(safeUser);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      const field = error.meta?.target?.[0] || "field";
+      return res
+        .status(409)
+        .json({ error: `A felhasználó ezzel a ${field} már létezik` });
+    }
     next(error);
   }
 };
@@ -36,10 +61,10 @@ export const authenticateUser = async (
   next: NextFunction
 ) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     const user = await prisma.user.findUnique({
-      where: { username },
+      where: { email },
     });
 
     if (!user) {

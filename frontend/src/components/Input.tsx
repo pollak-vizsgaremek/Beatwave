@@ -33,7 +33,7 @@ const Input = ({
       )}
       <div className="relative w-full">
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#13313D]">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-border">
             {icon}
           </div>
         )}
@@ -51,7 +51,7 @@ const Input = ({
           <button
             type="button"
             onClick={togglePassword}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#13313D] hover:text-black cursor-pointer z-10"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-border hover:text-black cursor-pointer z-10"
           >
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>

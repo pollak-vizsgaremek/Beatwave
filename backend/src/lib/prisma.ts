@@ -1,3 +1,16 @@
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 
-export const prisma = new PrismaClient();
+import { PrismaClient } from '../../generated/prisma/client';
+import config from '../config/config';
+
+const adapter = new PrismaMariaDb({
+  host: config.databaseHost,
+  user: config.databaseUser,
+  password: config.databasePassword,
+  database: config.databaseName,
+  connectionLimit: 5
+});
+const prisma = new PrismaClient({ adapter });
+
+export { prisma }
