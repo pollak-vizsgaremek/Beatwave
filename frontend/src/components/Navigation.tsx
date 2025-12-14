@@ -1,7 +1,6 @@
-import { Bell } from "lucide-react";
-import { UserRound } from "lucide-react";
-import { Search } from "lucide-react";
+import { Bell, UserRound, Search } from "lucide-react";
 import { Link } from "react-router";
+
 import Input from "./Input";
 
 const Navigation = () => {
@@ -19,6 +18,7 @@ const Navigation = () => {
         inputPlaceHolder="Keresés..."
         icon={<Search strokeWidth={3} size={30} />}
         inputClassName="min-w-2/3"
+        wrapperClassName="!-mt-0"
       />
 
       <div className="flex gap-5 mr-10">

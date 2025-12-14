@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import Input from "../components/Input";
 import MusicWave from "../components/MusicWave";
 import Button from "../components/Button";
+import api from "../utils/api";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -61,23 +62,11 @@ const Register = () => {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:3000/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          username: formData.username,
-          password: formData.password,
-        }),
+      await api.post("/register", {
+        email: formData.email,
+        username: formData.username,
+        password: formData.password,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Registration failed");
-      }
 
       navigate("/login");
     } catch (err: any) {
@@ -88,9 +77,9 @@ const Register = () => {
   };
 
   return (
-    <div className="flex flex-row h-screen w-screen">
+    <div className="flex flex-row h-screen w-screen bg-linear-to-r from-black to-border">
       <div className="w-1/2 flex items-center justify-center">
-        <div className="w-1/2 h-5/6 bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10">
+        <div className="min-w-[500px] w-1/2 h-5/6 bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10">
           <div className="absolute top-4 left-6 flex items-center gap-2">
             {/* You can Replace this with an actual SVG logo if available */}
             <div className="w-8 h-8 bg-linear-to-tr from-[#7c3aed] to-[#3b82f6] rounded-full"></div>
