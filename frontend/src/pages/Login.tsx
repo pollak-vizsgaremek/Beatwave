@@ -55,7 +55,7 @@ const Login = () => {
         <MusicWave />
       </div>
       <div className="w-1/2 flex items-center justify-center z-10">
-        <div className="min-w-[500px] w-1/2 h-4/6 bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10 backdrop-blur-md">
+        <div className="min-w-[500px] w-1/2 h-4/6 bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10 backdrop-blur-md">
           <div className="absolute top-4 left-6 flex items-center gap-2">
             <div className="w-8 h-8 bg-linear-to-tr from-[#7c3aed] to-[#3b82f6] rounded-full"></div>
             <span className="text-2xl font-bold text-white tracking-wide">
