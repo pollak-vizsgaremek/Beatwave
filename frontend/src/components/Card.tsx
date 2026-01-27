@@ -1,11 +1,16 @@
 const Card = () => {
   return (
-    <div className="bg-card w-2/6 rounded-lg p-5 flex justify-between">
-      <div className="text-xl">
-        <h2 className="font-semibold">Recently played on [platform]:</h2>
-        <p>[song name]</p>
+    <div className="">
+      <div className="bg-card rounded-lg p-5 flex flex-col items-center">
+        <h1 className="font-bold text-xl">#[placing]</h1>
+        <div>
+          <div className="bg-accent w-24 h-24 mb-4 rounded-full flex items-center justify-center">
+            [album pic here]
+          </div>
+          <h2 className="font-semibold text-lg">[artist/song name]</h2>
+          <p className="text-sm text-gray-400 mt-2">[additional info]</p>
+        </div>
       </div>
-      <div>[album pic here]</div>
     </div>
   );
 };
