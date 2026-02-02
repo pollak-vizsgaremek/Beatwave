@@ -90,7 +90,6 @@ export const authenticateUser = async (
       token,
       user: {
         id: user.id,
-        username: user.username,
         email: user.email,
         role: user.role,
       },

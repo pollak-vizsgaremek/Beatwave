@@ -40,7 +40,7 @@ const Navigation = () => {
         <div className="relative">
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="text-white hover:opacity-80 transition-opacity"
+            className="text-white hover:opacity-80 transition-opacity cursor-pointer"
           >
             <UserRound strokeWidth={3} size={30} />
           </button>
