@@ -27,6 +27,7 @@
     }
   }
 
+
   /*  Colors */
   --color-card: #295777;
   --color-accent: #423686;
@@ -36,6 +37,16 @@
   --color-input-hover: #5987aa;
   --color-spotify-green: #1db954;
   --color-soundcloud-orange: #ff5500;
+}
+
+@layer components {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 :root {
