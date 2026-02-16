@@ -1,10 +1,10 @@
-import Card from "../components/Card";
+import TopList from "../components/TopList";
 
 const Home = () => {
   const Artists = [
     {
       name: "Artist 1",
-      image: "https://via.placeholder.com/150",
+      image: "https://www.inaturalist.org/observations/8440600",
     },
     {
       name: "Artist 2",
@@ -57,18 +57,9 @@ const Home = () => {
         </div>
       </div>
 
-      <div className="pl-30 ">
-        <h2 className="text-2xl font-semibold mb-5">Your top 10 Artists:</h2>
-        <div className="flex flex-row overflow-x-visible ml-6">
-          {Artists.map((artist, i) => (
-            <Card
-              key={i}
-              name={artist.name}
-              image={artist.image}
-              placing={i + 1}
-            />
-          ))}
-        </div>
+      {/* The Top list starts here*/}
+      <div className="pl-30 flex flex-col">
+        <TopList list={Artists} title={"Your top 10 Artists:"} />
       </div>
       <div className="pl-30">
         <h2 className="text-2xl font-semibold mb-5">Your top 10 Songs:</h2>
