@@ -1,11 +1,26 @@
 import { Router } from "express";
+
 import { createUser, authenticateUser } from "../controllers/authController";
-import { getUserProfile } from "../controllers/userProfile";
+import { getUserProfile, updateUserProfile } from "../controllers/userProfile";
+import {
+  getSpotifyAuthUrl,
+  spotifyCallback,
+  getSpotifyToken,
+  disconnectSpotify,
+} from "../controllers/spotifyController";
+
+import { verifyToken } from "../middlewares/authMiddleware";
 
 const router = Router();
 
 router.post("/register", createUser);
 router.post("/login", authenticateUser);
-router.get("UserProfile", getUserProfile);
+router.get("/user-profile", verifyToken, getUserProfile);
+router.put("/user-profile", verifyToken, updateUserProfile);
+
+router.get("/auth/spotify/url", verifyToken, getSpotifyAuthUrl);
+router.get("/auth/spotify/callback", spotifyCallback);
+router.get("/auth/spotify/token", verifyToken, getSpotifyToken);
+router.delete("/auth/spotify", verifyToken, disconnectSpotify);
 
 export default router;

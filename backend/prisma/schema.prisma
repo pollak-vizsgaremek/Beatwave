@@ -40,8 +40,10 @@ model User {
 
 model ConnectedApp {
   id          String   @id @default(uuid()) // internal id
-  platform       String
-  accessToken String?
+  platform    String
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
   connectedAt DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
   userId      String

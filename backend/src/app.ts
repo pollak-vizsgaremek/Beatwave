@@ -6,11 +6,13 @@ import cors from "cors";
 
 const app = express();
 
+import config from "./config/config";
+
 app.use(
   cors({
-    origin: "http://localhost:5173", // URL of the frontend
+    origin: config.frontendUrl, // URL of the frontend configuration
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
