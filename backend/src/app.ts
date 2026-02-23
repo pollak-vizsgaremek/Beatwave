@@ -1,13 +1,21 @@
-import express from 'express';
-import itemRoutes from './routes/itemRoutes';
-import { errorHandler } from './middlewares/errorHandler';
+import express from "express";
+import appRoutes from "./routes/appRoutes";
+import { errorHandler } from "./middlewares/errorHandler";
+
+import cors from "cors";
 
 const app = express();
 
+app.use(
+  cors({
+    origin: "http://localhost:5173", // URL of the frontend
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
-// Routes
-app.use('/api/items', itemRoutes);
+app.use("/", appRoutes);
 
 // Global error handler (should be after routes)
 app.use(errorHandler);
