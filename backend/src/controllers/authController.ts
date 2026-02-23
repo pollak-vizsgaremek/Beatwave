@@ -8,7 +8,7 @@ import config from "../config/config";
 export const createUser = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { username, email, password } = req.body;
@@ -58,7 +58,7 @@ export const createUser = async (
 export const authenticateUser = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { email, password } = req.body;
@@ -82,7 +82,7 @@ export const authenticateUser = async (
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       config.jwtSecret,
-      { expiresIn: config.jwtExpiresIn as any }
+      { expiresIn: config.jwtExpiresIn as any },
     );
 
     res.status(200).json({
@@ -92,6 +92,7 @@ export const authenticateUser = async (
         id: user.id,
         email: user.email,
         role: user.role,
+        username: user.username,
       },
     });
   } catch (error) {
