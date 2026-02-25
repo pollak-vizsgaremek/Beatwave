@@ -1,48 +1,33 @@
+import { useState, useEffect } from "react";
+import api from "../utils/api";
 import TopList from "../components/TopList";
 
 const Home = () => {
-  const Artists = [
-    {
-      name: "Artist 1",
-      image: "https://www.inaturalist.org/observations/8440600",
-    },
-    {
-      name: "Artist 2",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 3",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 4",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 5",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 6",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 7",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 8",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 9",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      name: "Artist 10",
-      image: "https://via.placeholder.com/150",
-    },
-  ];
+  const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTopArtists = async () => {
+      try {
+        const response = await api.get("/auth/spotify/top/artists");
+        // Map Spotify response to { name, image } format expected by TopList
+        const formattedArtists = response.data.items.map((artist: any) => ({
+          name: artist.name,
+          image:
+            artist.images?.length > 0
+              ? artist.images[0].url
+              : "https://via.placeholder.com/150",
+        }));
+        setArtists(formattedArtists);
+      } catch (error) {
+        console.error("Error fetching top artists:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTopArtists();
+  }, []);
 
   return (
     <div className="flex flex-col gap-20">
@@ -59,7 +44,15 @@ const Home = () => {
 
       {/* The Top list starts here*/}
       <div className="pl-30 flex flex-col">
-        <TopList list={Artists} title={"Your top 10 Artists:"} />
+        {loading ? (
+          <p className="text-gray-400">Loading your top artists...</p>
+        ) : artists.length > 0 ? (
+          <TopList list={artists} title={"Your top 10 Artists:"} />
+        ) : (
+          <p className="text-gray-400">
+            Connect your Spotify to see your top artists here.
+          </p>
+        )}
       </div>
       <div className="pl-30">
         <h2 className="text-2xl font-semibold mb-5">Your top 10 Songs:</h2>

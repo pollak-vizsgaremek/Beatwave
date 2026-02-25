@@ -20,16 +20,47 @@ export const createUser = async (
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Érvénytelen email formátum" });
+    }
+
+    if (
+      password.length < 8 ||
+      !/\d/.test(password) ||
+      !/[!@#$%^&*(),.?":{}|<>]/.test(password) ||
+      !/[A-Z]/.test(password)
+    ) {
+      return res.status(400).json({
+        error: "A jelszó nem felel meg a biztonsági követelményeknek",
+      });
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { username }],
+      },
     });
 
-    const existingUser2 = await prisma.user.findUnique({
-      where: { username },
-    });
-
-    if (existingUser || existingUser2) {
-      return res.status(409).json({ error: "User already exists" });
+    if (existingUser) {
+      if (existingUser.email === email && existingUser.username === username) {
+        return res
+          .status(409)
+          .json({
+            error:
+              "A felhasználó ezzel az email címmel és felhasználónévvel már létezik",
+          });
+      } else if (existingUser.email === email) {
+        return res
+          .status(409)
+          .json({ error: "A felhasználó ezzel az email címmel már létezik" });
+      } else {
+        return res
+          .status(409)
+          .json({
+            error: "A felhasználó ezzel a felhasználónévvel már létezik",
+          });
+      }
     }
 
     const passwordHash = await bcrypt.hash(password + pepper, rounds);

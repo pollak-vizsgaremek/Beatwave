@@ -86,7 +86,7 @@ const UserProfile = () => {
     }
   };
 
-  const connectedToSpotify = user?.spotifyConnected ?? true;
+  const connectedToSpotify = user?.spotifyConnected ?? false;
   const connectedToSoundCloud = user?.soundCloudConnected ?? false;
 
   useEffect(() => {
