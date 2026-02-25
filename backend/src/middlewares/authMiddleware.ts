@@ -24,6 +24,9 @@ export const verifyToken = (
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
     req.userId = decoded.id;
+    console.log(
+      `[Spotify MiddleWare] Extracted userId: ${req.userId} from token.`,
+    );
     next();
   } catch (error) {
     return res.status(403).json({ error: "Érvénytelen token" });

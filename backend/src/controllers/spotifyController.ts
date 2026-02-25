@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import config from "../config/config";
 import { prisma } from "../lib/prisma";
 
+const spotifyCache = new Map<string, { data: any; timestamp: number }>();
+
 const SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize";
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 
@@ -30,6 +32,7 @@ export const getSpotifyAuthUrl = async (
       scope: scope,
       redirect_uri: config.spotifyRedirectUri,
       state: state,
+      show_dialog: "true", // Forces Spotify to prompt for permissions
     });
 
     res.json({ url: `${SPOTIFY_AUTH_URL}?${params.toString()}` });
@@ -53,7 +56,7 @@ export const spotifyCallback = async (
 
   if (!state || !code) {
     return res.redirect(
-      `${config.frontendUrl}/error?msg=state_or_code_missing`,
+      `${config.frontendUrl}/profile?spotify_error=state_or_code_missing`,
     );
   }
 
@@ -63,7 +66,9 @@ export const spotifyCallback = async (
     const userId = decoded.userId;
 
     if (!userId) {
-      return res.redirect(`${config.frontendUrl}/error?msg=invalid_state`);
+      return res.redirect(
+        `${config.frontendUrl}/profile?spotify_error=invalid_state`,
+      );
     }
 
     // Spotify requires the Client ID and Secret to be base64 encoded together
@@ -89,7 +94,7 @@ export const spotifyCallback = async (
     if (!tokenResponse.ok) {
       console.error("Spotify Token Error:", data);
       return res.redirect(
-        `${config.frontendUrl}/error?msg=spotify_token_error`,
+        `${config.frontendUrl}/profile?spotify_error=spotify_token_error`,
       );
     }
 
@@ -134,12 +139,13 @@ export const spotifyCallback = async (
     res.redirect(`${config.frontendUrl}/profile?spotify_status=success`);
   } catch (error) {
     console.error("Spotify Callback Error:", error);
-    res.redirect(`${config.frontendUrl}/error?msg=server_error`);
+    res.redirect(`${config.frontendUrl}/profile?spotify_error=server_error`);
   }
 };
 
 export const getValidSpotifyToken = async (
   userId: string,
+  forceRefresh: boolean = false,
 ): Promise<string | null> => {
   try {
     const connection = await prisma.connectedApp.findFirst({
@@ -155,7 +161,7 @@ export const getValidSpotifyToken = async (
       connection.expiresAt &&
       connection.expiresAt.getTime() - Date.now() < 60000;
 
-    if (!isExpired) {
+    if (!isExpired && !forceRefresh) {
       return connection.accessToken;
     }
 
@@ -196,7 +202,7 @@ export const getValidSpotifyToken = async (
     const newRefreshToken = data.refresh_token || connection.refreshToken; // Sometimes Spotify doesn't return a new refresh token
     const newExpiresAt = data.expires_in
       ? new Date(Date.now() + data.expires_in * 1000)
-      : connection.expiresAt;
+      : new Date(Date.now() + 3600 * 1000); // Default to 1 hour if Spotify omits it
 
     // Update DB
     await prisma.connectedApp.update({
@@ -261,6 +267,119 @@ export const disconnectSpotify = async (
     });
 
     res.json({ message: "Spotify successfully disconnected" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getSpotifyTopItems = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId;
+    const type = req.params.type;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (type !== "artists" && type !== "tracks") {
+      return res.status(400).json({
+        error: "Invalid type parameter. Must be 'artists' or 'tracks'.",
+      });
+    }
+
+    const cacheKey = `${userId}-${type}`;
+    const cachedEntry = spotifyCache.get(cacheKey);
+
+    // 1 hour in ms
+    const CACHE_DURATION_MS = 60 * 60 * 1000;
+
+    if (cachedEntry && Date.now() - cachedEntry.timestamp < CACHE_DURATION_MS) {
+      console.log(`Returning cached Spotify top ${type} for user: ${userId}`);
+      return res.json({ items: cachedEntry.data, cached: true });
+    }
+
+    let token = await getValidSpotifyToken(userId);
+
+    if (!token) {
+      return res.json({ items: [], connected: false, cached: false });
+    }
+
+    let response = await fetch(
+      `https://api.spotify.com/v1/me/top/${type}?time_range=long_term&limit=10`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    // If token is invalid despite DB thinking it's valid, force a refresh and retry ONCE
+    if (response.status === 401) {
+      token = await getValidSpotifyToken(userId, true);
+
+      if (!token) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Spotify access token expired and could not be refreshed.",
+        });
+      }
+
+      // Retry the fetch with the new token
+      response = await fetch(
+        `https://api.spotify.com/v1/me/top/${type}?limit=10`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`Error fetching Spotify top ${type}:`, errorData);
+
+      // Prevent proxying 401 from Spotify to frontend, which triggers app auto-logout
+      if (response.status === 401) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Spotify access token expired or invalid.",
+        });
+      }
+
+      // If forbidden, they likely don't have the user-top-read scope allowed initially
+      if (response.status === 403) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Insufficient permissions to read top items from Spotify.",
+        });
+      }
+      return res
+        .status(response.status)
+        .json({ error: `Spotify API error: ${response.statusText}` });
+    }
+
+    const data = await response.json();
+
+    // Cache the items
+    spotifyCache.set(cacheKey, {
+      data: data.items,
+      timestamp: Date.now(),
+    });
+
+    res.json({ items: data.items, cached: false });
   } catch (error) {
     next(error);
   }

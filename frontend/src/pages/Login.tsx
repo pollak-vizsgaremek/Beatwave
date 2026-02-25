@@ -32,15 +32,14 @@ const Login = () => {
         password: formData.password,
       });
 
-      // Assuming backend returns a token or user object
-      // For now, just navigate to dashboard/home
       console.log("Login success:", response.data);
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        localStorage.setItem("user", JSON.stringify(response.data.user || {}));
+        navigate("/home"); // Navigate to home/dashboard only on success
+      } else {
+        setError("Invalid response from server");
       }
-
-      navigate("/home"); // Navigate to home/dashboard
     } catch (err: any) {
       console.error("Login error:", err);
       setError(err.response?.data?.error || "Invalid credentials");
@@ -106,7 +105,7 @@ const Login = () => {
                   localStorage.setItem("token", "DEV_TOKEN");
                   localStorage.setItem(
                     "user",
-                    JSON.stringify({ username: "Developer", role: "ADMIN" })
+                    JSON.stringify({ username: "Developer", role: "ADMIN" }),
                   );
                   navigate("/home");
                 }}

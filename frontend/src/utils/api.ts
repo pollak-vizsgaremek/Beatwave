@@ -11,6 +11,9 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) {
+      if (!config.headers) {
+        config.headers = {} as any;
+      }
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -26,6 +29,10 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       // If server says 401 Unauthorized, log out the user
       // BUT ignore if using Dev Token
+      console.error(
+        "401 Unauthorized Intercepted from URL:",
+        error.config?.url,
+      );
       const token = localStorage.getItem("token");
       if (token !== "DEV_TOKEN") {
         localStorage.removeItem("token");

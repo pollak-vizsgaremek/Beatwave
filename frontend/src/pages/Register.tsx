@@ -70,7 +70,9 @@ const Register = () => {
 
       navigate("/login");
     } catch (err: any) {
-      setError(err.message);
+      setError(
+        err.response?.data?.error || err.message || "Registration failed",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -141,15 +143,15 @@ const Register = () => {
                       strengthScore <= 1
                         ? "text-red-400"
                         : strengthScore <= 3
-                        ? "text-yellow-400"
-                        : "text-green-400"
+                          ? "text-yellow-400"
+                          : "text-green-400"
                     }`}
                   >
                     {strengthScore <= 1
                       ? "Gyenge"
                       : strengthScore <= 3
-                      ? "Közepes"
-                      : "Erős"}
+                        ? "Közepes"
+                        : "Erős"}
                   </span>
                 </div>
                 <div className="h-2 w-full bg-gray-600 rounded-full overflow-hidden">
@@ -158,8 +160,8 @@ const Register = () => {
                       strengthScore <= 1
                         ? "bg-red-500"
                         : strengthScore <= 3
-                        ? "bg-yellow-500"
-                        : "bg-green-500"
+                          ? "bg-yellow-500"
+                          : "bg-green-500"
                     }`}
                     style={{ width: `${(strengthScore / 4) * 100}%` }}
                   ></div>
