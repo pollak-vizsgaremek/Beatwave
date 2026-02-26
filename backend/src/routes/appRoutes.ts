@@ -8,6 +8,7 @@ import {
   getSpotifyToken,
   disconnectSpotify,
   getSpotifyTopItems,
+  getSpotifyCurrentlyPlaying,
 } from "../controllers/spotifyController";
 
 import { verifyToken } from "../middlewares/authMiddleware";
@@ -24,5 +25,6 @@ router.get("/auth/spotify/callback", spotifyCallback);
 router.get("/auth/spotify/token", verifyToken, getSpotifyToken);
 router.delete("/auth/spotify", verifyToken, disconnectSpotify);
 router.get("/auth/spotify/top/:type", verifyToken, getSpotifyTopItems);
+router.get("/auth/spotify/currently-playing", verifyToken, getSpotifyCurrentlyPlaying);
 
 export default router;

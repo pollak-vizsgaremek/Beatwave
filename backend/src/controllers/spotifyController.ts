@@ -333,7 +333,7 @@ export const getSpotifyTopItems = async (
 
       // Retry the fetch with the new token
       response = await fetch(
-        `https://api.spotify.com/v1/me/top/${type}?limit=10`,
+        `https://api.spotify.com/v1/me/top/${type}?time_range=long_term&limit=10`,
         {
           method: "GET",
           headers: {
@@ -384,3 +384,91 @@ export const getSpotifyTopItems = async (
     next(error);
   }
 };
+
+export const getSpotifyCurrentlyPlaying = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    let token = await getValidSpotifyToken(userId);
+
+    if (!token) {
+      return res.json({ item: null, connected: false });
+    }
+
+    let response = await fetch(
+      "https://api.spotify.com/v1/me/player/currently-playing",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (response.status === 401) {
+      token = await getValidSpotifyToken(userId, true);
+
+      if (!token) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Spotify access token expired and could not be refreshed.",
+        });
+      }
+
+      response = await fetch(
+        "https://api.spotify.com/v1/me/player/currently-playing",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+    }
+
+    if (response.status === 204) {
+      return res.json({ item: null, connected: true });
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error fetching Spotify currently playing:", errorData);
+      if (response.status === 401) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Spotify access token expired or invalid.",
+        });
+      }
+
+      // If forbidden, they likely don't have the user-top-read scope allowed initially
+      if (response.status === 403) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Insufficient permissions to read top items from Spotify.",
+        });
+      }
+      return res
+        .status(response.status)
+        .json({ error: `Spotify API error: ${response.statusText}` });
+    }
+
+    const data = await response.json();
+    res.json({ item: data.item, is_playing: data.is_playing, progress_ms: data.progress_ms, connected: true });
+  } catch (error) {
+    next(error);
+  }
+}

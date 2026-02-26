@@ -21,7 +21,7 @@ const Navigation = () => {
   };
 
   return (
-    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-10 h-17 items-center justify-around w-2/3 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30">
+    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-10 h-17 items-center justify-around w-2/3 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30 min-w-2/4">
       <Link to="/home" className="text-white text-2xl font-bold ml-10">
         Beatwave
       </Link>
@@ -53,7 +53,7 @@ const Navigation = () => {
                 className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-accent-dark transition-colors first:rounded-t-lg border-b border-accent-dark"
               >
                 <Settings size={18} />
-                <span>Settings</span>
+                <span>Profile</span>
               </button>
               <button
                 onClick={() => setIsDropdownOpen(false)}
