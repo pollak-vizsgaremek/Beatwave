@@ -30,7 +30,7 @@ const Register = () => {
     const reqs = {
       length: password.length >= 8,
       number: /\d/.test(password),
-      special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>+-]/.test(password),
       uppercase: /[A-Z]/.test(password),
     };
 

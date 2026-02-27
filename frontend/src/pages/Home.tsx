@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../utils/api";
 import TopList from "../components/TopList";
-import { div } from "framer-motion/client";
 
 const Home = () => {
   const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
@@ -18,6 +17,11 @@ const Home = () => {
     artist: string | null;
   } | null>(null);
   const [loadingCurrentlyPlaying, setLoadingCurrentlyPlaying] = useState(true);
+
+  const [recentlyPlayed, setRecentlyPlayed] = useState<
+    { name: string; image: string }[]
+  >([]);
+  const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
 
   useEffect(() => {
     const fetchTopArtists = async () => {
@@ -69,7 +73,6 @@ const Home = () => {
     const fetchCurrentlyPlaying = async () => {
       try {
         const response = await api.get("/auth/spotify/currently-playing");
-        console.log("Spotify currently playing response:", response.data);
 
         const formattedCurrentlyPlaying = {
           progress_ms: response.data.progress_ms,
@@ -94,9 +97,36 @@ const Home = () => {
 
     fetchCurrentlyPlaying();
 
-    const intervalId = setInterval(fetchCurrentlyPlaying, 10000);
+    const intervalId = setInterval(fetchCurrentlyPlaying, 5000);
 
     return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const fetchRecentlyPlayed = async () => {
+      try {
+        const response = await api.get("/auth/spotify/recently-played/1");
+
+        const formattedRecentlyPlayed = {
+          name: response.data.items[0].track.name,
+          image:
+            response.data.items[0].track.album.images?.[0]?.url ??
+            "https://placehold.co/300x300",
+        };
+        setRecentlyPlayed(formattedRecentlyPlayed);
+      } catch (error) {
+        console.error("Error recently played tracks:", error);
+      } finally {
+        setLoadingRecentlyPlayed(false);
+      }
+    };
+
+    fetchRecentlyPlayed();
+
+    if (!currentlyPlaying || !currentlyPlaying.name) {
+      const intervalId = setInterval(fetchRecentlyPlayed, 5000);
+      return () => clearInterval(intervalId);
+    }
   }, []);
 
   return (
@@ -110,7 +140,8 @@ const Home = () => {
             </p>
           ) : !currentlyPlaying || !currentlyPlaying.name ? (
             <div className="flex items-center justify-center h-35 text-xl">
-              There is no Spotify open
+              Here is your last played music
+              {loadingRecentlyPlayed ? (<p></p>) :(<p></p>)}
             </div>
           ) : (
             <div>
@@ -121,12 +152,12 @@ const Home = () => {
                     alt={currentlyPlaying.name}
                     className="w-32 h-32 rounded"
                   />
-                  <div className="flex flex-col justify-center items-center w-full">
+                  <div className="flex flex-col justify-center items-center w-full ml-4">
                     <div className="mb-4 text-center">
                       <p className="text-2xl font-semibold">
                         {currentlyPlaying.name}
                       </p>
-                      <p className="text-lg font-light italic">
+                      <p className="text-lg font-light italic h-12 overflow-y-auto no-scrollbar">
                         {currentlyPlaying.artist}
                       </p>
                     </div>
@@ -142,12 +173,12 @@ const Home = () => {
                     alt={currentlyPlaying.name}
                     className="w-32 h-32 rounded"
                   />
-                  <div className="flex flex-col justify-center items-center w-full">
+                  <div className="flex flex-col justify-center items-center w-full ml-4">
                     <div className="mb-4 text-center">
                       <p className="text-2xl font-semibold">
                         {currentlyPlaying.name}
                       </p>
-                      <p className="text-lg font-light italic">
+                      <p className="text-lg font-light italic h-12 overflow-y-scroll no-scrollbar">
                         {currentlyPlaying.artist}
                       </p>
                     </div>

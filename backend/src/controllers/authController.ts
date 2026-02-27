@@ -28,7 +28,7 @@ export const createUser = async (
     if (
       password.length < 8 ||
       !/\d/.test(password) ||
-      !/[!@#$%^&*(),.?":{}|<>]/.test(password) ||
+      !/[!@#$%^&*(),.?":{}|<>+-]/.test(password) ||
       !/[A-Z]/.test(password)
     ) {
       return res.status(400).json({

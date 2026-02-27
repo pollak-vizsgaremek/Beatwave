@@ -24,7 +24,7 @@ export const getSpotifyAuthUrl = async (
     const state = jwt.sign({ userId }, config.jwtSecret, { expiresIn: "10m" });
 
     const scope =
-      "user-top-read user-read-currently-playing user-library-modify streaming app-remote-control user-read-playback-state user-modify-playback-state user-read-private user-read-email";
+      "user-top-read user-read-currently-playing user-library-modify streaming app-remote-control user-read-playback-state user-modify-playback-state user-read-private user-read-email user-read-recently-played";
 
     const params = new URLSearchParams({
       response_type: "code",
@@ -229,6 +229,7 @@ export const getSpotifyToken = async (
   try {
     const userId = req.userId;
 
+
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -266,6 +267,16 @@ export const disconnectSpotify = async (
       },
     });
 
+    console.log(`Spotify disconnected for user ${userId}`, spotifyCache);
+
+    spotifyCache.forEach((_, key) => {
+      if (key.startsWith(userId)) {
+        spotifyCache.delete(key);
+      }
+    });
+
+    console.log(`Spotify disconnected for user ${userId}`, spotifyCache);
+
     res.json({ message: "Spotify successfully disconnected" });
   } catch (error) {
     next(error);
@@ -280,6 +291,7 @@ export const getSpotifyTopItems = async (
   try {
     const userId = req.userId;
     const type = req.params.type;
+
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -342,7 +354,6 @@ export const getSpotifyTopItems = async (
         },
       );
     }
-
     if (!response.ok) {
       const errorData = await response.json();
       console.error(`Error fetching Spotify top ${type}:`, errorData);
@@ -468,6 +479,101 @@ export const getSpotifyCurrentlyPlaying = async (
 
     const data = await response.json();
     res.json({ item: data.item, is_playing: data.is_playing, progress_ms: data.progress_ms, connected: true });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export const getSpotifyRecentlyPlayed = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId;
+    const amount = parseInt(req.params.amount as string);
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!amount || amount <= 0 || amount > 50) {
+      return res
+        .status(400)
+        .json({ error: "Invalid amount parameter. Must be between 1 and 50." });
+    }
+
+    let token = await getValidSpotifyToken(userId);
+
+    if (!token) {
+      return res.json({ item: null, connected: false });
+    }
+
+    let response = await fetch(
+      `https://api.spotify.com/v1/me/player/recently-played?limit=$${amount}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (response.status === 401) {
+      token = await getValidSpotifyToken(userId, true);
+
+      if (!token) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Spotify access token expired and could not be refreshed.",
+        });
+      }
+
+      response = await fetch(
+        `https://api.spotify.com/v1/me/player/recently-played?limit=${amount}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+    }
+
+    if (response.status === 204) {
+      return res.json({ item: null, connected: true });
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Error fetching Spotify currently playing:", errorData);
+      if (response.status === 401) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Spotify access token expired or invalid.",
+        });
+      }
+
+      // If forbidden, they likely don't have the user-top-read scope allowed initially
+      if (response.status === 403) {
+        return res.json({
+          items: [],
+          connected: false,
+          cached: false,
+          error: "Insufficient permissions to read top items from Spotify.",
+        });
+      }
+      return res
+        .status(response.status)
+        .json({ error: `Spotify API error: ${response.statusText}` });
+    }
+
+    const data = await response.json();
+    res.json({ items: data.items, connected: true });
   } catch (error) {
     next(error);
   }
