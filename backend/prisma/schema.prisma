@@ -47,6 +47,8 @@ model ConnectedApp {
   connectedAt DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
   userId      String
+
+  @@unique([userId, platform])
 }
 
 model Post {

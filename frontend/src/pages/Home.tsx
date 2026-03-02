@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../utils/api";
 import TopList from "../components/TopList";
+import CurrentTrackCard from "../components/CurrentTrackCard";
 
 const Home = () => {
   const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
@@ -18,15 +19,19 @@ const Home = () => {
   } | null>(null);
   const [loadingCurrentlyPlaying, setLoadingCurrentlyPlaying] = useState(true);
 
-  const [recentlyPlayed, setRecentlyPlayed] = useState<
-    { name: string; image: string }[]
-  >([]);
+  const [recentlyPlayed, setRecentlyPlayed] = useState<{
+    name: string;
+    image: string;
+    artist: string;
+  } | null>(null);
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchTopArtists = async () => {
       try {
         const response = await api.get("/auth/spotify/top/artists");
+        if (!isMounted) return;
 
         const formattedArtists = response.data.items.map((artist: any) => ({
           name: artist.name,
@@ -39,22 +44,27 @@ const Home = () => {
       } catch (error) {
         console.error("Error fetching top artists:", error);
       } finally {
-        setLoadingArtists(false);
+        if (isMounted) setLoadingArtists(false);
       }
     };
 
     fetchTopArtists();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchTopTracks = async () => {
       try {
         const response = await api.get("/auth/spotify/top/tracks");
+        if (!isMounted) return;
 
         const formattedTracks = response.data.items.map((track: any) => ({
           name: track.name,
           image:
-            track.album.images?.length > 0
+            track.album?.images?.length > 0
               ? track.album.images[0].url
               : "https://placehold.co/300x300",
         }));
@@ -62,137 +72,150 @@ const Home = () => {
       } catch (error) {
         console.error("Error fetching top tracks:", error);
       } finally {
-        setLoadingTracks(false);
+        if (isMounted) setLoadingTracks(false);
       }
     };
 
     fetchTopTracks();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let isMounted = true;
+
     const fetchCurrentlyPlaying = async () => {
       try {
         const response = await api.get("/auth/spotify/currently-playing");
+        if (!isMounted) return;
 
-        const formattedCurrentlyPlaying = {
-          progress_ms: response.data.progress_ms,
-          is_playing: response.data.is_playing,
-          name: response.data.item?.name ?? null,
-          image:
-            response.data.item?.album?.images?.[0]?.url ??
-            "https://placehold.co/300x300",
-          artist:
-            response.data.item?.artists
-              ?.map((artist: any) => artist.name)
-              .join(", ") ?? null,
-        };
-
-        setCurrentlyPlaying(formattedCurrentlyPlaying);
+        if (response.status === 204 || !response.data || !response.data.item) {
+          setCurrentlyPlaying(null);
+        } else {
+          const formattedCurrentlyPlaying = {
+            progress_ms: response.data.progress_ms,
+            is_playing: response.data.is_playing,
+            name: response.data.item?.name ?? null,
+            image:
+              response.data.item?.album?.images?.[0]?.url ??
+              "https://placehold.co/300x300",
+            artist:
+              response.data.item?.artists
+                ?.map((artist: any) => artist.name)
+                .join(", ") ?? null,
+          };
+          setCurrentlyPlaying(formattedCurrentlyPlaying);
+        }
       } catch (error) {
         console.error("Error fetching currently playing:", error);
       } finally {
-        setLoadingCurrentlyPlaying(false);
+        if (isMounted) {
+          setLoadingCurrentlyPlaying(false);
+          // Poll every 15 seconds (server caches for 15s)
+          timeoutId = setTimeout(fetchCurrentlyPlaying, 15000);
+        }
       }
     };
 
     fetchCurrentlyPlaying();
 
-    const intervalId = setInterval(fetchCurrentlyPlaying, 5000);
-
-    return () => clearInterval(intervalId);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let isMounted = true;
+
     const fetchRecentlyPlayed = async () => {
       try {
         const response = await api.get("/auth/spotify/recently-played/1");
+        if (!isMounted) return;
 
-        const formattedRecentlyPlayed = {
-          name: response.data.items[0].track.name,
-          image:
-            response.data.items[0].track.album.images?.[0]?.url ??
-            "https://placehold.co/300x300",
-        };
-        setRecentlyPlayed(formattedRecentlyPlayed);
+        if (response.data?.items?.length > 0) {
+          const track = response.data.items[0].track;
+          setRecentlyPlayed({
+            name: track.name,
+            image:
+              track.album?.images?.[0]?.url ?? "https://placehold.co/300x300",
+            artist:
+              track.artists?.map((artist: any) => artist.name).join(", ") ??
+              null,
+          });
+        }
       } catch (error) {
-        console.error("Error recently played tracks:", error);
+        console.error("Error fetching recently played tracks:", error);
       } finally {
-        setLoadingRecentlyPlayed(false);
+        if (isMounted) {
+          setLoadingRecentlyPlayed(false);
+          // Only keep polling when nothing is currently playing (every 30s)
+          if (!currentlyPlaying?.name) {
+            timeoutId = setTimeout(fetchRecentlyPlayed, 30000);
+          }
+        }
       }
     };
 
+    // Fetch immediately on mount, or when currentlyPlaying changes to null
     fetchRecentlyPlayed();
 
-    if (!currentlyPlaying || !currentlyPlaying.name) {
-      const intervalId = setInterval(fetchRecentlyPlayed, 5000);
-      return () => clearInterval(intervalId);
-    }
-  }, []);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, [currentlyPlaying?.name]);
 
   return (
     <div className="flex flex-col gap-20 mb-30">
       <div className="flex flex-col items-center justify-center w-full">
-        <h1 className="text-4xl font-bold mb-20">Welcome to Beatwave</h1>
-        <div className="bg-card w-2/6 rounded-lg p-5">
+        <h1 className="text-4xl font-bold mb-20 text-center">
+          Welcome to Beatwave
+        </h1>
+        <div className="bg-card w-11/12 md:w-2/6 rounded-lg p-5">
           {loadingCurrentlyPlaying ? (
-            <p className="text-gray-400">
+            <p className="text-gray-400 text-center">
               Loading your currently playing track...
             </p>
-          ) : !currentlyPlaying || !currentlyPlaying.name ? (
-            <div className="flex items-center justify-center h-35 text-xl">
-              Here is your last played music
-              {loadingRecentlyPlayed ? (<p></p>) :(<p></p>)}
+          ) : !currentlyPlaying?.name ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[140px] gap-4">
+              <span className="text-xl text-center">
+                Here is your last played music
+              </span>
+              {loadingRecentlyPlayed || !recentlyPlayed ? (
+                <p className="text-gray-400">
+                  Loading your last played track...
+                </p>
+              ) : (
+                <CurrentTrackCard
+                  name={recentlyPlayed.name}
+                  image={recentlyPlayed.image}
+                  artist={recentlyPlayed.artist}
+                  text="The Last Played Music"
+                />
+              )}
             </div>
           ) : (
             <div>
-              {currentlyPlaying.is_playing ? (
-                <div className="flex items-center gap-4 h-35">
-                  <img
-                    src={currentlyPlaying.image}
-                    alt={currentlyPlaying.name}
-                    className="w-32 h-32 rounded"
-                  />
-                  <div className="flex flex-col justify-center items-center w-full ml-4">
-                    <div className="mb-4 text-center">
-                      <p className="text-2xl font-semibold">
-                        {currentlyPlaying.name}
-                      </p>
-                      <p className="text-lg font-light italic h-12 overflow-y-auto no-scrollbar">
-                        {currentlyPlaying.artist}
-                      </p>
-                    </div>
-                    <p className="text-xl text-gray-400">
-                      The Music is playing
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-row items-center h-35">
-                  <img
-                    src={currentlyPlaying.image}
-                    alt={currentlyPlaying.name}
-                    className="w-32 h-32 rounded"
-                  />
-                  <div className="flex flex-col justify-center items-center w-full ml-4">
-                    <div className="mb-4 text-center">
-                      <p className="text-2xl font-semibold">
-                        {currentlyPlaying.name}
-                      </p>
-                      <p className="text-lg font-light italic h-12 overflow-y-scroll no-scrollbar">
-                        {currentlyPlaying.artist}
-                      </p>
-                    </div>
-                    <p className="text-xl text-gray-400">The Music is Paused</p>
-                  </div>
-                </div>
-              )}
+              <CurrentTrackCard
+                name={currentlyPlaying.name || ""}
+                image={currentlyPlaying.image || ""}
+                artist={currentlyPlaying.artist || ""}
+                text={
+                  currentlyPlaying.is_playing
+                    ? "The Music is Currently Playing"
+                    : "The Music is Currently Paused"
+                }
+              />
             </div>
           )}
         </div>
       </div>
 
-      {/* The Top list starts here*/}
-      <div className="pl-20 flex flex-col">
+      <div className="pl-4 md:pl-20 flex flex-col">
         {loadingArtists ? (
           <p className="text-gray-400">Loading your top artists...</p>
         ) : artists.length > 0 ? (
@@ -203,7 +226,7 @@ const Home = () => {
           </p>
         )}
       </div>
-      <div className="pl-20 flex flex-col">
+      <div className="pl-4 md:pl-20 flex flex-col">
         {loadingTracks ? (
           <p className="text-gray-400">Loading your top tracks...</p>
         ) : tracks.length > 0 ? (

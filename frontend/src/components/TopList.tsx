@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import Card from "./Card";
+import Card from "./TopCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 type TopListProps = { list: { name: string; image: string }[]; title: string };
