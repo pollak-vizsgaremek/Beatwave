@@ -4,12 +4,13 @@ interface InputProps {
   labelTitle?: string;
   inputType: string;
   inputName: string;
-  inputPlaceHolder: string;
+  inputPlaceHolder?: string;
   wrapperClassName?: string;
   labelClassName?: string;
   inputClassName?: string;
   forgotPwd?: boolean;
-  icon?: ReactNode;
+  iconLeft?: ReactNode;
+  iconRight?: ReactNode;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }

@@ -11,7 +11,8 @@ const Input = ({
   inputPlaceHolder,
   inputClassName,
   forgotPwd,
-  icon,
+  iconLeft,
+  iconRight,
   value,
   onChange,
 }: InputProps) => {
@@ -31,10 +32,10 @@ const Input = ({
           {labelTitle}
         </label>
       )}
-      <div className="relative w-full">
-        {icon && (
+      <div className="relative">
+        {iconLeft && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-border">
-            {icon}
+            {iconLeft}
           </div>
         )}
         <input
@@ -44,7 +45,7 @@ const Input = ({
           value={value}
           onChange={onChange}
           className={`bg-input-bg hover:bg-input-hover placeholder:text-black/70 text-black p-2 rounded-3xl border border-border hover:outline-1 focus:outline-2 w-full ${
-            icon ? "pl-10" : "pl-3"
+            iconLeft ? "pl-10" : "pl-3"
           } ${inputType === "password" ? "pr-10" : ""} ${inputClassName}`}
         />
         {inputType === "password" && (
@@ -55,6 +56,11 @@ const Input = ({
           >
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
+        )}
+        {iconRight && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-border">
+            {iconRight}
+          </div>
         )}
       </div>
       {forgotPwd && (

@@ -1,4 +1,11 @@
-import { Bell, UserRound, Search, Settings, LogOut } from "lucide-react";
+import {
+  Bell,
+  UserRound,
+  Search,
+  Settings,
+  LogOut,
+  SlidersHorizontal,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { useState } from "react";
 
@@ -6,6 +13,9 @@ import Input from "./Input";
 
 const Navigation = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isActiveSpotify, setIsActiveSpotify] = useState(true);
+  const [isActiveSoundCloud, setIsActiveSoundCloud] = useState(false);
+
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -32,10 +42,71 @@ const Navigation = () => {
         inputType="text"
         inputName="search"
         inputPlaceHolder="Keresés..."
-        icon={<Search strokeWidth={3} size={30} />}
-        inputClassName="min-w-2/3"
+        iconLeft={<Search strokeWidth={3} size={30} />}
+        iconRight={<SlidersHorizontal strokeWidth={3} size={30} />}
+        inputClassName="min-w-2/3 m"
         wrapperClassName="!-mt-0"
       />
+      <div className="relative top-20 bg-accent p-3 rounded-2xl">
+        <div className="flex flex-row gap-4">
+          <button
+            onClick={() => {
+              setIsActiveSpotify(!isActiveSpotify);
+
+              if (!isActiveSpotify && isActiveSoundCloud === true) {
+                setIsActiveSoundCloud(false);
+              }
+            }}
+            className={`w-32 cursor-pointer bg-spotify-green p-3 rounded-xl text-black outline hover:outline-2 hover:font-medium ${
+              isActiveSpotify ? "outline-2 font-medium" : "!bg-gray-500"
+            }`}
+          >
+            Spotify
+          </button>
+          <button
+            onClick={() => {
+              if (isActiveSpotify && !isActiveSoundCloud == true) {
+                setIsActiveSpotify(false);
+              }
+
+              setIsActiveSoundCloud(!isActiveSoundCloud);
+            }}
+            className={`w-32 cursor-pointer bg-soundcloud-orange p-3 rounded-xl text-white outline-black outline hover:outline-2 hover:font-medium ${
+              isActiveSoundCloud
+                ? "outline-2 font-medium"
+                : "!bg-gray-500 !text-black"
+            }`}
+          >
+            SoundCloud
+          </button>
+        </div>
+        <div className="flex flex-row gap-5">
+          <Input
+            wrapperClassName="flex-row-reverse"
+            inputName="Artists"
+            inputClassName="!w-4"
+            inputType="checkbox"
+            labelTitle="Artists"
+            labelClassName="text-sm"
+          />
+          <Input
+            wrapperClassName="flex-row-reverse w-2"
+            inputName="Artists"
+            inputClassName="!w-4"
+            inputType="checkbox"
+            labelTitle="Artists"
+            labelClassName="text-sm"
+          />
+          <Input
+            wrapperClassName="flex-row-reverse w-2"
+            inputName="Artists"
+            inputClassName="!w-4"
+            inputType="checkbox"
+            labelTitle="Artists"
+            labelClassName="text-sm"
+          />
+        </div>
+      </div>
 
       <div className="flex gap-5 mr-10 items-center">
         <div className="relative">
