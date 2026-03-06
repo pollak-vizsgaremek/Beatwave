@@ -12,6 +12,7 @@ interface User {
 }
 
 const UserProfile = () => {
+  const [isOnProfile, setIsOnProfile] = useState(true);
   const [spotiHover, setSpotiHover] = useState(false);
   const [soundHover, setSoundHover] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -46,14 +47,14 @@ const UserProfile = () => {
         password: password,
       });
       setUser((prev) =>
-        prev ? { ...prev, username: response.data.username } : null,
+        prev ? { ...prev, username: response.data.username } : null
       );
       setIsModalOpen(false);
       resetModal();
     } catch (error: any) {
       console.error("Update error:", error);
       setModalError(
-        error.response?.data?.error || "Hiba történt a frissítés során",
+        error.response?.data?.error || "Hiba történt a frissítés során"
       );
     } finally {
       setIsUpdating(false);
@@ -112,147 +113,168 @@ const UserProfile = () => {
   }
 
   return (
-    <div className="flex justify-center mt-20">
-      <div className="bg-card w-4/7 h-auto p-3 flex flex-row rounded-3xl">
-        <div className="w-2/5 p-2 h-full flex flex-col justify-center ">
-          <div className="flex justify-center items-center flex-col">
-            <div className="bg-accent mt-2 p-2 w-32 h-32 rounded-full flex justify-center items-center">
-              pfp-pic
-            </div>
-            <div
-              className="flex justify-center items-center mt-2 text-lg text-amber-600 cursor-pointer hover:text-amber-500"
-              onClick={() => setIsModalOpen(true)}
-            >
-              {user?.username || "Felhasználó"}{" "}
-              <PencilLine size={14} className="ml-1" />
-            </div>
-          </div>
-          <div className="flex justify-center items-center flex-col mt-2">
-            {connectedToSpotify ? (
-              <div
-                onPointerEnter={() => setSpotiHover(true)}
-                onPointerLeave={() => setSpotiHover(false)}
-                onClick={handleDisconnectSpotify}
-                className={`flex justify-center bg-spotify-green mt-2 p-3 rounded-2xl text-black font-semibold text-lg w-3/4 hover:bg-spotify-green/85 outline-1 hover:outline-2 cursor-pointer transition-colors ${
-                  spotiHover ? "!bg-red-700 text-white outline-black" : ""
-                }`}
-              >
-                {spotiHover ? (
-                  <p className="flex flex-row items-center">
-                    Leválasztás <X />
-                  </p>
-                ) : (
-                  <p>Spotify</p>
-                )}
-              </div>
-            ) : (
-              <div
-                onClick={handleConnectSpotify}
-                className="flex justify-center bg-gray-400 border-spotify-green border-2 mt-2 p-3 rounded-2xl text-black w-3/4 text-center cursor-pointer hover:bg-gray-500 transition-colors"
-                title="Kattints a Spotify összekapcsolásához"
-              >
-                Csatlakozás a Spotify-hoz
-              </div>
-            )}
-
-            {connectedToSoundCloud ? (
-              <div
-                onPointerEnter={() => setSoundHover(true)}
-                onPointerLeave={() => setSoundHover(false)}
-                className={`flex justify-center bg-soundcloud-orange mt-4 p-3 rounded-2xl text-white font-semibold text-lg w-3/4 hover:bg-soundcloud-orange/85 outline-white outline-1 hover:outline-2 ${
-                  soundHover ? "!bg-red-700 text-white !outline-black" : ""
-                }`}
-              >
-                {soundHover ? (
-                  <p className="flex flex-row items-center">
-                    Leválasztás <X />
-                  </p>
-                ) : (
-                  <p>SoundCloud</p>
-                )}
-              </div>
-            ) : (
-              <div className="flex justify-center bg-gray-400 border-soundcloud-orange border-2 mt-4 p-3 rounded-2xl text-black w-3/4 text-center">
-                {soundHover && connectedToSoundCloud ? (
-                  <p className="flex flex-row items-center">Összkapcsolás</p>
-                ) : (
-                  <p>SoundCloud fiókod nincs hozzá kapcsolva</p>
-                )}
-              </div>
-            )}
-          </div>
+    <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center justify-center mt-20 w-4/7">
+        <div className="flex gap-4 self-start ml-10 mb-2 text-2xl">
+          <button
+            className={`pointer hover:font-medium hover:underline underline-offset-2 ${
+              isOnProfile ? "font-medium underline" : ""
+            }`}
+            onClick={() => setIsOnProfile(true)}
+          >
+            Profile
+          </button>
+          <button
+            className={`pointer hover:font-medium hover:underline underline-offset-2${
+              isOnProfile ? "" : "font-medium underline"
+            }`}
+            onClick={() => setIsOnProfile(false)}
+          >
+            Settings
+          </button>
         </div>
-        <div className="w-3/4 p-2 h-full "></div>
-      </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-card w-[600px] p-4 rounded-3xl relative border border-border flex flex-col items-center">
-            <button
-              onClick={() => {
-                setIsModalOpen(false);
-                resetModal();
-              }}
-              className="absolute top-4 right-4 text-white hover:text-red-500 cursor-pointer"
-            >
-              <X size={40} />
-            </button>
-
-            <h2 className="text-3xl font-semibold text-white mb-6 mt-8">
-              Felhasználónév módosítása
-            </h2>
-
-            <form
-              onSubmit={handleUpdateUsername}
-              className="w-full flex flex-col items-center"
-            >
-              <Input
-                labelTitle="Új felhasználónév"
-                inputName="newUsername"
-                inputType="text"
-                inputPlaceHolder="Új név"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                wrapperClassName="!mt-2"
-                labelClassName="!font-normal"
-              />
-
-              <Input
-                labelTitle="Felhasználónév megerősítése"
-                inputName="confirmUsername"
-                inputType="text"
-                inputPlaceHolder="Új név újra"
-                value={confirmUsername}
-                onChange={(e) => setConfirmUsername(e.target.value)}
-                wrapperClassName="!mt-5"
-                labelClassName="!font-normal"
-              />
-
-              <Input
-                labelTitle="Jelenlegi jelszó"
-                inputName="password"
-                inputType="password"
-                inputPlaceHolder="Jelszó"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                wrapperClassName="!mt-5"
-                labelClassName="!font-normal"
-              />
-
-              {modalError && (
-                <p className="text-red-400 text-sm mt-4">{modalError}</p>
+        
+        <div className="bg-card w-full h-auto p-3 flex flex-row rounded-3xl">
+          <div className="w-2/5 p-2 h-full flex flex-col justify-center ">
+            <div className="flex justify-center items-center flex-col">
+              <div className="bg-accent mt-2 p-2 w-32 h-32 rounded-full flex justify-center items-center">
+                pfp-pic
+              </div>
+              <div
+                className="flex justify-center items-center mt-2 text-lg text-amber-600 cursor-pointer hover:text-amber-500"
+                onClick={() => setIsModalOpen(true)}
+              >
+                {user?.username || "Felhasználó"}{" "}
+                <PencilLine size={14} className="ml-1" />
+              </div>
+            </div>
+            <div className="flex justify-center items-center flex-col mt-2">
+              {connectedToSpotify ? (
+                <div
+                  onPointerEnter={() => setSpotiHover(true)}
+                  onPointerLeave={() => setSpotiHover(false)}
+                  onClick={handleDisconnectSpotify}
+                  className={`flex justify-center bg-spotify-green mt-2 p-3 rounded-2xl text-black font-semibold text-lg w-3/4 hover:bg-spotify-green/85 outline-1 hover:outline-2 cursor-pointer transition-colors ${
+                    spotiHover ? "!bg-red-700 text-white outline-black" : ""
+                  }`}
+                >
+                  {spotiHover ? (
+                    <p className="flex flex-row items-center">
+                      Leválasztás <X />
+                    </p>
+                  ) : (
+                    <p>Spotify</p>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onClick={handleConnectSpotify}
+                  className="flex justify-center bg-gray-400 border-spotify-green border-2 mt-2 p-3 rounded-2xl text-black w-3/4 text-center cursor-pointer hover:bg-gray-500 transition-colors"
+                  title="Kattints a Spotify összekapcsolásához"
+                >
+                  Csatlakozás a Spotify-hoz
+                </div>
               )}
 
-              <Button
-                labelTitle={isUpdating ? "Mentés..." : "Mentés"}
-                type="submit"
-                disabled={isUpdating}
-                className="mt-6 mb-4"
-              />
-            </form>
+              {connectedToSoundCloud ? (
+                <div
+                  onPointerEnter={() => setSoundHover(true)}
+                  onPointerLeave={() => setSoundHover(false)}
+                  className={`flex justify-center bg-soundcloud-orange mt-4 p-3 rounded-2xl text-white font-semibold text-lg w-3/4 hover:bg-soundcloud-orange/85 outline-white outline-1 hover:outline-2 ${
+                    soundHover ? "!bg-red-700 text-white !outline-black" : ""
+                  }`}
+                >
+                  {soundHover ? (
+                    <p className="flex flex-row items-center">
+                      Leválasztás <X />
+                    </p>
+                  ) : (
+                    <p>SoundCloud</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex justify-center bg-gray-400 border-soundcloud-orange border-2 mt-4 p-3 rounded-2xl text-black w-3/4 text-center">
+                  {soundHover && connectedToSoundCloud ? (
+                    <p className="flex flex-row items-center">Összkapcsolás</p>
+                  ) : (
+                    <p>SoundCloud fiókod nincs hozzá kapcsolva</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+          <div className="w-3/4 p-2 h-full "></div>
         </div>
-      )}
+
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-card w-[600px] p-4 rounded-3xl relative border border-border flex flex-col items-center">
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  resetModal();
+                }}
+                className="absolute top-4 right-4 text-white hover:text-red-500 cursor-pointer"
+              >
+                <X size={40} />
+              </button>
+
+              <h2 className="text-3xl font-semibold text-white mb-6 mt-8">
+                Felhasználónév módosítása
+              </h2>
+
+              <form
+                onSubmit={handleUpdateUsername}
+                className="w-full flex flex-col items-center"
+              >
+                <Input
+                  labelTitle="Új felhasználónév"
+                  inputName="newUsername"
+                  inputType="text"
+                  inputPlaceHolder="Új név"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  wrapperClassName="!mt-2"
+                  labelClassName="!font-normal"
+                />
+
+                <Input
+                  labelTitle="Felhasználónév megerősítése"
+                  inputName="confirmUsername"
+                  inputType="text"
+                  inputPlaceHolder="Új név újra"
+                  value={confirmUsername}
+                  onChange={(e) => setConfirmUsername(e.target.value)}
+                  wrapperClassName="!mt-5"
+                  labelClassName="!font-normal"
+                />
+
+                <Input
+                  labelTitle="Jelenlegi jelszó"
+                  inputName="password"
+                  inputType="password"
+                  inputPlaceHolder="Jelszó"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  wrapperClassName="!mt-5"
+                  labelClassName="!font-normal"
+                />
+
+                {modalError && (
+                  <p className="text-red-400 text-sm mt-4">{modalError}</p>
+                )}
+
+                <Button
+                  labelTitle={isUpdating ? "Mentés..." : "Mentés"}
+                  type="submit"
+                  disabled={isUpdating}
+                  className="mt-6 mb-4"
+                />
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

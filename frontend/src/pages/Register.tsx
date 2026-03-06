@@ -101,7 +101,7 @@ const Register = () => {
               inputType="email"
               inputName="email"
               inputPlaceHolder="kisferenc3532@gmail.com"
-              icon={<Mail size={20} />}
+              iconLeft={<Mail size={20} />}
               wrapperClassName="mt-0"
               value={formData.email}
               onChange={handleChange}
@@ -111,7 +111,7 @@ const Register = () => {
               inputType="text"
               inputName="username"
               inputPlaceHolder="kisferenc3532"
-              icon={<User size={20} />}
+              iconLeft={<User size={20} />}
               value={formData.username}
               onChange={handleChange}
             />
@@ -120,7 +120,7 @@ const Register = () => {
               inputType="password"
               inputName="password"
               inputPlaceHolder="•••••••"
-              icon={<Lock size={20} />}
+              iconLeft={<Lock size={20} />}
               value={formData.password}
               onChange={handleChange}
             />
@@ -129,7 +129,7 @@ const Register = () => {
               inputType="password"
               inputName="confirmPassword"
               inputPlaceHolder="•••••••"
-              icon={<Lock size={20} />}
+              iconLeft={<Lock size={20} />}
               value={formData.confirmPassword}
               onChange={handleChange}
             />
@@ -143,15 +143,15 @@ const Register = () => {
                       strengthScore <= 1
                         ? "text-red-400"
                         : strengthScore <= 3
-                          ? "text-yellow-400"
-                          : "text-green-400"
+                        ? "text-yellow-400"
+                        : "text-green-400"
                     }`}
                   >
                     {strengthScore <= 1
                       ? "Gyenge"
                       : strengthScore <= 3
-                        ? "Közepes"
-                        : "Erős"}
+                      ? "Közepes"
+                      : "Erős"}
                   </span>
                 </div>
                 <div className="h-2 w-full bg-gray-600 rounded-full overflow-hidden">
@@ -160,8 +160,8 @@ const Register = () => {
                       strengthScore <= 1
                         ? "bg-red-500"
                         : strengthScore <= 3
-                          ? "bg-yellow-500"
-                          : "bg-green-500"
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
                     }`}
                     style={{ width: `${(strengthScore / 4) * 100}%` }}
                   ></div>

@@ -74,7 +74,7 @@ const Login = () => {
               inputType="email"
               inputName="email"
               inputPlaceHolder="kisferenc3532@gmail.com"
-              icon={<Mail size={20} />}
+              iconLeft={<Mail size={20} />}
               value={formData.email}
               onChange={handleChange}
             />
@@ -84,7 +84,7 @@ const Login = () => {
               inputName="password"
               inputPlaceHolder="•••••••"
               forgotPwd={true}
-              icon={<Lock size={20} />}
+              iconLeft={<Lock size={20} />}
               value={formData.password}
               onChange={handleChange}
             />
@@ -105,7 +105,7 @@ const Login = () => {
                   localStorage.setItem("token", "DEV_TOKEN");
                   localStorage.setItem(
                     "user",
-                    JSON.stringify({ username: "Developer", role: "ADMIN" }),
+                    JSON.stringify({ username: "Developer", role: "ADMIN" })
                   );
                   navigate("/home");
                 }}
