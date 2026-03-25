@@ -171,22 +171,22 @@ const Home = () => {
 
   return (
     <div className="flex flex-col gap-20 mb-30">
-      <div className="flex flex-col items-center justify-center w-full">
-        <h1 className="text-4xl font-bold mb-20 text-center">
+      <div className="flex flex-col items-center justify-center w-full px-4 sm:px-0">
+        <h1 className="text-4xl sm:text-4xl md:text-5xl font-bold mt-10 mb-10 md:mb-20 text-center">
           Welcome to Beatwave
         </h1>
-        <div className="bg-card w-11/12 md:w-2/6 rounded-lg p-5">
+        <div className="bg-card w-full sm:w-[80%] md:w-[60%] lg:w-[50%] xl:w-1/2 max-w-[500px] rounded-2xl p-8 shadow-xl whitespace-nowrap">
           {loadingCurrentlyPlaying ? (
-            <p className="text-gray-400 text-center">
+            <p className="text-gray-400 text-center text-sm sm:text-base">
               Loading your currently playing track...
             </p>
           ) : !currentlyPlaying?.name ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[140px] gap-4">
-              <span className="text-xl text-center">
+              <span className="text-lg sm:text-xl text-center font-medium">
                 Here is your last played music
               </span>
               {loadingRecentlyPlayed || !recentlyPlayed ? (
-                <p className="text-gray-400">
+                <p className="text-gray-400 text-sm sm:text-base text-center">
                   Loading your last played track...
                 </p>
               ) : (

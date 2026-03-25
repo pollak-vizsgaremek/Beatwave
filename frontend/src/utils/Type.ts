@@ -12,7 +12,10 @@ interface InputProps {
   iconLeft?: ReactNode;
   iconRight?: ReactNode;
   value?: string;
+  checked?: boolean;
+  disabled?: boolean;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 interface ButtonProps {
