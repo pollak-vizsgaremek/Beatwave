@@ -1,6 +1,7 @@
-import { Mail, Lock, User } from "lucide-react";
+import { Mail, Lock, User, CheckCircle2, Circle } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 import Input from "../components/Input";
 import MusicWave from "../components/MusicWave";
@@ -11,6 +12,13 @@ const Register = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showError = (msg: string) => {
+    setError(msg);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    errorTimeoutRef.current = setTimeout(() => setError(null), 5000);
+  };
 
   const [formData, setFormData] = useState({
     email: "",
@@ -20,7 +28,6 @@ const Register = () => {
   });
 
   const [strengthScore, setStrengthScore] = useState(0);
-  const [missingReqs, setMissingReqs] = useState<string[]>([]);
 
   const [canRegister, setCanRegister] = useState(false);
 
@@ -36,13 +43,6 @@ const Register = () => {
 
     const score = Object.values(reqs).filter(Boolean).length;
     setStrengthScore(score);
-
-    const missing = [];
-    if (!reqs.length) missing.push("8+ karakter");
-    if (!reqs.number) missing.push("szám");
-    if (!reqs.special) missing.push("szimbólum");
-    if (!reqs.uppercase) missing.push("nagybetű");
-    setMissingReqs(missing);
 
     const allMet = Object.values(reqs).every(Boolean);
     const match = password === confirmPassword && password !== "";
@@ -70,7 +70,7 @@ const Register = () => {
 
       navigate("/login");
     } catch (err: any) {
-      setError(
+      showError(
         err.response?.data?.error || err.message || "Registration failed",
       );
     } finally {
@@ -94,7 +94,7 @@ const Register = () => {
           </h1>
           <form
             onSubmit={handleSubmit}
-            className="mt-10 w-full flex flex-col items-center"
+            className="mt-5 w-full flex flex-col items-center"
           >
             <Input
               labelTitle="Email"
@@ -134,56 +134,96 @@ const Register = () => {
               onChange={handleChange}
             />
 
-            {formData.password.length > 0 && (
-              <div className="w-2/3 mt-4 px-4">
-                <div className="flex justify-between text-xs text-white/80 mb-1">
-                  <span>Erősségi</span>
-                  <span
-                    className={`font-bold ${
-                      strengthScore <= 1
-                        ? "text-red-400"
-                        : strengthScore <= 3
-                        ? "text-yellow-400"
-                        : "text-green-400"
-                    }`}
-                  >
-                    {strengthScore <= 1
-                      ? "Gyenge"
-                      : strengthScore <= 3
-                      ? "Közepes"
-                      : "Erős"}
-                  </span>
-                </div>
-                <div className="h-2 w-full bg-gray-600 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-300 ${
-                      strengthScore <= 1
-                        ? "bg-red-500"
-                        : strengthScore <= 3
-                        ? "bg-yellow-500"
-                        : "bg-green-500"
-                    }`}
-                    style={{ width: `${(strengthScore / 4) * 100}%` }}
-                  ></div>
-                </div>
-                {missingReqs.length > 0 && (
-                  <p className="text-xs text-white/50 mt-2">
-                    Szükséges még: {missingReqs.join(", ")}
-                  </p>
-                )}
-              </div>
-            )}
+            {formData.password.length > 0 &&
+              (() => {
+                const reqs = {
+                  "8+ karakter": formData.password.length >= 8,
+                  "Tartalmaz or számot": /\d/.test(formData.password),
+                  "Tartalmaz szimbólumot": /[!@#$%^&*(),.?":{}|<>+-]/.test(
+                    formData.password,
+                  ),
+                  Nagybetű: /[A-Z]/.test(formData.password),
+                };
 
-            {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
+                return (
+                  <div className="mt-3 px-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex justify-between items-center text-sm mb-2">
+                      <span className="text-white/80 font-medium">
+                        Jelszó erőssége
+                      </span>
+                      <span
+                        className={`font-bold transition-colors ${
+                          strengthScore <= 1
+                            ? "text-red-400"
+                            : strengthScore <= 3
+                              ? "text-yellow-400"
+                              : "text-spotify-green"
+                        }`}
+                      >
+                        {strengthScore <= 1
+                          ? "Gyenge"
+                          : strengthScore <= 3
+                            ? "Közepes"
+                            : "Erős"}
+                      </span>
+                    </div>
+
+                    {/* Segmented Progress Bar */}
+                    <div className="flex gap-1.5 h-1.5 w-full mb-4">
+                      {[1, 2, 3, 4].map((segment) => {
+                        let bgColor = "bg-white/10"; // default empty
+                        if (segment <= strengthScore) {
+                          if (strengthScore <= 1)
+                            bgColor =
+                              "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]";
+                          else if (strengthScore <= 3)
+                            bgColor =
+                              "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]";
+                          else
+                            bgColor =
+                              "bg-spotify-green shadow-[0_0_8px_rgba(30,215,96,0.5)]";
+                        }
+                        return (
+                          <div
+                            key={segment}
+                            className={`flex-1 rounded-full transition-all duration-300 ${bgColor}`}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* Visual Checklist */}
+                    <div className="grid grid-cols-2 gap-y-2 gap-x-4 mt-2">
+                      {Object.entries(reqs).map(([label, isMet]) => (
+                        <div key={label} className="flex items-center gap-2">
+                          {isMet ? (
+                            <CheckCircle2
+                              size={16}
+                              className="text-spotify-green"
+                            />
+                          ) : (
+                            <Circle size={16} className="text-white/30" />
+                          )}
+                          <span
+                            className={`text-xs transition-colors duration-300 ${isMet ? "text-white" : "text-white/50"}`}
+                          >
+                            {label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
             <Button
               labelTitle={isLoading ? "Loading..." : "Regisztrálás"}
               type="submit"
               disabled={!canRegister || isLoading}
-              className="mt-6"
+              className="mt-6 absolute bottom-15"
             />
           </form>
-          <p className="mt-6 text-white/80">
+          <p className="mt-6  absolute bottom-5 text-white/80">
             Van már fiókod?{" "}
             <Link
               to="/login"
@@ -197,6 +237,19 @@ const Register = () => {
       <div className="w-1/2 relative">
         <MusicWave />
       </div>
+
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -10,6 +10,7 @@ import {
   getSpotifyTopItems,
   getSpotifyCurrentlyPlaying,
   getSpotifyRecentlyPlayed,
+  searchSpotify,
 } from "../controllers/spotifyController";
 
 import { verifyToken } from "../middlewares/authMiddleware";
@@ -28,5 +29,6 @@ router.delete("/auth/spotify", verifyToken, disconnectSpotify);
 router.get("/auth/spotify/top/:type", verifyToken, getSpotifyTopItems);
 router.get("/auth/spotify/currently-playing", verifyToken, getSpotifyCurrentlyPlaying);
 router.get("/auth/spotify/recently-played/:amount", verifyToken, getSpotifyRecentlyPlayed);
+router.get("/auth/spotify/search", verifyToken, searchSpotify);
 
 export default router;

@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Discussion from "./pages/Discussion";
 import UserProfile from "./pages/UserProfile";
 import Register from "./pages/Register";
+import SearchResult from "./pages/SearchResult";
 
 function App() {
   const location = useLocation();
@@ -24,6 +25,7 @@ function App() {
             <Route index element={<Home />} path="home" />
             <Route element={<Discussion />} path="discussion" />
             <Route element={<UserProfile />} path="profile" />
+            <Route element={<SearchResult />} path="search" />
           </Route>
         </Routes>
       </AnimatePresence>

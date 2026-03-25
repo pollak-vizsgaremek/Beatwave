@@ -28,13 +28,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       // If server says 401 Unauthorized, log out the user
-      // BUT ignore if using Dev Token
-      console.error(
-        "401 Unauthorized Intercepted from URL:",
-        error.config?.url,
-      );
-      const token = localStorage.getItem("token");
-      if (token !== "DEV_TOKEN") {
+      // BUT ignore if the request itself was the login/register attempt
+      const url = error.config?.url;
+      if (url && !url.includes("/login") && !url.includes("/register")) {
+        console.error("401 Unauthorized Intercepted from URL:", url);
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         window.location.href = "/login";
