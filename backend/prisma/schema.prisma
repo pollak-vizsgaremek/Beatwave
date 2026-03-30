@@ -57,6 +57,8 @@ model Post {
   likeAmount Int      @default(0)
   hashtags   String? // egyszerűsített: tárolható CSV-ként vagy JSON-ként, igény szerint változtatható
   postedAt   DateTime @default(now())
+  title      String
+  topic      String
 
   user   User @relation(fields: [userId], references: [id])
   userId String

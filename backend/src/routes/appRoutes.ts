@@ -14,6 +14,7 @@ import {
 } from "../controllers/spotifyController";
 
 import { verifyToken } from "../middlewares/authMiddleware";
+import { getPosts } from '../controllers/postController';
 
 const router = Router();
 
@@ -30,5 +31,7 @@ router.get("/auth/spotify/top/:type", verifyToken, getSpotifyTopItems);
 router.get("/auth/spotify/currently-playing", verifyToken, getSpotifyCurrentlyPlaying);
 router.get("/auth/spotify/recently-played/:amount", verifyToken, getSpotifyRecentlyPlayed);
 router.get("/auth/spotify/search", verifyToken, searchSpotify);
+
+router.get("/posts", getPosts);
 
 export default router;

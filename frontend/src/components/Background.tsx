@@ -21,7 +21,7 @@ const Background = () => {
           width: "50vw",
           height: "50vw",
           backgroundColor: "#4f46e5",
-          animationDuration: "25s",
+          animationDuration: "10s",
           animationDelay: "0s",
         }}
       ></div>
@@ -35,7 +35,7 @@ const Background = () => {
           width: "40vw",
           height: "40vw",
           backgroundColor: "#3b82f6",
-          animationDuration: "22s",
+          animationDuration: "12s",
           animationDelay: "-5s",
         }}
       ></div>
@@ -49,7 +49,7 @@ const Background = () => {
           width: "35vw",
           height: "35vw",
           backgroundColor: "#a855f7",
-          animationDuration: "28s",
+          animationDuration: "8s",
           animationDelay: "-10s",
         }}
       ></div>
