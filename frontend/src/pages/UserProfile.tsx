@@ -155,7 +155,7 @@ const UserProfile = () => {
                   onPointerLeave={() => setSpotiHover(false)}
                   onClick={handleDisconnectSpotify}
                   className={`flex justify-center bg-spotify-green mt-2 p-3 rounded-2xl text-black font-semibold text-lg w-3/4 hover:bg-spotify-green/85 outline-1 hover:outline-2 cursor-pointer transition-colors ${
-                    spotiHover ? "!bg-red-700 text-white outline-black" : ""
+                    spotiHover ? "bg-red-700! text-white outline-black" : ""
                   }`}
                 >
                   {spotiHover ? (
@@ -181,7 +181,7 @@ const UserProfile = () => {
                   onPointerEnter={() => setSoundHover(true)}
                   onPointerLeave={() => setSoundHover(false)}
                   className={`flex justify-center bg-soundcloud-orange mt-4 p-3 rounded-2xl text-white font-semibold text-lg w-3/4 hover:bg-soundcloud-orange/85 outline-white outline-1 hover:outline-2 ${
-                    soundHover ? "!bg-red-700 text-white !outline-black" : ""
+                    soundHover ? "bg-red-700! text-white outline-black!" : ""
                   }`}
                 >
                   {soundHover ? (
