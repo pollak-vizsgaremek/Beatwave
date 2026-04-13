@@ -25,4 +25,19 @@ interface ButtonProps {
   className?: string;
 }
 
-export type { InputProps, ButtonProps };
+interface DiscussionType {
+  id: string;
+  text: string;
+  likeAmount: number;
+  hashtags: string;
+  postedAt: Date;
+  userId: string;
+  title: string;
+  topic: string;
+  user: {
+    id: string;
+    username: string;
+  };
+};
+
+export type { InputProps, ButtonProps, DiscussionType };

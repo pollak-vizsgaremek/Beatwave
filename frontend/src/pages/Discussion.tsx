@@ -2,18 +2,10 @@ import { Link } from "react-router";
 import Button from "../components/Button";
 import { useEffect, useState } from "react";
 import api from "../utils/api";
+import type { DiscussionType } from "../utils/Type";
 
 const Discussion = () => {
-  const [postsData, setPostsData] = useState({
-    id: String,
-    text: String,
-    likeAmount: Number,
-    hastags: String,
-    postedAt: Date,
-    userId: String,
-    title: String,
-    topic: String,
-  });
+  const [postsData, setPostsData] = useState<DiscussionType[]>([]);
   const [lodingPosts, setLoadingPosts] = useState(true);
 
   useEffect(() => {
@@ -21,14 +13,15 @@ const Discussion = () => {
       try {
         const response = await api.get("/posts");
 
-        setPostsData(response);
+        setPostsData(response.data);
       } catch (error) {
         console.error("Error fetching Posts:", error);
       } finally {
         setLoadingPosts(false);
       }
-    };
-  });
+    };  
+    fetchAllPosts();
+  }, []);
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -42,7 +35,7 @@ const Discussion = () => {
       </div>
 
       <div>
-        <Link to="/create_discussion">
+        <Link to="/discussion/create">
           <Button
             labelTitle="Create a post"
             className="outline-1 outline-black hover:outline-gray-500 mt-8!"
@@ -55,7 +48,20 @@ const Discussion = () => {
           Posts
         </h1>
         <div className="flex flex-col items-center justify-center">
-          <p>No posts yet</p>
+          {lodingPosts ? (
+            <p>Loading posts...</p>
+          ) : postsData.length === 0 ? (
+            <p>No posts yet</p>
+          ) : (
+            postsData.map((post) => (
+              <Link to={`/discussion/view/${post.id}`}>
+                <div key={post.id}>
+                  <h2>{post.title}</h2>
+                  <p>{post.text}</p>
+                </div>
+              </Link>
+            ))
+          )}
         </div>
       </div>
     </div>
