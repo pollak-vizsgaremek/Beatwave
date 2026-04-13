@@ -14,6 +14,10 @@ interface Config {
   databaseUser: string;
   databaseName: string;
   databasePassword: string;
+  spotifyClientId: string;
+  spotifyClientSecret: string;
+  spotifyRedirectUri: string;
+  frontendUrl: string;
 }
 
 const config: Config = {
@@ -28,6 +32,10 @@ const config: Config = {
   databaseUser: process.env.DATABASE_USER || "",
   databaseName: process.env.DATABASE_NAME || "",
   databasePassword: process.env.DATABASE_PASSWORD || "",
+  spotifyClientId: process.env.SPOTIFY_CLIENT_ID || "",
+  spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET || "",
+  spotifyRedirectUri: process.env.SPOTIFY_REDIRECT_URI || "",
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
 };
 
 export default config;
