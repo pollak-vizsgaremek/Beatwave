@@ -1,9 +1,4 @@
 export const isTokenExpired = (token: string): boolean => {
-  // Allow Dev Token in Development
-  if (token === "DEV_TOKEN" && import.meta.env.DEV) {
-    return false;
-  }
-
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");

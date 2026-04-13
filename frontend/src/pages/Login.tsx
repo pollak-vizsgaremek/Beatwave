@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { Mail, Lock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 import Button from "../components/Button";
 import Input from "../components/Input";
@@ -15,6 +16,13 @@ const Login = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showError = (msg: string) => {
+    setError(msg);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    errorTimeoutRef.current = setTimeout(() => setError(null), 5000);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -32,18 +40,17 @@ const Login = () => {
         password: formData.password,
       });
 
-      // Assuming backend returns a token or user object
-      // For now, just navigate to dashboard/home
       console.log("Login success:", response.data);
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        localStorage.setItem("user", JSON.stringify(response.data.user || {}));
+        navigate("/home"); // Navigate to home/dashboard only on success
+      } else {
+        showError("Invalid response from server");
       }
-
-      navigate("/home"); // Navigate to home/dashboard
     } catch (err: any) {
       console.error("Login error:", err);
-      setError(err.response?.data?.error || "Invalid credentials");
+      showError(err.response?.data?.error || "Invalid credentials");
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +82,7 @@ const Login = () => {
               inputType="email"
               inputName="email"
               inputPlaceHolder="kisferenc3532@gmail.com"
-              icon={<Mail size={20} />}
+              iconLeft={<Mail size={20} />}
               value={formData.email}
               onChange={handleChange}
             />
@@ -85,35 +92,19 @@ const Login = () => {
               inputName="password"
               inputPlaceHolder="•••••••"
               forgotPwd={true}
-              icon={<Lock size={20} />}
+              iconLeft={<Lock size={20} />}
               value={formData.password}
               onChange={handleChange}
             />
-
-            {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
 
             <Button
               labelTitle={isLoading ? "Loading..." : "Bejelentkezés"}
               type="submit"
               disabled={isLoading}
+              className="mt-6"
             />
 
-            {import.meta.env.DEV && (
-              <button
-                type="button"
-                className="mt-4 text-xs text-yellow-500 hover:text-yellow-400 underline"
-                onClick={() => {
-                  localStorage.setItem("token", "DEV_TOKEN");
-                  localStorage.setItem(
-                    "user",
-                    JSON.stringify({ username: "Developer", role: "ADMIN" })
-                  );
-                  navigate("/home");
-                }}
-              >
-                [Dev Mode] Login Bypass
-              </button>
-            )}
+
 
             <p className="mt-6 text-white/80">
               Nincs még fiókod?{" "}
@@ -127,6 +118,19 @@ const Login = () => {
           </form>
         </div>
       </div>
+
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
