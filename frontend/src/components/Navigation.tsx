@@ -13,6 +13,8 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import Input from "./Input";
+import api from "../utils/api";
+import type { NotificationType } from "../utils/Type";
 
 const Navigation = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -35,6 +37,12 @@ const Navigation = () => {
   // Warning Popup State
   const [showWarning, setShowWarning] = useState(false);
   const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Notifications
+  const [notifications, setNotifications] = useState<NotificationType[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   // Filter Availability Logic
   const canFilterArtist = searchAlbums || searchArtists || searchTracks;
@@ -82,13 +90,53 @@ const Navigation = () => {
       ) {
         setIsDropdownOpen(false);
       }
+      if (
+        isNotificationsOpen &&
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target as Node)
+      ) {
+        setIsNotificationsOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isFilterOpen, isDropdownOpen]);
+  }, [isFilterOpen, isDropdownOpen, isNotificationsOpen]);
+
+  // Fetch and poll notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await api.get("/notifications");
+        setNotifications(response.data);
+        setUnreadCount(response.data.filter((n: NotificationType) => !n.read).length);
+      } catch (error) {
+        // Ignore API failures quietly for polling
+      }
+    };
+
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 30000); // 30s
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  const handleOpenNotifications = async () => {
+    setIsNotificationsOpen(!isNotificationsOpen);
+    if (!isNotificationsOpen && unreadCount > 0) {
+      try {
+        await api.patch("/notifications/read");
+        setUnreadCount(0);
+        setNotifications(prev => prev.map(n => ({...n, read: true})));
+      } catch (err) {
+        console.error("Failed to mark notifications read:", err);
+      }
+    }
+  };
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -448,11 +496,15 @@ const Navigation = () => {
                             value={yearMin}
                             onChange={(e) =>
                               setYearMin(
-                                Math.min(Number(e.target.value), yearMax),
+                                Math.min(Number(e.target.value), yearMax)
                               )
                             }
                             disabled={!canFilterYear}
-                            className={`w-full accent-spotify-green cursor-pointer ${!canFilterYear ? "opacity-50 cursor-not-allowed" : ""}`}
+                            className={`w-full accent-spotify-green cursor-pointer ${
+                              !canFilterYear
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
                           />
                           <input
                             type="range"
@@ -461,11 +513,15 @@ const Navigation = () => {
                             value={yearMax}
                             onChange={(e) =>
                               setYearMax(
-                                Math.max(Number(e.target.value), yearMin),
+                                Math.max(Number(e.target.value), yearMin)
                               )
                             }
                             disabled={!canFilterYear}
-                            className={`w-full accent-spotify-green cursor-pointer ${!canFilterYear ? "opacity-50 cursor-not-allowed" : ""}`}
+                            className={`w-full accent-spotify-green cursor-pointer ${
+                              !canFilterYear
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                            }`}
                           />
                         </div>
                       </div>
@@ -479,6 +535,56 @@ const Navigation = () => {
       />
 
       <div className="flex gap-2 sm:gap-4 md:gap-5 items-center shrink-0">
+        <div className="relative" ref={notificationsRef}>
+          <button
+            onClick={handleOpenNotifications}
+            className="text-white hover:opacity-80 transition-opacity cursor-pointer relative mt-1 mr-2"
+          >
+            <Bell strokeWidth={2.5} size={28} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-[#1A1E23]"></span>
+            )}
+          </button>
+
+          {isNotificationsOpen && (
+            <div className="absolute right-0 mt-3 w-72 bg-accent rounded-lg shadow-lg shadow-black-100/50 border border-accent-dark max-h-96 overflow-y-auto no-scrollbar z-50">
+              <div className="p-3 border-b border-accent-dark sticky top-0 bg-accent z-10 flex justify-between items-center">
+                <h3 className="text-white font-bold text-sm">Notifications</h3>
+              </div>
+              <div className="flex flex-col">
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-center text-gray-400 text-sm">
+                    No new notifications
+                  </div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      onClick={() => {
+                        if (notif.link) {
+                          handleNavigate(notif.link);
+                          setIsNotificationsOpen(false);
+                        }
+                      }}
+                      className={`p-3 border-b border-accent-dark/50 last:border-0 hover:bg-accent-dark/30 transition-colors cursor-pointer ${
+                        !notif.read ? "bg-accent-dark/60" : "opacity-60"
+                      }`}
+                    >
+                      <p
+                        className={`text-[13px] leading-snug ${
+                          !notif.read ? "text-white" : "text-gray-400"
+                        }`}
+                      >
+                        {notif.message}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="relative" ref={profileRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -495,13 +601,6 @@ const Navigation = () => {
               >
                 <Settings size={18} />
                 <span>Profile</span>
-              </button>
-              <button
-                onClick={() => setIsDropdownOpen(false)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-accent-dark transition-colors border-b border-accent-dark cursor-pointer"
-              >
-                <Bell size={18} />
-                <span>Notifications</span>
               </button>
               <button
                 onClick={handleLogout}

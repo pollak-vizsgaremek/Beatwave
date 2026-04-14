@@ -33,6 +33,7 @@ model User {
   connectedApps          ConnectedApp[]
   posts                  Post[]
   comments               Comment[]
+  commentLikes           CommentLike[]
   notifications          Notification[] @relation("UserNotifications")
   triggeredNotifications Notification[] @relation("TriggeredNotifications")
   moderationLogs         ModerationLog[]
@@ -53,12 +54,12 @@ model ConnectedApp {
 
 model Post {
   id         String   @id @default(uuid()) // post_id
-  text       String
+  text       String   @db.LongText
   likeAmount Int      @default(0)
   hashtags   String? // egyszerűsített: tárolható CSV-ként vagy JSON-ként, igény szerint változtatható
   postedAt   DateTime @default(now())
-  title      String
-  topic      String
+  title      String   
+  topic      String   
 
   user   User @relation(fields: [userId], references: [id])
   userId String
@@ -69,7 +70,7 @@ model Post {
 
 model Comment {
   id          String   @id @default(uuid()) // comment_id
-  text        String
+  text        String   @db.Text
   likeAmount  Int      @default(0)
   commentedAt DateTime @default(now())
 
@@ -78,6 +79,9 @@ model Comment {
 
   post   Post @relation(fields: [postId], references: [id])
   postId String
+
+  // Likes tracking
+  likes   CommentLike[]
 
   // önreferenciális kapcsolat (reply / previous comment)
   previousComment   Comment?  @relation("PreviousComment", fields: [previousCommentId], references: [id])
@@ -89,6 +93,8 @@ model Comment {
 model Notification {
   id        String   @id @default(uuid()) // notification_id
   type      String
+  message   String?  @db.Text
+  link      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -123,4 +129,14 @@ model ModerationLog {
   // The user who created the content
   user   User   @relation(fields: [userId], references: [id])
   userId String
+}
+
+model CommentLike {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  commentId String
+
+  @@unique([userId, commentId])
 }

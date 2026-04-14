@@ -3,6 +3,20 @@ import api from "../utils/api";
 import TopList from "../components/TopList";
 import CurrentTrackCard from "../components/CurrentTrackCard";
 
+interface CurrentlyPlaying {
+  progress_ms: number;
+  is_playing: boolean;
+  name: string; 
+  image: string;
+  artist: string;
+}
+
+interface RecentlyPlayed {
+  name: string;
+  image: string;
+  artist: string;
+}
+
 const Home = () => {
   const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
@@ -10,20 +24,10 @@ const Home = () => {
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(true);
 
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<{
-    progress_ms: number;
-    is_playing: boolean;
-    name: string | null;
-    image: string | null;
-    artist: string | null;
-  } | null>(null);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<CurrentlyPlaying | null>(null);
   const [loadingCurrentlyPlaying, setLoadingCurrentlyPlaying] = useState(true);
 
-  const [recentlyPlayed, setRecentlyPlayed] = useState<{
-    name: string;
-    image: string;
-    artist: string;
-  } | null>(null);
+  const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed | null>(null);
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
 
   useEffect(() => {
@@ -191,9 +195,9 @@ const Home = () => {
                 </p>
               ) : (
                 <CurrentTrackCard
-                  name={recentlyPlayed.name}
-                  image={recentlyPlayed.image}
-                  artist={recentlyPlayed.artist}
+                  name={recentlyPlayed.name ?? ""}
+                  image={recentlyPlayed.image ?? ""}
+                  artist={recentlyPlayed.artist ?? ""}
                   text="The Last Played Music"
                 />
               )}

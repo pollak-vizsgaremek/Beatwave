@@ -14,7 +14,7 @@ import {
 } from "../controllers/spotifyController";
 
 import { verifyToken } from "../middlewares/authMiddleware";
-import { getPostById, getPosts } from '../controllers/postController';
+import { getPostById, getPosts, createPost, getCommentsByPostId, createComment, likeComment, getNotifications, markNotificationsRead } from '../controllers/postController';
 
 const router = Router();
 
@@ -32,7 +32,13 @@ router.get("/auth/spotify/currently-playing", verifyToken, getSpotifyCurrentlyPl
 router.get("/auth/spotify/recently-played/:amount", verifyToken, getSpotifyRecentlyPlayed);
 router.get("/auth/spotify/search", verifyToken, searchSpotify);
 
-router.get("/posts", getPosts);
-router.get("/post/:id", getPostById);
+router.get("/posts", verifyToken, getPosts);
+router.get("/post/:id", verifyToken, getPostById);
+router.post("/posts", verifyToken, createPost);
+router.get("/post/:id/comments", verifyToken, getCommentsByPostId);
+router.post("/post/:id/comments", verifyToken, createComment);
+router.post("/comment/:id/like", verifyToken, likeComment);
+router.get("/notifications", verifyToken, getNotifications);
+router.patch("/notifications/read", verifyToken, markNotificationsRead);
 
 export default router;
