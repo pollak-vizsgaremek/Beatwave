@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Input from "./Input";
 import api from "../utils/api";
 import type { NotificationType } from "../utils/Type";
+import Button from "./Button";
 
 const Navigation = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -111,7 +112,9 @@ const Navigation = () => {
       try {
         const response = await api.get("/notifications");
         setNotifications(response.data);
-        setUnreadCount(response.data.filter((n: NotificationType) => !n.read).length);
+        setUnreadCount(
+          response.data.filter((n: NotificationType) => !n.read).length
+        );
       } catch (error) {
         // Ignore API failures quietly for polling
       }
@@ -131,7 +134,7 @@ const Navigation = () => {
       try {
         await api.patch("/notifications/read");
         setUnreadCount(0);
-        setNotifications(prev => prev.map(n => ({...n, read: true})));
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       } catch (err) {
         console.error("Failed to mark notifications read:", err);
       }
@@ -557,28 +560,49 @@ const Navigation = () => {
                     No new notifications
                   </div>
                 ) : (
-                  notifications.map((notif) => (
-                    <div
-                      key={notif.id}
-                      onClick={() => {
-                        if (notif.link) {
-                          handleNavigate(notif.link);
-                          setIsNotificationsOpen(false);
-                        }
-                      }}
-                      className={`p-3 border-b border-accent-dark/50 last:border-0 hover:bg-accent-dark/30 transition-colors cursor-pointer ${
-                        !notif.read ? "bg-accent-dark/60" : "opacity-60"
-                      }`}
-                    >
-                      <p
-                        className={`text-[13px] leading-snug ${
-                          !notif.read ? "text-white" : "text-gray-400"
+                  <div>
+                    {notifications.map((notif) => (
+                      <div
+                        key={notif.id}
+                        onClick={() => {
+                          if (notif.link) {
+                            handleNavigate(notif.link);
+                            setIsNotificationsOpen(false);
+                          }
+                        }}
+                        className={`p-3 border-b border-accent-dark/50 last:border-0 hover:bg-accent-dark/30 transition-colors cursor-pointer ${
+                          !notif.read ? "bg-accent-dark/60" : "opacity-60"
                         }`}
                       >
-                        {notif.message}
-                      </p>
+                        <p
+                          className={`text-[13px] leading-snug ${
+                            !notif.read ? "text-white" : "text-gray-400"
+                          }`}
+                        >
+                          {notif.message}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="flex justify-center">
+                      <Button
+                        labelTitle="Delete Notif"
+                        onClick={async () => {
+                          try {
+                            await api.delete("/notifications/read");
+                            setNotifications((prev) =>
+                              prev.filter((n) => !n.read)
+                            );
+                          } catch (err) {
+                            console.error(
+                              "Failed to delete read notifications:",
+                              err
+                            );
+                          }
+                        }}
+                        className="mt-0! p-4! w-full rounded-lg!"
+                      />
                     </div>
-                  ))
+                  </div>
                 )}
               </div>
             </div>
