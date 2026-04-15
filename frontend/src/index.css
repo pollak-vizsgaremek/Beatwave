@@ -37,6 +37,7 @@
   --color-input-hover: #5987aa;
   --color-spotify-green: #1db954;
   --color-soundcloud-orange: #ff5500;
+  --color-card-black: #1a1e23;
 }
 
 @layer components {

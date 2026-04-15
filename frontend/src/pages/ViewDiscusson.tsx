@@ -177,7 +177,7 @@ const ViewDiscussion = () => {
           </p>
         ) : (
           <div className="w-full max-w-4xl mx-auto px-4 md:px-10">
-            <div className="bg-[#1A1E23] rounded-3xl p-6 md:p-8 shadow-xl mt-6">
+            <div className="bg-card-black rounded-3xl p-6 md:p-8 shadow-xl mt-6">
               <div className="flex flex-col md:flex-row md:items-end md:justify-between mb-4 border-b border-gray-700 pb-4">
                 <div className="flex flex-col gap-2">
                   <h1 className="text-3xl font-bold">{postData.title}</h1>
@@ -228,7 +228,7 @@ const ViewDiscussion = () => {
                 Comments
               </h2>
 
-              <div className="flex flex-col gap-4 mb-10 bg-[#1A1E23] p-5 rounded-2xl">
+              <div className="flex flex-col gap-4 mb-10 bg-card-black p-5 rounded-2xl">
                 <textarea
                   className="w-full bg-[#2D333B] text-white p-4 rounded-xl border border-transparent focus:outline-none focus:border-spotify-green resize-none text-base"
                   rows={3}
@@ -248,7 +248,7 @@ const ViewDiscussion = () => {
                   Loading comments...
                 </p>
               ) : comments.length === 0 ? (
-                <div className="text-center py-10 bg-[#1A1E23] rounded-2xl">
+                <div className="text-center py-10 bg-card-black rounded-2xl">
                   <p className="text-gray-400">
                     No comments yet. Be the first to start the discussion!
                   </p>
@@ -258,7 +258,7 @@ const ViewDiscussion = () => {
                   {comments.map((comment) => (
                     <div
                       key={comment.id}
-                      className="bg-[#1A1E23] p-5 rounded-2xl shadow-md border border-[#2D333B]"
+                      className="bg-card-black p-5 rounded-2xl shadow-md border border-[#2D333B]"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-2 mb-3">
