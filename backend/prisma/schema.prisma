@@ -17,6 +17,7 @@ datasource db {
 
 enum Role {
   USER
+  MODERATOR
   ADMIN
 }
 
@@ -108,15 +109,14 @@ model Notification {
 }
 
 enum ModerationStatus {
-  PENDING
-  RESOLVED
-  IGNORED
+  DELETED
+  WARNED
 }
 
 model ModerationLog {
   id        String            @id @default(uuid())
   reason    String
-  status    ModerationStatus  @default(PENDING)
+  status    ModerationStatus  @default(WARNED)
   createdAt DateTime          @default(now())
 
   // The content that was flagged (optional relations)
