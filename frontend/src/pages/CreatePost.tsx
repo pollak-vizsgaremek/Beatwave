@@ -102,23 +102,33 @@ const CreateDiscusson = () => {
         </p>
       </div>
 
-      <form onSubmit={SubmitPost} className="w-full max-w-3xl mt-10">
-        <div className="flex flex-col items-center justify-center w-full gap-5">
-          <input
-            type="text"
-            name="title"
-            placeholder="Title *"
-            value={formData.title}
+      <form onSubmit={SubmitPost} className="w-full max-w-4xl mt-10">
+        <div className="flex flex-col items-center justify-center w-full gap-5 bg-card-black rounded-3xl p-6 md:p-8 shadow-xl mt-6">
+          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 justify-items-center">
+            <input
+              type="text"
+              name="title"
+              placeholder="Title *"
+              value={formData.title}
+              onChange={handleChange}
+              className="w-3/4 md:w-full p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40"
+            />
+            <input
+              type="text"
+              name="topic"
+              placeholder="Topic *"
+              value={formData.topic}
+              onChange={handleChange}
+              className="w-3/4 md:w-full p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40"
+            />
+          </div>
+
+          <textarea
+            name="text"
+            placeholder="What's on your mind? *"
+            value={formData.text}
             onChange={handleChange}
-            className="w-3/4 md:w-1/2 p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40"
-          />
-          <input
-            type="text"
-            name="topic"
-            placeholder="Topic *"
-            value={formData.topic}
-            onChange={handleChange}
-            className="w-3/4 md:w-1/2 p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40"
+            className="w-3/4 h-3/4 md:w-full md:size-40 p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40 resize-none"
           />
           <input
             type="text"
@@ -127,23 +137,15 @@ const CreateDiscusson = () => {
             placeholder="Hashtags (e.g. #music #beatwave)"
             value={formData.hashtags}
             onChange={handleChange}
-            className="w-3/4 md:w-1/2 p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40"
+            className="w-3/4 md:w-full p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40"
           />
-          <textarea
-            name="text"
-            placeholder="What's on your mind? *"
-            value={formData.text}
-            onChange={handleChange}
-            className="w-3/4 md:w-1/2 p-4 rounded-xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-white/40 resize-none"
-          />
-        </div>
-
-        <div className="flex flex-col items-center justify-center w-full mt-8">
-          <Button
-            type="submit"
-            labelTitle={isLoading ? "Creating..." : "Create Post"}
-            disabled={isLoading}
-          />
+          <div className="flex flex-col items-center justify-center w-full">
+            <Button
+              type="submit"
+              labelTitle={isLoading ? "Creating..." : "Create Post"}
+              disabled={isLoading}
+            />
+          </div>
         </div>
       </form>
 
