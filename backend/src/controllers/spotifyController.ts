@@ -3,7 +3,11 @@ import jwt from "jsonwebtoken";
 import config from "../config/config";
 import { prisma } from "../lib/prisma";
 import NodeCache from "node-cache";
-import { safeJsonParse, spotifyFetch } from "../lib/spotifyUtils";
+import {
+  safeJsonParse,
+  spotifyFetch,
+  getValidSpotifyToken,
+} from "../lib/spotifyUtils";
 
 // TTL of 60 minutes (3600s), cleanup check every 10 mins (600s)
 const spotifyCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
@@ -17,7 +21,7 @@ export const getSpotifyAuthUrl = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId; // Set by verifyToken middleware
+    const userId = req.userId;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -74,7 +78,6 @@ export const spotifyCallback = async (
       );
     }
 
-    // Spotify requires the Client ID and Secret to be base64 encoded together
     const authHeader = Buffer.from(
       `${config.spotifyClientId}:${config.spotifyClientSecret}`,
     ).toString("base64");
@@ -140,83 +143,8 @@ export const spotifyCallback = async (
   }
 };
 
-export const getValidSpotifyToken = async (
-  userId: string,
-  forceRefresh: boolean = false,
-): Promise<string | null> => {
-  try {
-    const connection = await prisma.connectedApp.findFirst({
-      where: { userId, platform: "Spotify" },
-    });
-
-    if (!connection || !connection.accessToken) {
-      return null;
-    }
-
-    // Check if token is expired, with a 1-minute buffer
-    const isExpired =
-      connection.expiresAt &&
-      connection.expiresAt.getTime() - Date.now() < 60000;
-
-    if (!isExpired && !forceRefresh) {
-      return connection.accessToken;
-    }
-
-    if (!connection.refreshToken) {
-      console.warn(
-        "Spotify token expired but no refresh token available for user",
-        userId,
-      );
-      return null; // Could optionally delete the connection here
-    }
-
-    console.log(`Refreshing Spotify token for user ${userId}`);
-
-    const authHeader = Buffer.from(
-      `${config.spotifyClientId}:${config.spotifyClientSecret}`,
-    ).toString("base64");
-
-    const refreshResponse = await fetch(SPOTIFY_TOKEN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${authHeader}`,
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: connection.refreshToken,
-      }).toString(),
-    });
-
-    const data = await refreshResponse.json();
-
-    if (!refreshResponse.ok) {
-      console.error("Failed to refresh Spotify token:", data);
-      return null;
-    }
-
-    const newAccessToken = data.access_token;
-    const newRefreshToken = data.refresh_token || connection.refreshToken; // Sometimes Spotify doesn't return a new refresh token
-    const newExpiresAt = data.expires_in
-      ? new Date(Date.now() + data.expires_in * 1000)
-      : new Date(Date.now() + 3600 * 1000); // Default to 1 hour if Spotify omits it
-
-    // Update DB
-    await prisma.connectedApp.update({
-      where: { id: connection.id },
-      data: {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-        expiresAt: newExpiresAt,
-      },
-    });
-
-    return newAccessToken;
-  } catch (error) {
-    console.error("Error validifying Spotify token:", error);
-    return null;
-  }
-};
+// Re-export so existing callers outside this module still work
+export { getValidSpotifyToken };
 
 export const getSpotifyToken = async (
   req: Request,
@@ -265,6 +193,7 @@ export const disconnectSpotify = async (
 
     console.log(`Spotify disconnected for user ${userId}`);
 
+    // Clear all cached entries belonging to this user
     const keys = spotifyCache.keys();
     keys.forEach((key) => {
       if (key.startsWith(`${userId}-`)) {
@@ -326,7 +255,6 @@ export const getSpotifyTopItems = async (
       const errorData = await safeJsonParse(response);
       console.error(`Error fetching Spotify top ${type}:`, errorData);
 
-      // Prevent proxying 401 from Spotify to frontend, which triggers app auto-logout
       if (response.status === 401) {
         return res.json({
           items: [],
@@ -336,7 +264,6 @@ export const getSpotifyTopItems = async (
         });
       }
 
-      // If forbidden, they likely don't have the user-top-read scope allowed initially
       if (response.status === 403) {
         return res.json({
           items: [],
@@ -352,7 +279,6 @@ export const getSpotifyTopItems = async (
 
     const data = (await safeJsonParse(response)) || { items: [] };
 
-    // Cache the items
     spotifyCache.set(cacheKey, data.items);
 
     res.json({ items: data.items, cached: false });
@@ -406,22 +332,20 @@ export const getSpotifyCurrentlyPlaying = async (
     if (!response.ok) {
       const errorData = await safeJsonParse(response);
       console.error("Error fetching Spotify currently playing:", errorData);
+
       if (response.status === 401) {
         return res.json({
-          items: [],
+          item: null,
           connected: false,
-          cached: false,
           error: "Spotify access token expired or invalid.",
         });
       }
 
-      // If forbidden, they likely don't have the user-top-read scope allowed initially
       if (response.status === 403) {
         return res.json({
-          items: [],
+          item: null,
           connected: false,
-          cached: false,
-          error: "Insufficient permissions to read top items from Spotify.",
+          error: "Insufficient permissions.",
         });
       }
       return res
@@ -454,11 +378,13 @@ export const getSpotifyRecentlyPlayed = async (
 ) => {
   try {
     const userId = req.userId;
-    const amount = parseInt(req.params.amount as string);
 
+    // Auth check before parsing params
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const amount = parseInt(req.params.amount as string);
 
     if (!amount || amount <= 0 || amount > 50) {
       return res
@@ -477,7 +403,7 @@ export const getSpotifyRecentlyPlayed = async (
     const token = await getValidSpotifyToken(userId);
 
     if (!token) {
-      return res.json({ item: null, connected: false });
+      return res.json({ items: [], connected: false });
     }
 
     const response = await spotifyFetch(
@@ -492,28 +418,26 @@ export const getSpotifyRecentlyPlayed = async (
     );
 
     if (response.status === 204) {
-      return res.json({ item: null, connected: true });
+      return res.json({ items: [], connected: true });
     }
 
     if (!response.ok) {
       const errorData = await safeJsonParse(response);
       console.error("Error fetching Spotify recently played:", errorData);
+
       if (response.status === 401) {
         return res.json({
           items: [],
           connected: false,
-          cached: false,
           error: "Spotify access token expired or invalid.",
         });
       }
 
-      // If forbidden, they likely don't have the user-top-read scope allowed initially
       if (response.status === 403) {
         return res.json({
           items: [],
           connected: false,
-          cached: false,
-          error: "Insufficient permissions to read top items from Spotify.",
+          error: "Insufficient permissions.",
         });
       }
       return res
@@ -578,12 +502,8 @@ export const searchSpotify = async (
     }
 
     // Tag filters
-    if (req.query["tag:new"] === "true") {
-      queryParts.push("tag:new");
-    }
-    if (req.query["tag:hipster"] === "true") {
-      queryParts.push("tag:hipster");
-    }
+    if (req.query["tag:new"] === "true") queryParts.push("tag:new");
+    if (req.query["tag:hipster"] === "true") queryParts.push("tag:hipster");
 
     // Year filter
     const yearMin = req.query.yearMin as string | undefined;
@@ -610,14 +530,17 @@ export const searchSpotify = async (
       return res.json({ results: {}, connected: false, cached: false });
     }
 
-    const offset = (req.query.offset as string) || "0";
-    const limit = (req.query.limit as string) || "10";
+    // Sanitize and clamp offset / limit before forwarding to Spotify
+    const rawOffset = parseInt((req.query.offset as string) || "0");
+    const rawLimit = parseInt((req.query.limit as string) || "10");
+    const offset = Math.max(0, isNaN(rawOffset) ? 0 : rawOffset);
+    const limit = Math.min(50, Math.max(1, isNaN(rawLimit) ? 10 : rawLimit));
 
     const searchParams = new URLSearchParams({
       q: finalQuery,
       type: type,
-      offset: offset,
-      limit: limit,
+      offset: String(offset),
+      limit: String(limit),
     });
 
     const response = await spotifyFetch(

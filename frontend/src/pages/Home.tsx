@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import api from "../utils/api";
 import TopList from "../components/TopList";
 import CurrentTrackCard from "../components/CurrentTrackCard";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 
 interface CurrentlyPlaying {
   progress_ms: number;
@@ -33,6 +35,8 @@ const Home = () => {
   );
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
 
+  const { error, showError } = useErrorToast();
+
   useEffect(() => {
     let isMounted = true;
     const fetchTopArtists = async () => {
@@ -48,8 +52,12 @@ const Home = () => {
               : "https://placehold.co/300x300",
         }));
         setArtists(formattedArtists);
-      } catch (error) {
-        console.error("Error fetching top artists:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        // Only show toast for unexpected errors — not for "not connected"
+        if (err.response?.status !== 404) {
+          showError("Failed to load top artists.");
+        }
       } finally {
         if (isMounted) setLoadingArtists(false);
       }
@@ -76,8 +84,11 @@ const Home = () => {
               : "https://placehold.co/300x300",
         }));
         setTracks(formattedTracks);
-      } catch (error) {
-        console.error("Error fetching top tracks:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err.response?.status !== 404) {
+          showError("Failed to load top tracks.");
+        }
       } finally {
         if (isMounted) setLoadingTracks(false);
       }
@@ -115,8 +126,11 @@ const Home = () => {
           };
           setCurrentlyPlaying(formattedCurrentlyPlaying);
         }
-      } catch (error) {
-        console.error("Error fetching currently playing:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err.response?.status !== 404) {
+          showError("Failed to load currently playing track.");
+        }
       } finally {
         if (isMounted) {
           setLoadingCurrentlyPlaying(false);
@@ -154,8 +168,11 @@ const Home = () => {
               null,
           });
         }
-      } catch (error) {
-        console.error("Error fetching recently played tracks:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err.response?.status !== 404) {
+          showError("Failed to load recently played tracks.");
+        }
       } finally {
         if (isMounted) {
           setLoadingRecentlyPlayed(false);
@@ -167,7 +184,6 @@ const Home = () => {
       }
     };
 
-    // Fetch immediately on mount, or when currentlyPlaying changes to null
     fetchRecentlyPlayed();
 
     return () => {
@@ -244,6 +260,8 @@ const Home = () => {
           </p>
         )}
       </div>
+
+      <ErrorToast error={error} />
     </div>
   );
 };

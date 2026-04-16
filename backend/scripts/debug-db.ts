@@ -1,6 +1,14 @@
+/**
+ * scripts/debug-db.ts
+ *
+ * One-off development script to verify the database connection and print
+ * basic diagnostics. Run with: npx tsx scripts/debug-db.ts
+ *
+ * NOT part of the production application — kept here for convenience.
+ */
 import "dotenv/config";
-import { prisma } from "./lib/prisma";
-import config from "./config/config";
+import { prisma } from "../src/lib/prisma";
+import config from "../src/config/config";
 
 async function main() {
   try {

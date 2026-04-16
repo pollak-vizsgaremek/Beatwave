@@ -15,11 +15,15 @@ export const verifyToken = (
 ) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Nincs bejelentkezve" });
   }
 
-  const token = authHeader.split(" ")[1];
+  const token = authHeader.slice(7);
+
+  if (!token) {
+    return res.status(401).json({ error: "Nincs bejelentkezve" });
+  }
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;

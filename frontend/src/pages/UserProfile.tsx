@@ -4,6 +4,8 @@ import api from "../utils/api";
 import Input from "../components/Input";
 import Button from "../components/Button";
 import { Link } from 'react-router';
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 
 interface User {
   username: string;
@@ -24,20 +26,20 @@ const UserProfile = () => {
   const [newUsername, setNewUsername] = useState("");
   const [confirmUsername, setConfirmUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [modalError, setModalError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const { error, showError } = useErrorToast();
 
   const handleUpdateUsername = async (e: React.FormEvent) => {
     e.preventDefault();
-    setModalError(null);
 
     if (newUsername !== confirmUsername) {
-      setModalError("A két felhasználónév nem egyezik!");
+      showError("A két felhasználónév nem egyezik!");
       return;
     }
 
     if (!password) {
-      setModalError("Kérlek add meg a jelszavad!");
+      showError("Kérlek add meg a jelszavad!");
       return;
     }
 
@@ -52,10 +54,9 @@ const UserProfile = () => {
       );
       setIsModalOpen(false);
       resetModal();
-    } catch (error: any) {
-      console.error("Update error:", error);
-      setModalError(
-        error.response?.data?.error || "Hiba történt a frissítés során",
+    } catch (err: any) {
+      showError(
+        err.response?.data?.error || "Hiba történt a frissítés során",
       );
     } finally {
       setIsUpdating(false);
@@ -66,15 +67,16 @@ const UserProfile = () => {
     setNewUsername("");
     setConfirmUsername("");
     setPassword("");
-    setModalError(null);
   };
 
   const handleConnectSpotify = async () => {
     try {
       const response = await api.get("/auth/spotify/url");
       window.location.href = response.data.url;
-    } catch (error) {
-      console.error("Error connecting Spotify:", error);
+    } catch (err: any) {
+      showError(
+        err.response?.data?.error || "Failed to connect Spotify. Try again.",
+      );
     }
   };
 
@@ -83,8 +85,11 @@ const UserProfile = () => {
       await api.delete("/auth/spotify");
       setUser((prev) => (prev ? { ...prev, spotifyConnected: false } : null));
       setSpotiHover(false);
-    } catch (error) {
-      console.error("Error disconnecting from Spotify:", error);
+    } catch (err: any) {
+      showError(
+        err.response?.data?.error ||
+          "Failed to disconnect Spotify. Try again.",
+      );
     }
   };
 
@@ -96,8 +101,10 @@ const UserProfile = () => {
       try {
         const response = await api.get("/user-profile");
         setUser(response.data);
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
+      } catch (err: any) {
+        showError(
+          err.response?.data?.error || "Failed to load profile.",
+        );
       } finally {
         setLoading(false);
       }
@@ -204,8 +211,13 @@ const UserProfile = () => {
             </div>
           </div>
           <div className="w-3/4 p-2 h-full ">
-            <select name="timeRange" className="w-2/5 p-3 rounded-2xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-              <option selected value="4week">4 weeks</option>
+            {/* Fixed: use defaultValue on <select> instead of `selected` on <option> */}
+            <select
+              name="timeRange"
+              defaultValue="4week"
+              className="w-2/5 p-3 rounded-2xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            >
+              <option value="4week">4 weeks</option>
               <option value="6month">6 months</option>
               <option value="alltime">All time</option>
             </select>
@@ -273,10 +285,6 @@ const UserProfile = () => {
                   labelClassName="!font-normal"
                 />
 
-                {modalError && (
-                  <p className="text-red-400 text-sm mt-4">{modalError}</p>
-                )}
-
                 <Button
                   labelTitle={isUpdating ? "Mentés..." : "Mentés"}
                   type="submit"
@@ -288,6 +296,8 @@ const UserProfile = () => {
           </div>
         )}
       </div>
+
+      <ErrorToast error={error} />
     </div>
   );
 };

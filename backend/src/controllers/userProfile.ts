@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma";
 import config from "../config/config";
 
+const MAX_USERNAME_LENGTH = 50;
+
 export const getUserProfile = async (
   req: Request,
   res: Response,
@@ -59,6 +61,16 @@ export const updateUserProfile = async (
       return res.status(400).json({ error: "Hiányzó adatok" });
     }
 
+    if (typeof username !== "string" || username.trim().length === 0) {
+      return res.status(400).json({ error: "Érvénytelen felhasználónév" });
+    }
+
+    if (username.trim().length > MAX_USERNAME_LENGTH) {
+      return res.status(400).json({
+        error: `A felhasználónév legfeljebb ${MAX_USERNAME_LENGTH} karakter lehet`,
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
     });
@@ -76,7 +88,13 @@ export const updateUserProfile = async (
 
     const updatedUser = await prisma.user.update({
       where: { id: req.userId },
-      data: { username },
+      data: { username: username.trim() },
+      // Only return safe fields — never expose passwordHash, role, etc. in the response
+      select: {
+        id: true,
+        username: true,
+        email: true,
+      },
     });
 
     res.status(200).json(updatedUser);
