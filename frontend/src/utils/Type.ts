@@ -23,6 +23,49 @@ interface ButtonProps {
   type?: "button" | "submit" | "reset";
   disabled?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
-export type { InputProps, ButtonProps };
+interface DiscussionType {
+  id: string;
+  text: string;
+  likeAmount: number;
+  hashtags: string;
+  postedAt: Date;
+  userId: string;
+  title: string;
+  topic: string;
+  user: {
+    id: string;
+    username: string;
+  };
+};
+
+interface CommentType {
+  id: string;
+  text: string;
+  likeAmount: number;
+  commentedAt: Date;
+  userId: string;
+  postId: string;
+  previousCommentId: string | null;
+  isLiked?: boolean;
+  user: {
+    id: string;
+    username: string;
+  };
+  replies?: CommentType[];
+}
+
+interface NotificationType {
+  id: string;
+  type: string;
+  message: string | null;
+  link?: string | null;
+  read: boolean;
+  createdAt: Date;
+  userId: string;
+  triggeredById: string | null;
+}
+
+export type { InputProps, ButtonProps, DiscussionType, CommentType, NotificationType };

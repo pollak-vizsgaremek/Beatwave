@@ -47,14 +47,14 @@ const UserProfile = () => {
         password: password,
       });
       setUser((prev) =>
-        prev ? { ...prev, username: response.data.username } : null
+        prev ? { ...prev, username: response.data.username } : null,
       );
       setIsModalOpen(false);
       resetModal();
     } catch (error: any) {
       console.error("Update error:", error);
       setModalError(
-        error.response?.data?.error || "Hiba történt a frissítés során"
+        error.response?.data?.error || "Hiba történt a frissítés során",
       );
     } finally {
       setIsUpdating(false);
@@ -133,8 +133,7 @@ const UserProfile = () => {
             Settings
           </button>
         </div>
-        
-        <div className="bg-card w-full h-auto p-3 flex flex-row rounded-3xl">
+        <div className="bg-card-black w-full h-auto p-3 flex flex-row rounded-3xl">
           <div className="w-2/5 p-2 h-full flex flex-col justify-center ">
             <div className="flex justify-center items-center flex-col">
               <div className="bg-accent mt-2 p-2 w-32 h-32 rounded-full flex justify-center items-center">
@@ -203,7 +202,13 @@ const UserProfile = () => {
               )}
             </div>
           </div>
-          <div className="w-3/4 p-2 h-full "></div>
+          <div className="w-3/4 p-2 h-full ">
+            <select name="timeRange" className="w-2/5 p-3 rounded-2xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+              <option selected value="4week">4 weeks</option>
+              <option value="6month">6 months</option>
+              <option value="alltime">All time</option>
+            </select>
+          </div>
         </div>
 
         {isModalOpen && (
