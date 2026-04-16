@@ -24,6 +24,7 @@ export const verifyToken = (
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
     req.userId = decoded.id;
+    req.role = decoded.role;
     console.log(
       `[Spotify MiddleWare] Extracted userId: ${req.userId} from token.`,
     );
@@ -31,4 +32,11 @@ export const verifyToken = (
   } catch (error) {
     return res.status(403).json({ error: "Érvénytelen token" });
   }
+};
+
+export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (req.role !== "ADMIN") {
+    return res.status(403).json({ error: "Nincs jogosultságod" });
+  }
+  next();
 };

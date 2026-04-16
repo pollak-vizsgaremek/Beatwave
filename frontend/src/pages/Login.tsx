@@ -57,14 +57,18 @@ const Login = () => {
   };
 
   return (
-    <div className="w-screen h-screen flex flex-row bg-linear-to-l from-black to-border overflow-hidden">
-      <div className="w-1/2 relative z-0">
+    <div className="w-screen h-screen flex flex-col sm:flex-row bg-linear-to-l from-black to-border overflow-hidden">
+      <div className="w-full sm:w-1/2 relative z-0 order-1 mb-4 sm:mb-0 max-h-[40vh] sm:max-h-none overflow-hidden">
         <MusicWave />
       </div>
-      <div className="w-1/2 flex items-center justify-center z-10">
-        <div className="min-w-[500px] w-1/2 h-4/6 bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10 backdrop-blur-md">
+      <div className="w-full sm:w-1/2 flex items-center justify-center z-10 order-2 sm:order-1">
+        <div className="min-w-[300px] w-full max-w-[500px] min-h-[70vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10 backdrop-blur-md">
           <div className="absolute top-4 left-6 flex items-center gap-2">
-            <div className="w-8 h-8 bg-linear-to-tr from-[#7c3aed] to-[#3b82f6] rounded-full"></div>
+            <img
+              src="/Beatwave_logo.png"
+              alt="Beatwave Logo"
+              className="w-8 h-8 rounded-full object-cover"
+            />
             <span className="text-2xl font-bold text-white tracking-wide">
               Beatwave
             </span>
@@ -83,6 +87,7 @@ const Login = () => {
               inputName="email"
               inputPlaceHolder="kisferenc3532@gmail.com"
               iconLeft={<Mail size={20} />}
+              wrapperClassName="mt-0"
               value={formData.email}
               onChange={handleChange}
             />
@@ -93,6 +98,7 @@ const Login = () => {
               inputPlaceHolder="•••••••"
               forgotPwd={true}
               iconLeft={<Lock size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.password}
               onChange={handleChange}
             />
@@ -103,8 +109,6 @@ const Login = () => {
               disabled={isLoading}
               className="mt-6"
             />
-
-
 
             <p className="mt-6 text-white/80">
               Nincs még fiókod?{" "}

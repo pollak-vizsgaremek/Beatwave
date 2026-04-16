@@ -79,12 +79,15 @@ const Register = () => {
   };
 
   return (
-    <div className="flex flex-row h-screen w-screen bg-linear-to-r from-black to-border">
-      <div className="w-1/2 flex items-center justify-center">
-        <div className="min-w-[500px] w-1/2 h-5/6 bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10">
+    <div className="flex flex-col sm:flex-row h-screen w-screen bg-linear-to-r from-black to-border">
+      <div className="w-full sm:w-1/2 flex items-center justify-center order-2 sm:order-1">
+        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
           <div className="absolute top-4 left-6 flex items-center gap-2">
-            {/* You can Replace this with an actual SVG logo if available */}
-            <div className="w-8 h-8 bg-linear-to-tr from-[#7c3aed] to-[#3b82f6] rounded-full"></div>
+            <img
+              src="/Beatwave_logo.png"
+              alt="Beatwave Logo"
+              className="w-8 h-8 rounded-full object-cover"
+            />
             <span className="text-2xl font-bold text-white tracking-wide">
               Beatwave
             </span>
@@ -112,6 +115,7 @@ const Register = () => {
               inputName="username"
               inputPlaceHolder="kisferenc3532"
               iconLeft={<User size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.username}
               onChange={handleChange}
             />
@@ -121,6 +125,7 @@ const Register = () => {
               inputName="password"
               inputPlaceHolder="•••••••"
               iconLeft={<Lock size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.password}
               onChange={handleChange}
             />
@@ -130,6 +135,7 @@ const Register = () => {
               inputName="confirmPassword"
               inputPlaceHolder="•••••••"
               iconLeft={<Lock size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.confirmPassword}
               onChange={handleChange}
             />
@@ -220,10 +226,10 @@ const Register = () => {
               labelTitle={isLoading ? "Loading..." : "Regisztrálás"}
               type="submit"
               disabled={!canRegister || isLoading}
-              className="mt-6 absolute bottom-15"
+              className="mt-3 sm:mt-12"
             />
           </form>
-          <p className="mt-6  absolute bottom-5 text-white/80">
+          <p className="mt-6 mb-6 text-white/80">
             Van már fiókod?{" "}
             <Link
               to="/login"
@@ -234,7 +240,7 @@ const Register = () => {
           </p>
         </div>
       </div>
-      <div className="w-1/2 relative">
+      <div className="w-full sm:w-1/2 relative order-1 sm:order-2 mb-4 sm:mb-0 max-h-[40vh] sm:max-h-none overflow-hidden">
         <MusicWave />
       </div>
 

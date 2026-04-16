@@ -6,7 +6,7 @@ import CurrentTrackCard from "../components/CurrentTrackCard";
 interface CurrentlyPlaying {
   progress_ms: number;
   is_playing: boolean;
-  name: string; 
+  name: string;
   image: string;
   artist: string;
 }
@@ -24,10 +24,13 @@ const Home = () => {
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(true);
 
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<CurrentlyPlaying | null>(null);
+  const [currentlyPlaying, setCurrentlyPlaying] =
+    useState<CurrentlyPlaying | null>(null);
   const [loadingCurrentlyPlaying, setLoadingCurrentlyPlaying] = useState(true);
 
-  const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed | null>(null);
+  const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed | null>(
+    null,
+  );
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
 
   useEffect(() => {
@@ -179,7 +182,7 @@ const Home = () => {
         <h1 className="text-4xl sm:text-4xl md:text-5xl font-bold mt-10 mb-10 md:mb-20 text-center">
           Welcome to Beatwave
         </h1>
-        <div className="bg-card w-full sm:w-[80%] md:w-[60%] lg:w-[50%] xl:w-1/2 max-w-[500px] rounded-2xl p-8 shadow-xl whitespace-nowrap">
+        <div className="bg-card w-full sm:w-[80%] md:w-[60%] lg:w-[50%] xl:w-1/2 max-w-[500px] rounded-2xl p-6 sm:p-8 shadow-xl whitespace-normal">
           {loadingCurrentlyPlaying ? (
             <p className="text-gray-400 text-center text-sm sm:text-base">
               Loading your currently playing track...
