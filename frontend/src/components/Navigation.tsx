@@ -7,6 +7,8 @@ import {
   SlidersHorizontal,
   ChevronDown,
   ChevronUp,
+  Menu,
+  X,
 } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { useState, useRef, useEffect } from "react";
@@ -44,6 +46,10 @@ const Navigation = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
+
+  // Mobile menu
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Filter Availability Logic
   const canFilterArtist = searchAlbums || searchArtists || searchTracks;
@@ -98,13 +104,20 @@ const Navigation = () => {
       ) {
         setIsNotificationsOpen(false);
       }
+      if (
+        isMenuOpen &&
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
+        setIsMenuOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isFilterOpen, isDropdownOpen, isNotificationsOpen]);
+  }, [isFilterOpen, isDropdownOpen, isNotificationsOpen, isMenuOpen]);
 
   // Fetch and poll notifications
   useEffect(() => {
@@ -113,7 +126,7 @@ const Navigation = () => {
         const response = await api.get("/notifications");
         setNotifications(response.data);
         setUnreadCount(
-          response.data.filter((n: NotificationType) => !n.read).length
+          response.data.filter((n: NotificationType) => !n.read).length,
         );
       } catch (error) {
         // Ignore API failures quietly for polling
@@ -131,6 +144,19 @@ const Navigation = () => {
   const handleOpenNotifications = async () => {
     setIsNotificationsOpen(!isNotificationsOpen);
     if (!isNotificationsOpen && unreadCount > 0) {
+      try {
+        await api.patch("/notifications/read");
+        setUnreadCount(0);
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      } catch (err) {
+        console.error("Failed to mark notifications read:", err);
+      }
+    }
+  };
+
+  const handleMenuToggle = async () => {
+    setIsMenuOpen(!isMenuOpen);
+    if (!isMenuOpen && unreadCount > 0) {
       try {
         await api.patch("/notifications/read");
         setUnreadCount(0);
@@ -249,7 +275,7 @@ const Navigation = () => {
   };
 
   return (
-    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-2 sm:gap-4 md:gap-8 h-17 items-center justify-between px-2 sm:px-4 md:px-8 w-[98%] sm:w-[95%] xl:w-3/4 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30 relative">
+    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-3 sm:gap-4 md:gap-8 items-center justify-between px-4 sm:px-4 md:px-8 w-full sm:w-[95%] xl:w-3/4 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30 relative py-5 sm:py-3 min-h-[92px] sm:min-h-[68px]">
       <Link
         to="/home"
         className="text-white text-lg sm:text-xl md:text-2xl font-bold shrink-0"
@@ -258,7 +284,7 @@ const Navigation = () => {
       </Link>
       <Link
         to="/discussion"
-        className="text-white text-sm sm:text-base md:text-lg font-medium shrink-0"
+        className="hidden md:block text-white text-sm sm:text-base md:text-lg font-medium shrink-0"
       >
         Discussion
       </Link>
@@ -499,7 +525,7 @@ const Navigation = () => {
                             value={yearMin}
                             onChange={(e) =>
                               setYearMin(
-                                Math.min(Number(e.target.value), yearMax)
+                                Math.min(Number(e.target.value), yearMax),
                               )
                             }
                             disabled={!canFilterYear}
@@ -516,7 +542,7 @@ const Navigation = () => {
                             value={yearMax}
                             onChange={(e) =>
                               setYearMax(
-                                Math.max(Number(e.target.value), yearMin)
+                                Math.max(Number(e.target.value), yearMin),
                               )
                             }
                             disabled={!canFilterYear}
@@ -537,7 +563,7 @@ const Navigation = () => {
         }
       />
 
-      <div className="flex gap-2 sm:gap-4 md:gap-5 items-center shrink-0">
+      <div className="hidden md:flex gap-2 sm:gap-4 md:gap-5 items-center shrink-0">
         <div className="relative" ref={notificationsRef}>
           <button
             onClick={handleOpenNotifications}
@@ -590,12 +616,12 @@ const Navigation = () => {
                           try {
                             await api.delete("/notifications/read");
                             setNotifications((prev) =>
-                              prev.filter((n) => !n.read)
+                              prev.filter((n) => !n.read),
                             );
                           } catch (err) {
                             console.error(
                               "Failed to delete read notifications:",
-                              err
+                              err,
                             );
                           }
                         }}
@@ -628,7 +654,7 @@ const Navigation = () => {
               </button>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-accent-dark transition-colors last:rounded-b-lg cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-colors last:rounded-b-lg cursor-pointer"
               >
                 <LogOut size={18} />
                 <span>Log Out</span>
@@ -637,6 +663,124 @@ const Navigation = () => {
           )}
         </div>
       </div>
+
+      <button
+        onClick={handleMenuToggle}
+        className="md:hidden text-white hover:opacity-80 transition-opacity cursor-pointer"
+      >
+        <Menu size={30} />
+      </button>
+
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            ref={menuRef}
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="fixed top-0 right-0 h-full w-full sm:w-80 bg-accent shadow-lg z-50 flex flex-col justify-between p-6"
+          >
+            {/* Top section */}
+            <div className="relative">
+              <button
+                onClick={() => setIsMenuOpen(false)}
+                className="absolute -top-2 -right-2 text-white hover:opacity-80 bg-accent-dark/50 rounded-full p-2"
+              >
+                <X size={32} />
+              </button>
+
+              <Link
+                to="/discussion"
+                onClick={() => setIsMenuOpen(false)}
+                className="text-white text-xl mb-6 hover:opacity-80 block font-medium"
+              >
+                Discussion
+              </Link>
+
+              <div className="mb-6">
+                <h3 className="text-white font-bold text-lg mb-4">
+                  Notifications
+                </h3>
+                <div className="max-h-48 overflow-y-auto no-scrollbar">
+                  {notifications.length === 0 ? (
+                    <div className="p-3 text-center text-gray-400 text-base">
+                      No new notifications
+                    </div>
+                  ) : (
+                    <>
+                      {notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          onClick={() => {
+                            if (notif.link) {
+                              navigate(notif.link);
+                              setIsMenuOpen(false);
+                            }
+                          }}
+                          className={`p-3 border-b border-accent-dark/50 last:border-0 hover:bg-accent-dark/30 transition-colors cursor-pointer rounded-lg mb-2 ${
+                            !notif.read ? "bg-accent-dark/60" : "opacity-60"
+                          }`}
+                        >
+                          <p
+                            className={`text-sm leading-relaxed ${
+                              !notif.read ? "text-white" : "text-gray-400"
+                            }`}
+                          >
+                            {notif.message}
+                          </p>
+                        </div>
+                      ))}
+                      <div className="p-3">
+                        <Button
+                          labelTitle="Delete Read"
+                          onClick={async () => {
+                            try {
+                              await api.delete("/notifications/read");
+                              setNotifications((prev) =>
+                                prev.filter((n) => !n.read),
+                              );
+                            } catch (err) {
+                              console.error(
+                                "Failed to delete read notifications:",
+                                err,
+                              );
+                            }
+                          }}
+                          className="w-full! text-base! py-3!"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  navigate("/profile");
+                  setIsMenuOpen(false);
+                }}
+                className="text-white text-xl mb-6 text-left hover:opacity-80 w-full py-3 px-4 rounded-lg hover:bg-accent-dark/30 transition-colors font-medium"
+              >
+                Profile
+              </button>
+            </div>
+
+            {/* Bottom section - Log Out button */}
+            <div className="border-t border-accent-dark/50 pt-6">
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setIsMenuOpen(false);
+                }}
+                className="text-red-400 text-xl text-left hover:text-red-300 w-full py-4 px-4 rounded-lg hover:bg-red-600/30 transition-colors font-medium"
+              >
+                Log Out
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showWarning && (

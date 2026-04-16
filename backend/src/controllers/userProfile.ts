@@ -15,6 +15,7 @@ export const getUserProfile = async (
         id: true,
         username: true,
         email: true,
+        role: true,
         connectedApps: {
           select: {
             platform: true,
@@ -31,6 +32,7 @@ export const getUserProfile = async (
       id: user.id,
       username: user.username,
       email: user.email,
+      role: user.role,
       spotifyConnected: user.connectedApps.some(
         (app) => app.platform === "Spotify",
       ),

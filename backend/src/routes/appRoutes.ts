@@ -13,7 +13,7 @@ import {
   searchSpotify,
 } from "../controllers/spotifyController";
 
-import { verifyToken } from "../middlewares/authMiddleware";
+import { verifyToken, isAdmin } from "../middlewares/authMiddleware";
 import {
   getPostById,
   getPosts,
@@ -29,6 +29,14 @@ import {
   getCommentsByPostId,
   likeComment,
 } from "../controllers/commentController";
+import {
+  getAllUsers,
+  getAllPosts,
+  getAllComments,
+  getModerationLogs,
+  deletePost,
+  deleteComment,
+} from "../controllers/adminController";
 
 const router = Router();
 
@@ -45,12 +53,12 @@ router.get("/auth/spotify/top/:type", verifyToken, getSpotifyTopItems);
 router.get(
   "/auth/spotify/currently-playing",
   verifyToken,
-  getSpotifyCurrentlyPlaying
+  getSpotifyCurrentlyPlaying,
 );
 router.get(
   "/auth/spotify/recently-played/:amount",
   verifyToken,
-  getSpotifyRecentlyPlayed
+  getSpotifyRecentlyPlayed,
 );
 router.get("/auth/spotify/search", verifyToken, searchSpotify);
 
@@ -65,5 +73,13 @@ router.post("/comment/:id/like", verifyToken, likeComment);
 router.get("/notifications", verifyToken, getNotifications);
 router.patch("/notifications/read", verifyToken, markNotificationsRead);
 router.delete("/notifications/read", verifyToken, deleteNotificationsRead);
+
+// Admin routes
+router.get("/admin/users", verifyToken, isAdmin, getAllUsers);
+router.get("/admin/posts", verifyToken, isAdmin, getAllPosts);
+router.get("/admin/comments", verifyToken, isAdmin, getAllComments);
+router.get("/admin/logs", verifyToken, isAdmin, getModerationLogs);
+router.delete("/admin/posts/:id", verifyToken, isAdmin, deletePost);
+router.delete("/admin/comments/:id", verifyToken, isAdmin, deleteComment);
 
 export default router;

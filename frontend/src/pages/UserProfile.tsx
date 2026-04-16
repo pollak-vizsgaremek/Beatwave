@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import api from "../utils/api";
 import Input from "../components/Input";
 import Button from "../components/Button";
+import { Link } from 'react-router';
 
 interface User {
   username: string;
@@ -208,6 +209,13 @@ const UserProfile = () => {
               <option value="6month">6 months</option>
               <option value="alltime">All time</option>
             </select>
+
+            <Link to="/admin">
+              <Button
+                labelTitle="admin"
+                className="mt-6! outline-1 border-none hover:outline-white hover:outline-1 hover:outline-offset-2"
+              />
+            </Link>
           </div>
         </div>
 

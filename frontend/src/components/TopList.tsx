@@ -32,14 +32,16 @@ const TopList = ({ list, title }: TopListProps) => {
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-row justify-center items-center">
-        <h2 className="text-3xl font-semibold start w-1/2 whitespace-nowrap">{title}</h2>
-        <div className="flex items-center w-1/2 justify-end sm:mr-0 md:mr-30">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+        <h2 className="text-3xl font-semibold w-full sm:w-1/2 whitespace-normal break-words">
+          {title}
+        </h2>
+        <div className="flex items-center w-full sm:w-1/2 justify-start sm:justify-end gap-2">
           <button
             type="button"
             onClick={() => handleNav("left")}
             disabled={!canScrollLeft}
-            className={`transition-colors ${canScrollLeft ? "cursor-pointer hover:text-white" : "text-gray-600"}`}
+            className={`hidden sm:inline-flex transition-colors ${canScrollLeft ? "cursor-pointer hover:text-white" : "text-gray-600"}`}
           >
             <ChevronLeft size={60} />
           </button>
@@ -47,14 +49,14 @@ const TopList = ({ list, title }: TopListProps) => {
             type="button"
             onClick={() => handleNav("right")}
             disabled={!canScrollRight}
-            className={`transition-colors ${canScrollRight ? "cursor-pointer hover:text-white" : "text-gray-600"}`}
+            className={`hidden sm:inline-flex transition-colors ${canScrollRight ? "cursor-pointer hover:text-white" : "text-gray-600"}`}
           >
             <ChevronRight size={60} />
           </button>
         </div>
       </div>
       <div
-        className="flex flex-row overflow-auto overscroll-auto ml-6 scroll-smooth no-scrollbar"
+        className="flex flex-row overflow-x-auto overflow-y-hidden sm:overflow-auto overscroll-auto ml-0 sm:ml-6 scroll-smooth no-scrollbar"
         ref={topListScroll}
         onScroll={handleScroll}
       >
