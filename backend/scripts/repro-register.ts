@@ -1,3 +1,11 @@
+/**
+ * scripts/repro-register.ts
+ *
+ * One-off development script to reproduce and test the registration endpoint.
+ * Run with: npx tsx scripts/repro-register.ts
+ *
+ * NOT part of the production application — kept here for convenience.
+ */
 async function testRegister() {
   const user = {
     email: "unique_user_" + Date.now() + "@example.com",
@@ -14,7 +22,7 @@ async function testRegister() {
     });
     console.log("Status 1:", res.status);
 
-    console.log("Request 2 (Should fail)...");
+    console.log("Request 2 (Should fail with 409)...");
     res = await fetch("http://localhost:6969/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

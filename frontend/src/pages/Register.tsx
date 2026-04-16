@@ -1,24 +1,24 @@
 import { Mail, Lock, User, CheckCircle2, Circle } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
 
 import Input from "../components/Input";
 import MusicWave from "../components/MusicWave";
 import Button from "../components/Button";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 
 const Register = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { error, showError } = useErrorToast();
 
-  const showError = (msg: string) => {
-    setError(msg);
-    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
-    errorTimeoutRef.current = setTimeout(() => setError(null), 5000);
-  };
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      navigate("/home");
+    }
+  }, [navigate]);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -28,11 +28,10 @@ const Register = () => {
   });
 
   const [strengthScore, setStrengthScore] = useState(0);
-
   const [canRegister, setCanRegister] = useState(false);
 
   useEffect(() => {
-    const { password, confirmPassword } = formData;
+    const { email, username, password, confirmPassword } = formData;
 
     const reqs = {
       length: password.length >= 8,
@@ -46,12 +45,18 @@ const Register = () => {
 
     const allMet = Object.values(reqs).every(Boolean);
     const match = password === confirmPassword && password !== "";
-    setCanRegister(allMet && match);
-  }, [formData.password, formData.confirmPassword]);
+    const fieldsFilledIn =
+      email.trim().length > 0 && username.trim().length > 0;
+    setCanRegister(allMet && match && fieldsFilledIn);
+  }, [
+    formData.email,
+    formData.username,
+    formData.password,
+    formData.confirmPassword,
+  ]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (error) setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +64,6 @@ const Register = () => {
     if (!canRegister) return;
 
     setIsLoading(true);
-    setError(null);
 
     try {
       await api.post("/register", {
@@ -174,10 +178,9 @@ const Register = () => {
                       </span>
                     </div>
 
-                    {/* Segmented Progress Bar */}
                     <div className="flex gap-1.5 h-1.5 w-full mb-4">
                       {[1, 2, 3, 4].map((segment) => {
-                        let bgColor = "bg-white/10"; // default empty
+                        let bgColor = "bg-white/10";
                         if (segment <= strengthScore) {
                           if (strengthScore <= 1)
                             bgColor =
@@ -198,7 +201,6 @@ const Register = () => {
                       })}
                     </div>
 
-                    {/* Visual Checklist */}
                     <div className="grid grid-cols-2 gap-y-2 gap-x-4 mt-2">
                       {Object.entries(reqs).map(([label, isMet]) => (
                         <div key={label} className="flex items-center gap-2">
@@ -244,18 +246,7 @@ const Register = () => {
         <MusicWave />
       </div>
 
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium"
-          >
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ErrorToast error={error} />
     </div>
   );
 };

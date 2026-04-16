@@ -11,13 +11,16 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router";
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+
+import ErrorToast from "./ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 
 import Input from "./Input";
 import api from "../utils/api";
 import type { NotificationType } from "../utils/Type";
 import Button from "./Button";
+import { AnimatePresence, motion } from "framer-motion";
 
 const Navigation = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -37,9 +40,8 @@ const Navigation = () => {
   // Advanced Filters Toggle
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Warning Popup State
-  const [showWarning, setShowWarning] = useState(false);
-  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Warning toast (uses shared hook)
+  const { error: warningMsg, showError: showWarning } = useErrorToast();
 
   // Notifications
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
@@ -226,13 +228,9 @@ const Navigation = () => {
     if (searchTracks) types.push("track");
 
     if (types.length === 0) {
-      setShowWarning(true);
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
-      }
-      warningTimeoutRef.current = setTimeout(() => {
-        setShowWarning(false);
-      }, 5000);
+      showWarning(
+        "Please select at least one result type (Albums, Artists, Tracks, etc.) before searching.",
+      );
       return;
     }
 
@@ -782,19 +780,7 @@ const Navigation = () => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showWarning && (
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium"
-          >
-            Please select at least one result type (Albums, Artists, Tracks,
-            etc.) before searching.
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ErrorToast error={warningMsg} />
     </div>
   );
 };

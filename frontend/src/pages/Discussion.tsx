@@ -3,23 +3,29 @@ import { Heart, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import Button from "../components/Button";
-
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 import formatRelative from "../utils/DateFormatting";
 import type { DiscussionType } from "../utils/Type";
 
 const Discussion = () => {
+  // Fixed typo: was `lodingPosts` (missing 'a')
   const [postsData, setPostsData] = useState<DiscussionType[]>([]);
-  const [lodingPosts, setLoadingPosts] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const { error, showError } = useErrorToast();
 
   useEffect(() => {
     const fetchAllPosts = async () => {
       try {
         const response = await api.get("/posts");
-
         setPostsData(response.data);
-      } catch (error) {
-        console.error("Error fetching Posts:", error);
+      } catch (err: any) {
+        console.error("Error fetching Posts:", err);
+        showError(
+          err.response?.data?.error ||
+            "Failed to load posts. Please try again.",
+        );
       } finally {
         setLoadingPosts(false);
       }
@@ -48,20 +54,25 @@ const Discussion = () => {
       </div>
 
       <div className="flex flex-col justify-center self-center w-full ml-0 md:ml-20">
-        <h1 className="text-3xl font-semibold text-center w-full">Posts</h1>
+        <h1 className="mt-4 text-4xl font-semibold text-left w-full">Posts</h1>
         <div className="grid flex-row items-center justify-center w-full max-w-[420px] md:max-w-none mx-auto gap-4 mt-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {lodingPosts ? (
+          {loadingPosts ? (
             <p>Loading posts...</p>
           ) : postsData.length === 0 ? (
             <p>No posts yet</p>
           ) : (
             postsData.map((post) => (
-              <Link className="z-10" to={`/discussion/view/${post.id}`}>
+              // Fixed: key is now on the <Link> wrapper, not the inner <div>
+              <Link
+                key={post.id}
+                className="z-10"
+                to={`/discussion/view/${post.id}`}
+              >
                 <div
                   key={post.id}
                   className="flex flex-col relative bg-gray-500/60 w-full min-h-[220px] sm:min-h-[260px] p-2 sm:p-4 mt-2 rounded-lg outline-1 outline-black"
                 >
-                  <div className="flex flex-col sm:flex-row self-start items-start sm:items-center relative top-1 w-full">
+                  <div className="flex flex-row self-start items-start sm:items-center relative top-1 w-full">
                     <p className="font-bold text-xl max-w-[100px] sm:max-w-[150px] truncate">
                       {post.user.username}
                     </p>
@@ -107,6 +118,8 @@ const Discussion = () => {
           )}
         </div>
       </div>
+
+      <ErrorToast error={error} />
     </div>
   );
 };
