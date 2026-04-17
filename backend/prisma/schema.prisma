@@ -37,14 +37,15 @@ model User {
   commentLikes           CommentLike[]
   notifications          Notification[] @relation("UserNotifications")
   triggeredNotifications Notification[] @relation("TriggeredNotifications")
-  moderationLogs         ModerationLog[]
+  moderationLogs         ModerationLog[] @relation("UserLogs")
+  performedModerations   ModerationLog[] @relation("ModeratorLogs")
 }
 
 model ConnectedApp {
   id          String   @id @default(uuid()) // internal id
   platform     String
-  accessToken  String?
-  refreshToken String?
+  accessToken  String?  @db.Text
+  refreshToken String?  @db.Text
   expiresAt    DateTime?
   connectedAt DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
@@ -115,20 +116,25 @@ enum ModerationStatus {
 
 model ModerationLog {
   id        String            @id @default(uuid())
-  reason    String
   status    ModerationStatus  @default(WARNED)
+  action    String            // What action was taken (DELETE_POST, DELETE_COMMENT, etc.)
+  details   String            // Additional details about the action
   createdAt DateTime          @default(now())
 
-  // The content that was flagged (optional relations)
+  // The admin/moderator who performed the action
+  moderator   User   @relation("ModeratorLogs", fields: [moderatorId], references: [id])
+  moderatorId String
+
+  // The user who created the content
+  user   User   @relation("UserLogs", fields: [userId], references: [id])
+  userId String
+
+  // The content that was moderated (optional relations)
   post   Post?   @relation(fields: [postId], references: [id])
   postId String?
 
   comment   Comment? @relation(fields: [commentId], references: [id])
   commentId String?
-
-  // The user who created the content
-  user   User   @relation(fields: [userId], references: [id])
-  userId String
 }
 
 model CommentLike {

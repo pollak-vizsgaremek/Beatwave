@@ -13,6 +13,7 @@ import SearchResult from "./pages/SearchResult";
 import CreateDiscusson from "./pages/CreatePost";
 import Error404 from "./pages/Error404";
 import ViewDiscussion from "./pages/ViewDiscusson";
+import AdminPanel from './pages/AdminPanel';
 
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
             <Route element={<Discussion />} path="discussion" />
             <Route element={<CreateDiscusson />} path="discussion/create" />
             <Route element={<ViewDiscussion />} path="discussion/view/:id" />
+            <Route element={<AdminPanel />} path="admin" />
           </Route>
           <Route element={<Error404 />} path="*" />
         </Routes>

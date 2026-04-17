@@ -1,11 +1,12 @@
-import { useState, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { Mail, Lock } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 import Button from "../components/Button";
 import Input from "../components/Input";
 import MusicWave from "../components/MusicWave";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 
 const Login = () => {
@@ -14,25 +15,22 @@ const Login = () => {
     email: "",
     password: "",
   });
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { error, showError } = useErrorToast();
 
-  const showError = (msg: string) => {
-    setError(msg);
-    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
-    errorTimeoutRef.current = setTimeout(() => setError(null), 5000);
-  };
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      navigate("/home");
+    }
+  }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (error) setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
 
     try {
       const response = await api.post("/login", {
@@ -40,16 +38,14 @@ const Login = () => {
         password: formData.password,
       });
 
-      console.log("Login success:", response.data);
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user || {}));
-        navigate("/home"); // Navigate to home/dashboard only on success
+        navigate("/home");
       } else {
         showError("Invalid response from server");
       }
     } catch (err: any) {
-      console.error("Login error:", err);
       showError(err.response?.data?.error || "Invalid credentials");
     } finally {
       setIsLoading(false);
@@ -57,14 +53,18 @@ const Login = () => {
   };
 
   return (
-    <div className="w-screen h-screen flex flex-row bg-linear-to-l from-black to-border overflow-hidden">
-      <div className="w-1/2 relative z-0">
+    <div className="w-screen h-screen flex flex-col sm:flex-row bg-linear-to-l from-black to-border overflow-hidden">
+      <div className="w-full sm:w-1/2 relative z-0 order-1 mb-4 sm:mb-0 max-h-[40vh] sm:max-h-none overflow-hidden">
         <MusicWave />
       </div>
-      <div className="w-1/2 flex items-center justify-center z-10">
-        <div className="min-w-[500px] w-1/2 h-4/6 bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10 backdrop-blur-md">
+      <div className="w-full sm:w-1/2 flex items-center justify-center z-10 order-2 sm:order-1">
+        <div className="min-w-[300px] w-full max-w-[500px] min-h-[70vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10 backdrop-blur-md">
           <div className="absolute top-4 left-6 flex items-center gap-2">
-            <div className="w-8 h-8 bg-linear-to-tr from-[#7c3aed] to-[#3b82f6] rounded-full"></div>
+            <img
+              src="/Beatwave_logo.png"
+              alt="Beatwave Logo"
+              className="w-8 h-8 rounded-full object-cover"
+            />
             <span className="text-2xl font-bold text-white tracking-wide">
               Beatwave
             </span>
@@ -83,6 +83,7 @@ const Login = () => {
               inputName="email"
               inputPlaceHolder="kisferenc3532@gmail.com"
               iconLeft={<Mail size={20} />}
+              wrapperClassName="mt-0"
               value={formData.email}
               onChange={handleChange}
             />
@@ -93,6 +94,7 @@ const Login = () => {
               inputPlaceHolder="•••••••"
               forgotPwd={true}
               iconLeft={<Lock size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.password}
               onChange={handleChange}
             />
@@ -103,8 +105,6 @@ const Login = () => {
               disabled={isLoading}
               className="mt-6"
             />
-
-
 
             <p className="mt-6 text-white/80">
               Nincs még fiókod?{" "}
@@ -119,18 +119,7 @@ const Login = () => {
         </div>
       </div>
 
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium"
-          >
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ErrorToast error={error} />
     </div>
   );
 };

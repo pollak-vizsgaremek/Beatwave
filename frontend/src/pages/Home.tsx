@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import api from "../utils/api";
 import TopList from "../components/TopList";
 import CurrentTrackCard from "../components/CurrentTrackCard";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 
 interface CurrentlyPlaying {
   progress_ms: number;
   is_playing: boolean;
-  name: string; 
+  name: string;
   image: string;
   artist: string;
 }
@@ -24,11 +26,16 @@ const Home = () => {
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(true);
 
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<CurrentlyPlaying | null>(null);
+  const [currentlyPlaying, setCurrentlyPlaying] =
+    useState<CurrentlyPlaying | null>(null);
   const [loadingCurrentlyPlaying, setLoadingCurrentlyPlaying] = useState(true);
 
-  const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed | null>(null);
+  const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed | null>(
+    null,
+  );
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
+
+  const { error, showError } = useErrorToast();
 
   useEffect(() => {
     let isMounted = true;
@@ -45,8 +52,12 @@ const Home = () => {
               : "https://placehold.co/300x300",
         }));
         setArtists(formattedArtists);
-      } catch (error) {
-        console.error("Error fetching top artists:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        // Only show toast for unexpected errors — not for "not connected"
+        if (err.response?.status !== 404) {
+          showError("Failed to load top artists.");
+        }
       } finally {
         if (isMounted) setLoadingArtists(false);
       }
@@ -73,8 +84,11 @@ const Home = () => {
               : "https://placehold.co/300x300",
         }));
         setTracks(formattedTracks);
-      } catch (error) {
-        console.error("Error fetching top tracks:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err.response?.status !== 404) {
+          showError("Failed to load top tracks.");
+        }
       } finally {
         if (isMounted) setLoadingTracks(false);
       }
@@ -112,8 +126,11 @@ const Home = () => {
           };
           setCurrentlyPlaying(formattedCurrentlyPlaying);
         }
-      } catch (error) {
-        console.error("Error fetching currently playing:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err.response?.status !== 404) {
+          showError("Failed to load currently playing track.");
+        }
       } finally {
         if (isMounted) {
           setLoadingCurrentlyPlaying(false);
@@ -151,8 +168,11 @@ const Home = () => {
               null,
           });
         }
-      } catch (error) {
-        console.error("Error fetching recently played tracks:", error);
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err.response?.status !== 404) {
+          showError("Failed to load recently played tracks.");
+        }
       } finally {
         if (isMounted) {
           setLoadingRecentlyPlayed(false);
@@ -164,7 +184,6 @@ const Home = () => {
       }
     };
 
-    // Fetch immediately on mount, or when currentlyPlaying changes to null
     fetchRecentlyPlayed();
 
     return () => {
@@ -179,7 +198,7 @@ const Home = () => {
         <h1 className="text-4xl sm:text-4xl md:text-5xl font-bold mt-10 mb-10 md:mb-20 text-center">
           Welcome to Beatwave
         </h1>
-        <div className="bg-card w-full sm:w-[80%] md:w-[60%] lg:w-[50%] xl:w-1/2 max-w-[500px] rounded-2xl p-8 shadow-xl whitespace-nowrap">
+        <div className="bg-card w-full sm:w-[80%] md:w-[60%] lg:w-[50%] xl:w-1/2 max-w-[500px] rounded-2xl p-6 sm:p-8 shadow-xl whitespace-normal">
           {loadingCurrentlyPlaying ? (
             <p className="text-gray-400 text-center text-sm sm:text-base">
               Loading your currently playing track...
@@ -241,6 +260,8 @@ const Home = () => {
           </p>
         )}
       </div>
+
+      <ErrorToast error={error} />
     </div>
   );
 };

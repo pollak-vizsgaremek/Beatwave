@@ -44,22 +44,18 @@ export const createUser = async (
 
     if (existingUser) {
       if (existingUser.email === email && existingUser.username === username) {
-        return res
-          .status(409)
-          .json({
-            error:
-              "A felhasználó ezzel az email címmel és felhasználónévvel már létezik",
-          });
+        return res.status(409).json({
+          error:
+            "A felhasználó ezzel az email címmel és felhasználónévvel már létezik",
+        });
       } else if (existingUser.email === email) {
         return res
           .status(409)
           .json({ error: "A felhasználó ezzel az email címmel már létezik" });
       } else {
-        return res
-          .status(409)
-          .json({
-            error: "A felhasználó ezzel a felhasználónévvel már létezik",
-          });
+        return res.status(409).json({
+          error: "A felhasználó ezzel a felhasználónévvel már létezik",
+        });
       }
     }
 
@@ -94,20 +90,28 @@ export const authenticateUser = async (
   try {
     const { email, password } = req.body;
 
+    // Guard against missing fields
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
+    // Use a single generic error for both "no user" and "wrong password"
+    // to prevent user enumeration attacks
+    const INVALID_CREDENTIALS_ERROR = "Érvénytelen email vagy jelszó";
+
     if (!user) {
-      return res.status(401).json({ error: "Nem létező felhasználó" });
+      return res.status(401).json({ error: INVALID_CREDENTIALS_ERROR });
     }
 
     const pepper = config.passwordPepper;
-
     const isValid = await bcrypt.compare(password + pepper, user.passwordHash);
 
     if (!isValid) {
-      return res.status(401).json({ error: "Hibás jelszó" });
+      return res.status(401).json({ error: INVALID_CREDENTIALS_ERROR });
     }
 
     const token = jwt.sign(

@@ -11,7 +11,7 @@ const Background = () => {
   }
 
   return (
-    <div className="fixed top-0 left-0 w-screen h-screen -z-10 bg-linear-to-r from-[#000000] to-[#13313d] overflow-hidden">
+    <div className="fixed top-0 left-0 w-screen h-screen -z-10 bg-linear-to-b from-[#000000] to-[#13313d] overflow-hidden">
       {/* Bubble 1 */}
       <div
         className="absolute rounded-full blur-[80px] opacity-60 animate-float"

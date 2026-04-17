@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router";
 import api from "../utils/api";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 
 interface SpotifyImage {
   url: string;
@@ -81,10 +83,12 @@ const SearchResult = () => {
   const [searchParams] = useSearchParams();
   const [results, setResults] = useState<SearchResults>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
   const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({});
+
+  // All errors shown as the bottom toast
+  const { error, showError } = useErrorToast();
 
   const DEFAULT_VISIBLE = 5;
   const BATCH_SIZE = 10;
@@ -104,27 +108,37 @@ const SearchResult = () => {
       return;
     }
 
-    // Otherwise, fetch 5 more from the backend
+    // Otherwise, fetch more from the backend
     setLoadingMore((prev) => ({ ...prev, [key]: true }));
     try {
-      // Build params from current search but for this single type with offset
       const params = Object.fromEntries(searchParams.entries());
-      params.type = key === "artists" ? "artist" :
-                    key === "albums" ? "album" :
-                    key === "tracks" ? "track" :
-                    key === "playlists" ? "playlist" :
-                    key === "shows" ? "show" :
-                    key === "episodes" ? "episode" :
-                    key === "audiobooks" ? "audiobook" : key;
+      params.type =
+        key === "artists"
+          ? "artist"
+          : key === "albums"
+            ? "album"
+            : key === "tracks"
+              ? "track"
+              : key === "playlists"
+                ? "playlist"
+                : key === "shows"
+                  ? "show"
+                  : key === "episodes"
+                    ? "episode"
+                    : key === "audiobooks"
+                      ? "audiobook"
+                      : key;
       params.offset = String(items.length);
       params.limit = String(BATCH_SIZE);
 
       const response = await api.get("/auth/spotify/search", { params });
-      const newItems = response.data.results?.[key]?.items?.filter(Boolean) || [];
+      const newItems =
+        response.data.results?.[key]?.items?.filter(Boolean) || [];
 
-      // Deduplicate: only add items with IDs we don't already have
       const existingIds = new Set(items.map((item: any) => item.id));
-      const uniqueNewItems = newItems.filter((item: any) => !existingIds.has(item.id));
+      const uniqueNewItems = newItems.filter(
+        (item: any) => !existingIds.has(item.id),
+      );
 
       if (uniqueNewItems.length > 0) {
         setResults((prev) => ({
@@ -134,19 +148,18 @@ const SearchResult = () => {
             items: [...items, ...uniqueNewItems],
           },
         }));
-        // Only reveal 5 more — the rest stay hidden locally for the next click
         setVisibleCounts((prev) => ({
           ...prev,
           [key]: currentVisible + 5,
         }));
       }
 
-      // If fewer than BATCH_SIZE came back, no more to load
       if (newItems.length < BATCH_SIZE) {
         setHasMore((prev) => ({ ...prev, [key]: false }));
       }
-    } catch (err) {
-      console.error(`Error loading more ${key}:`, err);
+    } catch (err: any) {
+      // Show toast instead of silently swallowing
+      showError(`Failed to load more ${key}. Please try again.`);
     } finally {
       setLoadingMore((prev) => ({ ...prev, [key]: false }));
     }
@@ -165,7 +178,6 @@ const SearchResult = () => {
       }
 
       setLoading(true);
-      setError(null);
       setVisibleCounts({});
       setHasMore({});
       setLoadingMore({});
@@ -178,14 +190,21 @@ const SearchResult = () => {
         if (!isMounted) return;
 
         if (response.data.error) {
-          setError(response.data.error);
+          showError(response.data.error);
         } else {
           const data = response.data.results || {};
           setResults(data);
 
-          // Initialize hasMore: true if a type returned at least 5 items
           const moreState: Record<string, boolean> = {};
-          const types = ["tracks", "artists", "albums", "playlists", "shows", "episodes", "audiobooks"];
+          const types = [
+            "tracks",
+            "artists",
+            "albums",
+            "playlists",
+            "shows",
+            "episodes",
+            "audiobooks",
+          ];
           for (const t of types) {
             const items = data[t]?.items?.filter(Boolean) || [];
             moreState[t] = items.length >= BATCH_SIZE;
@@ -194,7 +213,9 @@ const SearchResult = () => {
         }
       } catch (err: any) {
         if (isMounted) {
-          setError(err.response?.data?.error || "An error occurred while searching.");
+          showError(
+            err.response?.data?.error || "An error occurred while searching.",
+          );
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -215,18 +236,12 @@ const SearchResult = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-red-400 text-lg text-center px-4">{error}</div>
-      </div>
-    );
-  }
-
   if (!query) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <p className="text-gray-400 text-lg">Enter a search query to get started.</p>
+        <p className="text-gray-400 text-lg">
+          Enter a search query to get started.
+        </p>
       </div>
     );
   }
@@ -259,27 +274,35 @@ const SearchResult = () => {
             Tracks
           </h2>
           <div className="flex flex-col gap-2">
-            {results.tracks.items.filter(Boolean).slice(0, getVisible("tracks")).map((track) => (
-              <div
-                key={track.id}
-                className="flex items-center gap-4 bg-card hover:bg-accent-dark transition-colors rounded-xl p-3 cursor-pointer"
-              >
-                <img
-                  src={track.album.images?.[0]?.url || "https://placehold.co/48x48"}
-                  alt={track.name}
-                  className="w-12 h-12 rounded-lg object-cover shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-medium truncate">{track.name}</p>
-                  <p className="text-gray-400 text-sm truncate">
-                    {track.artists.map((a) => a.name).join(", ")}
-                  </p>
+            {results.tracks.items
+              .filter(Boolean)
+              .slice(0, getVisible("tracks"))
+              .map((track) => (
+                <div
+                  key={track.id}
+                  className="flex items-center gap-4 bg-card hover:bg-accent-dark transition-colors rounded-xl p-3 cursor-pointer"
+                >
+                  <img
+                    src={
+                      track.album.images?.[0]?.url ||
+                      "https://placehold.co/48x48"
+                    }
+                    alt={track.name}
+                    className="w-12 h-12 rounded-lg object-cover shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate">
+                      {track.name}
+                    </p>
+                    <p className="text-gray-400 text-sm truncate">
+                      {track.artists.map((a) => a.name).join(", ")}
+                    </p>
+                  </div>
+                  <span className="text-gray-500 text-sm shrink-0">
+                    {formatDuration(track.duration_ms)}
+                  </span>
                 </div>
-                <span className="text-gray-500 text-sm shrink-0">
-                  {formatDuration(track.duration_ms)}
-                </span>
-              </div>
-            ))}
+              ))}
           </div>
           {hasMore["tracks"] && (
             <button
@@ -300,26 +323,32 @@ const SearchResult = () => {
             Artists
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {results.artists.items.filter(Boolean).slice(0, getVisible("artists")).map((artist) => (
-              <div
-                key={artist.id}
-                className="flex flex-col items-center gap-3 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
-              >
-                <img
-                  src={artist.images?.[0]?.url || "https://placehold.co/120x120"}
-                  alt={artist.name}
-                  className="w-24 h-24 rounded-full object-cover"
-                />
-                <p className="text-white font-medium text-center text-sm truncate w-full">
-                  {artist.name}
-                </p>
-                {artist.genres && artist.genres.length > 0 && (
-                  <p className="text-gray-400 text-xs text-center truncate w-full">
-                    {artist.genres.slice(0, 2).join(", ")}
+            {results.artists.items
+              .filter(Boolean)
+              .slice(0, getVisible("artists"))
+              .map((artist) => (
+                <div
+                  key={artist.id}
+                  className="flex flex-col items-center gap-3 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                >
+                  <img
+                    src={
+                      artist.images?.[0]?.url ||
+                      "https://placehold.co/120x120"
+                    }
+                    alt={artist.name}
+                    className="w-24 h-24 rounded-full object-cover"
+                  />
+                  <p className="text-white font-medium text-center text-sm truncate w-full">
+                    {artist.name}
                   </p>
-                )}
-              </div>
-            ))}
+                  {artist.genres && artist.genres.length > 0 && (
+                    <p className="text-gray-400 text-xs text-center truncate w-full">
+                      {artist.genres.slice(0, 2).join(", ")}
+                    </p>
+                  )}
+                </div>
+              ))}
           </div>
           {hasMore["artists"] && (
             <button
@@ -340,22 +369,30 @@ const SearchResult = () => {
             Albums
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {results.albums.items.filter(Boolean).slice(0, getVisible("albums")).map((album) => (
-              <div
-                key={album.id}
-                className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
-              >
-                <img
-                  src={album.images?.[0]?.url || "https://placehold.co/160x160"}
-                  alt={album.name}
-                  className="w-full aspect-square rounded-lg object-cover"
-                />
-                <p className="text-white font-medium text-sm truncate">{album.name}</p>
-                <p className="text-gray-400 text-xs truncate">
-                  {album.artists.map((a) => a.name).join(", ")} · {album.release_date?.substring(0, 4)}
-                </p>
-              </div>
-            ))}
+            {results.albums.items
+              .filter(Boolean)
+              .slice(0, getVisible("albums"))
+              .map((album) => (
+                <div
+                  key={album.id}
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                >
+                  <img
+                    src={
+                      album.images?.[0]?.url || "https://placehold.co/160x160"
+                    }
+                    alt={album.name}
+                    className="w-full aspect-square rounded-lg object-cover"
+                  />
+                  <p className="text-white font-medium text-sm truncate">
+                    {album.name}
+                  </p>
+                  <p className="text-gray-400 text-xs truncate">
+                    {album.artists.map((a) => a.name).join(", ")} ·{" "}
+                    {album.release_date?.substring(0, 4)}
+                  </p>
+                </div>
+              ))}
           </div>
           {hasMore["albums"] && (
             <button
@@ -376,22 +413,31 @@ const SearchResult = () => {
             Playlists
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {results.playlists.items.filter(Boolean).slice(0, getVisible("playlists")).map((playlist) => (
-              <div
-                key={playlist.id}
-                className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
-              >
-                <img
-                  src={playlist.images?.[0]?.url || "https://placehold.co/160x160"}
-                  alt={playlist.name}
-                  className="w-full aspect-square rounded-lg object-cover"
-                />
-                <p className="text-white font-medium text-sm truncate">{playlist.name}</p>
-                <p className="text-gray-400 text-xs truncate">
-                  by {playlist.owner?.display_name ?? "Unknown"} · {playlist.tracks?.total ?? 0} tracks
-                </p>
-              </div>
-            ))}
+            {results.playlists.items
+              .filter(Boolean)
+              .slice(0, getVisible("playlists"))
+              .map((playlist) => (
+                <div
+                  key={playlist.id}
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                >
+                  <img
+                    src={
+                      playlist.images?.[0]?.url ||
+                      "https://placehold.co/160x160"
+                    }
+                    alt={playlist.name}
+                    className="w-full aspect-square rounded-lg object-cover"
+                  />
+                  <p className="text-white font-medium text-sm truncate">
+                    {playlist.name}
+                  </p>
+                  <p className="text-gray-400 text-xs truncate">
+                    by {playlist.owner?.display_name ?? "Unknown"} ·{" "}
+                    {playlist.tracks?.total ?? 0} tracks
+                  </p>
+                </div>
+              ))}
           </div>
           {hasMore["playlists"] && (
             <button
@@ -399,7 +445,9 @@ const SearchResult = () => {
               disabled={loadingMore["playlists"]}
               className="mt-4 mx-auto block px-6 py-2 bg-accent hover:bg-accent-dark text-white text-sm font-medium rounded-full transition-colors cursor-pointer disabled:opacity-50"
             >
-              {loadingMore["playlists"] ? "Loading..." : "Show 5 more Playlists"}
+              {loadingMore["playlists"]
+                ? "Loading..."
+                : "Show 5 more Playlists"}
             </button>
           )}
         </section>
@@ -412,20 +460,29 @@ const SearchResult = () => {
             Shows
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {results.shows.items.filter(Boolean).slice(0, getVisible("shows")).map((show) => (
-              <div
-                key={show.id}
-                className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
-              >
-                <img
-                  src={show.images?.[0]?.url || "https://placehold.co/160x160"}
-                  alt={show.name}
-                  className="w-full aspect-square rounded-lg object-cover"
-                />
-                <p className="text-white font-medium text-sm truncate">{show.name}</p>
-                <p className="text-gray-400 text-xs truncate">{show.publisher}</p>
-              </div>
-            ))}
+            {results.shows.items
+              .filter(Boolean)
+              .slice(0, getVisible("shows"))
+              .map((show) => (
+                <div
+                  key={show.id}
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                >
+                  <img
+                    src={
+                      show.images?.[0]?.url || "https://placehold.co/160x160"
+                    }
+                    alt={show.name}
+                    className="w-full aspect-square rounded-lg object-cover"
+                  />
+                  <p className="text-white font-medium text-sm truncate">
+                    {show.name}
+                  </p>
+                  <p className="text-gray-400 text-xs truncate">
+                    {show.publisher}
+                  </p>
+                </div>
+              ))}
           </div>
           {hasMore["shows"] && (
             <button
@@ -446,25 +503,34 @@ const SearchResult = () => {
             Episodes
           </h2>
           <div className="flex flex-col gap-2">
-            {results.episodes.items.filter(Boolean).slice(0, getVisible("episodes")).map((episode) => (
-              <div
-                key={episode.id}
-                className="flex items-center gap-4 bg-card hover:bg-accent-dark transition-colors rounded-xl p-3 cursor-pointer"
-              >
-                <img
-                  src={episode.images?.[0]?.url || "https://placehold.co/48x48"}
-                  alt={episode.name}
-                  className="w-12 h-12 rounded-lg object-cover shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-medium truncate">{episode.name}</p>
-                  <p className="text-gray-400 text-sm truncate">{episode.release_date}</p>
+            {results.episodes.items
+              .filter(Boolean)
+              .slice(0, getVisible("episodes"))
+              .map((episode) => (
+                <div
+                  key={episode.id}
+                  className="flex items-center gap-4 bg-card hover:bg-accent-dark transition-colors rounded-xl p-3 cursor-pointer"
+                >
+                  <img
+                    src={
+                      episode.images?.[0]?.url || "https://placehold.co/48x48"
+                    }
+                    alt={episode.name}
+                    className="w-12 h-12 rounded-lg object-cover shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate">
+                      {episode.name}
+                    </p>
+                    <p className="text-gray-400 text-sm truncate">
+                      {episode.release_date}
+                    </p>
+                  </div>
+                  <span className="text-gray-500 text-sm shrink-0">
+                    {formatDuration(episode.duration_ms)}
+                  </span>
                 </div>
-                <span className="text-gray-500 text-sm shrink-0">
-                  {formatDuration(episode.duration_ms)}
-                </span>
-              </div>
-            ))}
+              ))}
           </div>
           {hasMore["episodes"] && (
             <button
@@ -485,22 +551,29 @@ const SearchResult = () => {
             Audiobooks
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {results.audiobooks.items.filter(Boolean).slice(0, getVisible("audiobooks")).map((book) => (
-              <div
-                key={book.id}
-                className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
-              >
-                <img
-                  src={book.images?.[0]?.url || "https://placehold.co/160x160"}
-                  alt={book.name}
-                  className="w-full aspect-square rounded-lg object-cover"
-                />
-                <p className="text-white font-medium text-sm truncate">{book.name}</p>
-                <p className="text-gray-400 text-xs truncate">
-                  {book.authors.map((a) => a.name).join(", ")}
-                </p>
-              </div>
-            ))}
+            {results.audiobooks.items
+              .filter(Boolean)
+              .slice(0, getVisible("audiobooks"))
+              .map((book) => (
+                <div
+                  key={book.id}
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                >
+                  <img
+                    src={
+                      book.images?.[0]?.url || "https://placehold.co/160x160"
+                    }
+                    alt={book.name}
+                    className="w-full aspect-square rounded-lg object-cover"
+                  />
+                  <p className="text-white font-medium text-sm truncate">
+                    {book.name}
+                  </p>
+                  <p className="text-gray-400 text-xs truncate">
+                    {book.authors.map((a) => a.name).join(", ")}
+                  </p>
+                </div>
+              ))}
           </div>
           {hasMore["audiobooks"] && (
             <button
@@ -508,11 +581,15 @@ const SearchResult = () => {
               disabled={loadingMore["audiobooks"]}
               className="mt-4 mx-auto block px-6 py-2 bg-accent hover:bg-accent-dark text-white text-sm font-medium rounded-full transition-colors cursor-pointer disabled:opacity-50"
             >
-              {loadingMore["audiobooks"] ? "Loading..." : "Show 5 more Audiobooks"}
+              {loadingMore["audiobooks"]
+                ? "Loading..."
+                : "Show 5 more Audiobooks"}
             </button>
           )}
         </section>
       )}
+
+      <ErrorToast error={error} />
     </div>
   );
 };
