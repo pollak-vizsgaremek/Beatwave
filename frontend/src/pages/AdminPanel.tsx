@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Users, FileText, MessageSquare, Shield, Trash2 } from "lucide-react";
 import api from "../utils/api";
 

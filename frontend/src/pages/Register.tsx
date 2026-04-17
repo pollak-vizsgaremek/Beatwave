@@ -66,13 +66,34 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      await api.post("/register", {
+      const registerResponse = await api.post("/register", {
         email: formData.email,
         username: formData.username,
         password: formData.password,
       });
 
-      navigate("/login");
+      if (registerResponse.data?.token) {
+        localStorage.setItem("token", registerResponse.data.token);
+        localStorage.setItem(
+          "user",
+          JSON.stringify(registerResponse.data.user || {}),
+        );
+        window.location.href = "/home";
+        return;
+      }
+
+      const response = await api.post("/login", {
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (response.data.token) {
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user || {}));
+        window.location.href = "/home";
+      } else {
+        showError("Registration succeeded, but login response was invalid.");
+      }
     } catch (err: any) {
       showError(
         err.response?.data?.error || err.message || "Registration failed",

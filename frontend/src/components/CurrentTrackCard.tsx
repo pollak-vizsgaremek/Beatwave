@@ -21,9 +21,11 @@ const CurrentlyPlayingCard = ({
           <p className="text-xl sm:text-2xl font-semibold break-words">
             {name}
           </p>
-          <p className="text-base sm:text-lg font-light italic h-auto overflow-hidden no-scrollbar break-words">
-            {artist}
-          </p>
+          {artist ? (
+            <p className="text-base sm:text-lg font-light italic h-auto overflow-hidden no-scrollbar break-words">
+              {artist}
+            </p>
+          ) : null}
         </div>
         <p className="text-base sm:text-xl text-gray-400">{text}</p>
       </div>

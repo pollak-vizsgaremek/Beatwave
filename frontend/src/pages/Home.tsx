@@ -31,13 +31,37 @@ const Home = () => {
   const [currentlyPlaying, setCurrentlyPlaying] =
     useState<CurrentlyPlaying | null>(null);
   const [loadingCurrentlyPlaying, setLoadingCurrentlyPlaying] = useState(true);
+  const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(
+    null,
+  );
 
   const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed | null>(
-    null
+    null,
   );
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
 
   const { error, showError } = useErrorToast();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSpotifyConnection = async () => {
+      try {
+        const response = await api.get("/user-profile");
+        if (!isMounted) return;
+        setSpotifyConnected(response.data.spotifyConnected ?? false);
+      } catch {
+        if (!isMounted) return;
+        setSpotifyConnected(false);
+      }
+    };
+
+    fetchSpotifyConnection();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -46,6 +70,12 @@ const Home = () => {
         const response = await api.get("/auth/spotify/top/artists");
         if (!isMounted) return;
 
+        if (response.data.connected === false) {
+          setSpotifyConnected(false);
+          setArtists([]);
+          return;
+        }
+
         const formattedArtists = response.data.items.map((artist: any) => ({
           name: artist.name,
           image:
@@ -53,11 +83,14 @@ const Home = () => {
               ? artist.images[0].url
               : "https://placehold.co/300x300",
         }));
+        setSpotifyConnected(true);
         setArtists(formattedArtists);
       } catch (err: any) {
         if (!isMounted) return;
         // Only show toast for unexpected errors — not for "not connected"
-        if (err.response?.status !== 404) {
+        if (err.response?.status === 404) {
+          setSpotifyConnected(false);
+        } else {
           showError("Failed to load top artists.");
         }
       } finally {
@@ -78,6 +111,12 @@ const Home = () => {
         const response = await api.get("/auth/spotify/top/tracks");
         if (!isMounted) return;
 
+        if (response.data.connected === false) {
+          setSpotifyConnected(false);
+          setTracks([]);
+          return;
+        }
+
         const formattedTracks = response.data.items.map((track: any) => ({
           name: track.name,
           image:
@@ -85,10 +124,13 @@ const Home = () => {
               ? track.album.images[0].url
               : "https://placehold.co/300x300",
         }));
+        setSpotifyConnected(true);
         setTracks(formattedTracks);
       } catch (err: any) {
         if (!isMounted) return;
-        if (err.response?.status !== 404) {
+        if (err.response?.status === 404) {
+          setSpotifyConnected(false);
+        } else {
           showError("Failed to load top tracks.");
         }
       } finally {
@@ -111,6 +153,14 @@ const Home = () => {
         const response = await api.get("/auth/spotify/currently-playing");
         if (!isMounted) return;
 
+        if (response.data?.connected === false) {
+          setSpotifyConnected(false);
+          setCurrentlyPlaying(null);
+          return;
+        }
+
+        setSpotifyConnected(true);
+
         if (response.status === 204 || !response.data || !response.data.item) {
           setCurrentlyPlaying(null);
         } else {
@@ -130,7 +180,10 @@ const Home = () => {
         }
       } catch (err: any) {
         if (!isMounted) return;
-        if (err.response?.status !== 404) {
+        if (err.response?.status === 404) {
+          setSpotifyConnected(false);
+          setCurrentlyPlaying(null);
+        } else {
           showError("Failed to load currently playing track.");
         }
       } finally {
@@ -159,6 +212,14 @@ const Home = () => {
         const response = await api.get("/auth/spotify/recently-played/1");
         if (!isMounted) return;
 
+        if (response.data?.connected === false) {
+          setSpotifyConnected(false);
+          setRecentlyPlayed(null);
+          return;
+        }
+
+        setSpotifyConnected(true);
+
         if (response.data?.items?.length > 0) {
           const track = response.data.items[0].track;
           setRecentlyPlayed({
@@ -169,10 +230,15 @@ const Home = () => {
               track.artists?.map((artist: any) => artist.name).join(", ") ??
               null,
           });
+        } else {
+          setRecentlyPlayed(null);
         }
       } catch (err: any) {
         if (!isMounted) return;
-        if (err.response?.status !== 404) {
+        if (err.response?.status === 404) {
+          setSpotifyConnected(false);
+          setRecentlyPlayed(null);
+        } else {
           showError("Failed to load recently played tracks.");
         }
       } finally {
@@ -201,7 +267,19 @@ const Home = () => {
           Welcome to Beatwave
         </h1>
         <div className="bg-card w-full sm:w-[80%] md:w-[60%] lg:w-[50%] xl:w-1/2 max-w-[500px] rounded-2xl p-6 sm:p-8 shadow-xl whitespace-normal">
-          {loadingCurrentlyPlaying ? (
+          {spotifyConnected === false ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[180px] gap-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-3xl">
+                ♪
+              </div>
+              <span className="text-lg sm:text-xl font-medium">
+                Spotify is not connected
+              </span>
+              <p className="text-gray-400 text-sm sm:text-base max-w-sm">
+                Connect your Spotify account in your profile settings
+              </p>
+            </div>
+          ) : loadingCurrentlyPlaying ? (
             <p className="text-gray-400 text-center text-sm sm:text-base">
               Loading your currently playing track...
             </p>
@@ -210,17 +288,21 @@ const Home = () => {
               <span className="text-lg sm:text-xl text-center font-medium">
                 Here is your last played music
               </span>
-              {loadingRecentlyPlayed || !recentlyPlayed ? (
+              {loadingRecentlyPlayed ? (
                 <p className="text-gray-400 text-sm sm:text-base text-center">
                   Loading your last played track...
                 </p>
-              ) : (
+              ) : recentlyPlayed ? (
                 <CurrentTrackCard
                   name={recentlyPlayed.name ?? ""}
                   image={recentlyPlayed.image ?? ""}
                   artist={recentlyPlayed.artist ?? ""}
                   text="The Last Played Music"
                 />
+              ) : (
+                <p className="text-gray-400 text-sm sm:text-base text-center">
+                  No recently played track found.
+                </p>
               )}
             </div>
           ) : (
@@ -238,49 +320,51 @@ const Home = () => {
             </div>
           )}
 
-          <div className="w-full flex justify-center mt-4 gap-10">
-            <motion.div
-              whileTap={{ scale: 0.75 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <SkipBack
-                size={36}
-                className="cursor-pointer hover:text-gray-400 active:text-gray-500"
-              />
-            </motion.div>
-
-            {loadingCurrentlyPlaying ? null : currentlyPlaying?.is_playing ? (
+          {spotifyConnected !== false && (
+            <div className="w-full flex justify-center mt-4 gap-10">
               <motion.div
                 whileTap={{ scale: 0.75 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
-                <Pause
-                  className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                <SkipBack
                   size={36}
+                  className="cursor-pointer hover:text-gray-400 active:text-gray-500"
                 />
               </motion.div>
-            ) : (
+
+              {loadingCurrentlyPlaying ? null : currentlyPlaying?.is_playing ? (
+                <motion.div
+                  whileTap={{ scale: 0.75 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <Pause
+                    className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                    size={36}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  whileTap={{ scale: 0.75 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <Play
+                    className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                    size={36}
+                  />
+                </motion.div>
+              )}
+
               <motion.div
                 whileTap={{ scale: 0.75 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >
-                <Play
-                  className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                <SkipForward
                   size={36}
+                  className="cursor-pointer hover:text-gray-400 active:text-gray-500"
                 />
               </motion.div>
-            )}
-
-            <motion.div
-              whileTap={{ scale: 0.75 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <SkipForward
-                size={36}
-                className="cursor-pointer hover:text-gray-400 active:text-gray-500"
-              />
-            </motion.div>
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
