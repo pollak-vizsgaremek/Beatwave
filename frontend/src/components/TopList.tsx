@@ -7,6 +7,9 @@ type TopListProps = { list: { name: string; image: string }[]; title: string };
 
 const TopList = ({ list, title }: TopListProps) => {
   const topListScroll = useRef<HTMLDivElement | null>(null);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startScrollLeft = useRef(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
@@ -29,6 +32,34 @@ const TopList = ({ list, title }: TopListProps) => {
     const scrollAmount = 250;
     topListScroll.current.scrollLeft +=
       direction === "left" ? -scrollAmount : scrollAmount;
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!topListScroll.current) return;
+    isDragging.current = true;
+    startX.current = e.clientX;
+    startScrollLeft.current = topListScroll.current.scrollLeft;
+    topListScroll.current.style.cursor = "grabbing";
+    topListScroll.current.style.scrollBehavior = "auto";
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current || !topListScroll.current) return;
+    e.preventDefault();
+    const walk = (e.clientX - startX.current) * 1.15;
+    topListScroll.current.scrollLeft = startScrollLeft.current - walk;
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isDragging.current = false;
+    if (topListScroll.current) {
+      topListScroll.current.style.cursor = "grab";
+      topListScroll.current.style.scrollBehavior = "smooth";
+    }
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
   };
 
   return (
@@ -69,9 +100,14 @@ const TopList = ({ list, title }: TopListProps) => {
         </div>
       </div>
       <div
-        className="flex flex-row overflow-x-auto overflow-y-hidden sm:overflow-auto overscroll-auto ml-0 sm:ml-6 scroll-smooth no-scrollbar"
+        className="flex flex-row overflow-x-auto overflow-y-hidden sm:overflow-auto overscroll-x-contain ml-0 sm:ml-6 no-scrollbar cursor-grab select-none active:cursor-grabbing"
         ref={topListScroll}
         onScroll={handleScroll}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        style={{ touchAction: "pan-y" }}
       >
         {list.map((list, i) => (
           <Card key={i} name={list.name} image={list.image} placing={i + 1} />

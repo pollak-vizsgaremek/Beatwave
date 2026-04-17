@@ -8,7 +8,7 @@ const TopCard = ({
   placing: number;
 }) => {
   return (
-    <div className="mr-6 sm:mr-12 mt-5 shrink-0 text-center min-w-[10rem] select-none">
+    <div className="mr-6 sm:mr-12 mt-5 shrink-0 text-center min-w-[10rem] select-none pointer-events-none">
       <h1 className="font-bold text-2xl mb-2">#{placing}</h1>
       <div
         style={{ backgroundImage: `url(${image})` }}
