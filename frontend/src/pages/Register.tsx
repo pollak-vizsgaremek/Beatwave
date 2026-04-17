@@ -148,7 +148,7 @@ const Register = () => {
               (() => {
                 const reqs = {
                   "8+ karakter": formData.password.length >= 8,
-                  "Tartalmaz or számot": /\d/.test(formData.password),
+                  "Tartalmaz számot": /\d/.test(formData.password),
                   "Tartalmaz szimbólumot": /[!@#$%^&*(),.?":{}|<>+-]/.test(
                     formData.password,
                   ),

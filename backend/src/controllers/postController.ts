@@ -1,12 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 
-// Shared user select — only expose id + username, never email or other sensitive fields
-const USER_SELECT = {
-  id: true,
-  username: true,
-} as const;
-
 const MAX_TITLE_LENGTH = 200;
 const MAX_TEXT_LENGTH = 10000;
 const MAX_TOPIC_LENGTH = 100;
@@ -14,12 +8,12 @@ const MAX_TOPIC_LENGTH = 100;
 export const getPosts = async (
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
   try {
     const getAllPosts = await prisma.post.findMany({
       include: {
-        user: { select: USER_SELECT },
+        user: { select: { id: true, username: true } },
       },
       orderBy: {
         postedAt: "desc",
@@ -36,7 +30,7 @@ export const getPosts = async (
 export const getPostById = async (
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
   try {
     const { id } = req.params;
@@ -44,13 +38,13 @@ export const getPostById = async (
     const getPost = await prisma.post.findUnique({
       where: { id },
       include: {
-        user: { select: USER_SELECT },
+        user: { select: { id: true, username: true } },
         comments: {
           include: {
-            user: { select: USER_SELECT },
+            user: { select: { id: true, username: true } },
             replies: {
               include: {
-                user: { select: USER_SELECT },
+                user: { select: { id: true, username: true } },
               },
             },
           },
@@ -71,7 +65,7 @@ export const getPostById = async (
 export const createPost = async (
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
   try {
     const { text, title, topic, hashtags } = req.body;
@@ -85,24 +79,24 @@ export const createPost = async (
       return res.status(400).json({ error: "Title is required." });
     }
     if (title.trim().length > MAX_TITLE_LENGTH) {
-      return res
-        .status(400)
-        .json({ error: `Title must be at most ${MAX_TITLE_LENGTH} characters.` });
+      return res.status(400).json({
+        error: `Title must be at most ${MAX_TITLE_LENGTH} characters.`,
+      });
     }
 
     if (!text || typeof text !== "string" || !text.trim()) {
       return res.status(400).json({ error: "Post text is required." });
     }
     if (text.trim().length > MAX_TEXT_LENGTH) {
-      return res
-        .status(400)
-        .json({ error: `Post text must be at most ${MAX_TEXT_LENGTH} characters.` });
+      return res.status(400).json({
+        error: `Post text must be at most ${MAX_TEXT_LENGTH} characters.`,
+      });
     }
 
     if (topic && topic.trim().length > MAX_TOPIC_LENGTH) {
-      return res
-        .status(400)
-        .json({ error: `Topic must be at most ${MAX_TOPIC_LENGTH} characters.` });
+      return res.status(400).json({
+        error: `Topic must be at most ${MAX_TOPIC_LENGTH} characters.`,
+      });
     }
 
     const createdPost = await prisma.post.create({
