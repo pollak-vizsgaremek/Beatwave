@@ -1,10 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 
+// Shared user select — only expose what the frontend needs, never email or passwordHash
+const USER_SELECT = {
+  id: true,
+  username: true,
+} as const;
+
+const MAX_COMMENT_LENGTH = 2000;
+
 export const getCommentsByPostId = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -12,14 +20,14 @@ export const getCommentsByPostId = async (
     const comments = await prisma.comment.findMany({
       where: {
         postId: id,
-        previousCommentId: null, // Only fetch top-level comments directly, as replies come in inclusion
+        previousCommentId: null, // Only fetch top-level comments; replies come via inclusion
       },
       include: {
-        user: true,
+        user: { select: USER_SELECT },
         likes: true,
         replies: {
           include: {
-            user: true,
+            user: { select: USER_SELECT },
             likes: true,
           },
         },
@@ -51,7 +59,7 @@ export const getCommentsByPostId = async (
 export const createComment = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id: postId } = req.params;
@@ -59,6 +67,16 @@ export const createComment = async (
 
     if (!req.userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Input validation
+    if (!text || typeof text !== "string" || !text.trim()) {
+      return res.status(400).json({ error: "Comment text is required." });
+    }
+    if (text.trim().length > MAX_COMMENT_LENGTH) {
+      return res.status(400).json({
+        error: `Comment must be at most ${MAX_COMMENT_LENGTH} characters.`,
+      });
     }
 
     const post = await prisma.post.findUnique({
@@ -72,24 +90,25 @@ export const createComment = async (
 
     const newComment = await prisma.comment.create({
       data: {
-        text,
+        text: text.trim(),
         postId,
         userId: req.userId,
         previousCommentId: previousCommentId || null,
       },
       include: {
-        user: true,
+        user: { select: USER_SELECT },
         replies: {
           include: {
-            user: true,
+            user: { select: USER_SELECT },
           },
         },
       },
     });
 
-    // Handle Notification
+    // Handle notification — lookup trigger user separately (already validated above)
     const triggerUser = await prisma.user.findUnique({
       where: { id: req.userId },
+      select: { username: true },
     });
 
     if (previousCommentId) {
@@ -119,7 +138,7 @@ export const createComment = async (
       });
     }
 
-    res.status(200).json(newComment);
+    res.status(201).json(newComment);
   } catch (error) {
     next(error);
   }
@@ -128,7 +147,7 @@ export const createComment = async (
 export const likeComment = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     const { id } = req.params;
@@ -148,33 +167,33 @@ export const likeComment = async (
     let isLiked = false;
 
     if (existingLike) {
-      // Unlike
-      await prisma.commentLike.delete({
-        where: { id: existingLike.id },
-      });
-      comment = await prisma.comment.update({
-        where: { id },
-        data: { likeAmount: { decrement: 1 } },
-        include: { user: true },
-      });
+      // Unlike — wrap in a transaction to keep the like row and counter in sync
+      [, comment] = await prisma.$transaction([
+        prisma.commentLike.delete({ where: { id: existingLike.id } }),
+        prisma.comment.update({
+          where: { id },
+          data: { likeAmount: { decrement: 1 } },
+          include: { user: { select: USER_SELECT } },
+        }),
+      ]);
       isLiked = false;
     } else {
-      // Like
-      await prisma.commentLike.create({
-        data: {
-          userId: req.userId,
-          commentId: id,
-        },
-      });
-      comment = await prisma.comment.update({
-        where: { id },
-        data: { likeAmount: { increment: 1 } },
-        include: { user: true },
-      });
+      // Like — wrap in a transaction to keep the like row and counter in sync
+      [, comment] = await prisma.$transaction([
+        prisma.commentLike.create({
+          data: { userId: req.userId, commentId: id },
+        }),
+        prisma.comment.update({
+          where: { id },
+          data: { likeAmount: { increment: 1 } },
+          include: { user: { select: USER_SELECT } },
+        }),
+      ]);
       isLiked = true;
 
       const triggerUser = await prisma.user.findUnique({
         where: { id: req.userId },
+        select: { username: true },
       });
 
       if (comment.userId !== req.userId && triggerUser) {

@@ -1,24 +1,24 @@
 import { Mail, Lock, User, CheckCircle2, Circle } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect } from "react";
 
 import Input from "../components/Input";
 import MusicWave from "../components/MusicWave";
 import Button from "../components/Button";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 
 const Register = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { error, showError } = useErrorToast();
 
-  const showError = (msg: string) => {
-    setError(msg);
-    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
-    errorTimeoutRef.current = setTimeout(() => setError(null), 5000);
-  };
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      navigate("/home");
+    }
+  }, [navigate]);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -28,11 +28,10 @@ const Register = () => {
   });
 
   const [strengthScore, setStrengthScore] = useState(0);
-
   const [canRegister, setCanRegister] = useState(false);
 
   useEffect(() => {
-    const { password, confirmPassword } = formData;
+    const { email, username, password, confirmPassword } = formData;
 
     const reqs = {
       length: password.length >= 8,
@@ -46,12 +45,18 @@ const Register = () => {
 
     const allMet = Object.values(reqs).every(Boolean);
     const match = password === confirmPassword && password !== "";
-    setCanRegister(allMet && match);
-  }, [formData.password, formData.confirmPassword]);
+    const fieldsFilledIn =
+      email.trim().length > 0 && username.trim().length > 0;
+    setCanRegister(allMet && match && fieldsFilledIn);
+  }, [
+    formData.email,
+    formData.username,
+    formData.password,
+    formData.confirmPassword,
+  ]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (error) setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,7 +64,6 @@ const Register = () => {
     if (!canRegister) return;
 
     setIsLoading(true);
-    setError(null);
 
     try {
       await api.post("/register", {
@@ -79,12 +83,15 @@ const Register = () => {
   };
 
   return (
-    <div className="flex flex-row h-screen w-screen bg-linear-to-r from-black to-border">
-      <div className="w-1/2 flex items-center justify-center">
-        <div className="min-w-[500px] w-1/2 h-5/6 bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-10">
+    <div className="flex flex-col sm:flex-row h-screen w-screen bg-linear-to-r from-black to-border">
+      <div className="w-full sm:w-1/2 flex items-center justify-center order-2 sm:order-1">
+        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
           <div className="absolute top-4 left-6 flex items-center gap-2">
-            {/* You can Replace this with an actual SVG logo if available */}
-            <div className="w-8 h-8 bg-linear-to-tr from-[#7c3aed] to-[#3b82f6] rounded-full"></div>
+            <img
+              src="/Beatwave_logo.png"
+              alt="Beatwave Logo"
+              className="w-8 h-8 rounded-full object-cover"
+            />
             <span className="text-2xl font-bold text-white tracking-wide">
               Beatwave
             </span>
@@ -112,6 +119,7 @@ const Register = () => {
               inputName="username"
               inputPlaceHolder="kisferenc3532"
               iconLeft={<User size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.username}
               onChange={handleChange}
             />
@@ -121,6 +129,7 @@ const Register = () => {
               inputName="password"
               inputPlaceHolder="•••••••"
               iconLeft={<Lock size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.password}
               onChange={handleChange}
             />
@@ -130,6 +139,7 @@ const Register = () => {
               inputName="confirmPassword"
               inputPlaceHolder="•••••••"
               iconLeft={<Lock size={20} />}
+              wrapperClassName="mt-2 sm:mt-4"
               value={formData.confirmPassword}
               onChange={handleChange}
             />
@@ -168,10 +178,9 @@ const Register = () => {
                       </span>
                     </div>
 
-                    {/* Segmented Progress Bar */}
                     <div className="flex gap-1.5 h-1.5 w-full mb-4">
                       {[1, 2, 3, 4].map((segment) => {
-                        let bgColor = "bg-white/10"; // default empty
+                        let bgColor = "bg-white/10";
                         if (segment <= strengthScore) {
                           if (strengthScore <= 1)
                             bgColor =
@@ -192,7 +201,6 @@ const Register = () => {
                       })}
                     </div>
 
-                    {/* Visual Checklist */}
                     <div className="grid grid-cols-2 gap-y-2 gap-x-4 mt-2">
                       {Object.entries(reqs).map(([label, isMet]) => (
                         <div key={label} className="flex items-center gap-2">
@@ -220,10 +228,10 @@ const Register = () => {
               labelTitle={isLoading ? "Loading..." : "Regisztrálás"}
               type="submit"
               disabled={!canRegister || isLoading}
-              className="mt-6 absolute bottom-15"
+              className="mt-3 sm:mt-12"
             />
           </form>
-          <p className="mt-6  absolute bottom-5 text-white/80">
+          <p className="mt-6 mb-6 text-white/80">
             Van már fiókod?{" "}
             <Link
               to="/login"
@@ -234,22 +242,11 @@ const Register = () => {
           </p>
         </div>
       </div>
-      <div className="w-1/2 relative">
+      <div className="w-full sm:w-1/2 relative order-1 sm:order-2 mb-4 sm:mb-0 max-h-[40vh] sm:max-h-none overflow-hidden">
         <MusicWave />
       </div>
 
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium"
-          >
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ErrorToast error={error} />
     </div>
   );
 };

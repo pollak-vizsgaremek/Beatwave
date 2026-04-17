@@ -12,6 +12,10 @@ import type { DiscussionType, CommentType } from "../utils/Type";
 import api from "../utils/api";
 import formatRelative from "../utils/DateFormatting";
 import Button from "../components/Button";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
+
+const MAX_COMMENT_LENGTH = 2000;
 
 const ViewDiscussion = () => {
   const { id } = useParams();
@@ -31,13 +35,20 @@ const ViewDiscussion = () => {
     new Set(),
   );
 
+  // Submission loading states to prevent double-clicks
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+
+  const { error, showError } = useErrorToast();
+
   useEffect(() => {
     const fetchPost = async () => {
       try {
         const response = await api.get(`/post/${id}`);
         setPostData(response.data);
-      } catch (error) {
-        console.error("Error fetching Post:", error);
+      } catch (err: any) {
+        console.error("Error fetching Post:", err);
+        showError(err.response?.data?.error || "Failed to load post.");
       } finally {
         setLoadingPost(false);
       }
@@ -47,8 +58,9 @@ const ViewDiscussion = () => {
       try {
         const response = await api.get(`/post/${id}/comments`);
         setComments(response.data);
-      } catch (error) {
-        console.error("Error fetching comments:", error);
+      } catch (err: any) {
+        console.error("Error fetching comments:", err);
+        showError(err.response?.data?.error || "Failed to load comments.");
       } finally {
         setLoadingComments(false);
       }
@@ -61,23 +73,42 @@ const ViewDiscussion = () => {
   }, [id]);
 
   const handleCommentSubmit = async () => {
-    if (!commentText.trim()) return;
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+
+    if (trimmed.length > MAX_COMMENT_LENGTH) {
+      showError(`Comment must be at most ${MAX_COMMENT_LENGTH} characters.`);
+      return;
+    }
+
+    setIsSubmittingComment(true);
     try {
       const response = await api.post(`/post/${id}/comments`, {
-        text: commentText,
+        text: trimmed,
       });
       setComments([...comments, response.data]);
       setCommentText("");
-    } catch (error) {
-      console.error("Error posting comment:", error);
+    } catch (err: any) {
+      console.error("Error posting comment:", err);
+      showError(err.response?.data?.error || "Failed to post comment.");
+    } finally {
+      setIsSubmittingComment(false);
     }
   };
 
   const handleReplySubmit = async (parentId: string) => {
-    if (!replyText.trim()) return;
+    const trimmed = replyText.trim();
+    if (!trimmed) return;
+
+    if (trimmed.length > MAX_COMMENT_LENGTH) {
+      showError(`Reply must be at most ${MAX_COMMENT_LENGTH} characters.`);
+      return;
+    }
+
+    setIsSubmittingReply(true);
     try {
       const response = await api.post(`/post/${id}/comments`, {
-        text: replyText,
+        text: trimmed,
         previousCommentId: parentId,
       });
 
@@ -96,8 +127,11 @@ const ViewDiscussion = () => {
       setReplyText("");
       setReplyingTo(null);
       setExpandedReplies((prev) => new Set(prev).add(parentId));
-    } catch (error) {
-      console.error("Error posting reply:", error);
+    } catch (err: any) {
+      console.error("Error posting reply:", err);
+      showError(err.response?.data?.error || "Failed to post reply.");
+    } finally {
+      setIsSubmittingReply(false);
     }
   };
 
@@ -142,8 +176,9 @@ const ViewDiscussion = () => {
           }),
         );
       }
-    } catch (error) {
-      console.error("Error liking comment:", error);
+    } catch (err: any) {
+      console.error("Error liking comment:", err);
+      showError(err.response?.data?.error || "Failed to like comment.");
     }
   };
 
@@ -237,8 +272,9 @@ const ViewDiscussion = () => {
                   onChange={(e) => setCommentText(e.target.value)}
                 />
                 <Button
-                  labelTitle="Post Comment"
+                  labelTitle={isSubmittingComment ? "Posting..." : "Post Comment"}
                   onClick={handleCommentSubmit}
+                  disabled={isSubmittingComment}
                   className="mt-0! px-6 py-2.5 self-end! text-sm font-bold bg-spotify-green hover:bg-spotify-green/80 border-none"
                 />
               </div>
@@ -325,9 +361,10 @@ const ViewDiscussion = () => {
                             </button>
                             <button
                               onClick={() => handleReplySubmit(comment.id)}
-                              className="px-5 py-2 bg-spotify-green text-black text-sm font-bold rounded-full hover:bg-spotify-green/80 transition-colors cursor-pointer"
+                              disabled={isSubmittingReply}
+                              className="px-5 py-2 bg-spotify-green text-black text-sm font-bold rounded-full hover:bg-spotify-green/80 transition-colors cursor-pointer disabled:opacity-50"
                             >
-                              Reply
+                              {isSubmittingReply ? "Posting..." : "Reply"}
                             </button>
                           </div>
                         </div>
@@ -407,6 +444,8 @@ const ViewDiscussion = () => {
           </div>
         )}
       </div>
+
+      <ErrorToast error={error} />
     </div>
   );
 };

@@ -38,7 +38,7 @@ const MusicWave = () => {
         })}
       </div>
       <p
-        className={`mt-12 text-5xl font-bold text-white tracking-widest uppercase opacity-80 transition-all duration-500 ${
+        className={`mt-6 sm:mt-12 text-5xl font-bold text-white tracking-widest uppercase opacity-80 transition-all duration-500 ${
           isTransitioning ? "scale-95 opacity-50" : "scale-100 opacity-80"
         }`}
       >

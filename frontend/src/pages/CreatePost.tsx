@@ -1,9 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { motion, AnimatePresence } from "framer-motion";
 
 import Button from "../components/Button";
+import ErrorToast from "../components/ErrorToast";
+import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
+
+const MAX_TITLE = 200;
+const MAX_TEXT = 10000;
+const MAX_TOPIC = 100;
 
 const CreateDiscusson = () => {
   const navigate = useNavigate();
@@ -14,18 +19,11 @@ const CreateDiscusson = () => {
     text: "",
   });
 
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { error, showError } = useErrorToast();
 
   const hashtagInputRef = useRef<HTMLInputElement>(null);
   const [cursorPosition, setCursorPosition] = useState<number | null>(null);
-
-  const showError = (msg: string) => {
-    setError(msg);
-    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
-    errorTimeoutRef.current = setTimeout(() => setError(null), 5000);
-  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -55,8 +53,6 @@ const CreateDiscusson = () => {
     if (name === "hashtags") {
       setCursorPosition(newCursor);
     }
-
-    if (error) setError(null);
   };
 
   useEffect(() => {
@@ -68,23 +64,37 @@ const CreateDiscusson = () => {
   const SubmitPost = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (
-      !formData.title.trim() ||
-      !formData.topic.trim() ||
-      !formData.text.trim()
-    ) {
-      showError("Please fill in all required fields (Title, Topic, Text).");
+    if (!formData.title.trim()) {
+      showError("Title is required.");
+      return;
+    }
+    if (formData.title.trim().length > MAX_TITLE) {
+      showError(`Title must be at most ${MAX_TITLE} characters.`);
+      return;
+    }
+    if (!formData.topic.trim()) {
+      showError("Topic is required.");
+      return;
+    }
+    if (formData.topic.trim().length > MAX_TOPIC) {
+      showError(`Topic must be at most ${MAX_TOPIC} characters.`);
+      return;
+    }
+    if (!formData.text.trim()) {
+      showError("Post text is required.");
+      return;
+    }
+    if (formData.text.trim().length > MAX_TEXT) {
+      showError(`Post text must be at most ${MAX_TEXT} characters.`);
       return;
     }
 
     setIsLoading(true);
-    setError(null);
 
     try {
       await api.post("/posts", formData);
       navigate("/discussion");
     } catch (err: any) {
-      console.error("Failed to create post:", err);
       showError(
         err.response?.data?.error || "Failed to create post. Please try again.",
       );
@@ -133,7 +143,7 @@ const CreateDiscusson = () => {
           <input
             type="text"
             name="hashtags"
-            ref={hashtagInputRef} // <-- Attached the ref here
+            ref={hashtagInputRef}
             placeholder="Hashtags (e.g. #music #beatwave)"
             value={formData.hashtags}
             onChange={handleChange}
@@ -149,18 +159,7 @@ const CreateDiscusson = () => {
         </div>
       </form>
 
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium"
-          >
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ErrorToast error={error} />
     </div>
   );
 };

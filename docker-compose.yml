@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: beatwave-mysql
+    ports:
+      # Maps your local machine's port 3306 to the container's port 3306.
+      - "3306:3306"
+    environment:
+      # We allow an empty root password to match your current Prisma/XAMPP .env file config.
+      MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+      # Automatically creates a database named 'beatwave' string up.
+      MYSQL_DATABASE: 'beatwave'
+    volumes:
+      # This ensures your database information is persisted even if the container is destroyed.
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
