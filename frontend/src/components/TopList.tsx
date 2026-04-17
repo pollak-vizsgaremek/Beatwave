@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import Card from "./TopCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { motion } from "framer-motion";
 
 type TopListProps = { list: { name: string; image: string }[]; title: string };
 
@@ -41,17 +42,29 @@ const TopList = ({ list, title }: TopListProps) => {
             type="button"
             onClick={() => handleNav("left")}
             disabled={!canScrollLeft}
-            className={`hidden sm:inline-flex transition-colors ${canScrollLeft ? "cursor-pointer hover:text-white" : "text-gray-600"}`}
+            className={`hidden sm:inline-flex transition-colors ${
+              canScrollLeft
+                ? "cursor-pointer hover:text-white"
+                : "text-gray-600"
+            }`}
           >
-            <ChevronLeft size={60} />
+            <motion.div whileTap={{ scale: 0.8 }}>
+              <ChevronLeft size={60} />
+            </motion.div>
           </button>
           <button
             type="button"
             onClick={() => handleNav("right")}
             disabled={!canScrollRight}
-            className={`hidden sm:inline-flex transition-colors ${canScrollRight ? "cursor-pointer hover:text-white" : "text-gray-600"}`}
+            className={`hidden sm:inline-flex transition-colors ${
+              canScrollRight
+                ? "cursor-pointer hover:text-white"
+                : "text-gray-600"
+            }`}
           >
-            <ChevronRight size={60} />
+            <motion.div whileTap={{ scale: 0.8 }}>
+              <ChevronRight size={60} />
+            </motion.div>
           </button>
         </div>
       </div>

@@ -4,6 +4,8 @@ import TopList from "../components/TopList";
 import CurrentTrackCard from "../components/CurrentTrackCard";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
+import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface CurrentlyPlaying {
   progress_ms: number;
@@ -31,7 +33,7 @@ const Home = () => {
   const [loadingCurrentlyPlaying, setLoadingCurrentlyPlaying] = useState(true);
 
   const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed | null>(
-    null,
+    null
   );
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
 
@@ -235,6 +237,50 @@ const Home = () => {
               />
             </div>
           )}
+
+          <div className="w-full flex justify-center mt-4 gap-10">
+            <motion.div
+              whileTap={{ scale: 0.75 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <SkipBack
+                size={36}
+                className="cursor-pointer hover:text-gray-400 active:text-gray-500"
+              />
+            </motion.div>
+
+            {loadingCurrentlyPlaying ? null : currentlyPlaying?.is_playing ? (
+              <motion.div
+                whileTap={{ scale: 0.75 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <Pause
+                  className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                  size={36}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                whileTap={{ scale: 0.75 }}
+                transition={{ type: "spring", stiffness: 300 }}
+              >
+                <Play
+                  className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                  size={36}
+                />
+              </motion.div>
+            )}
+
+            <motion.div
+              whileTap={{ scale: 0.75 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <SkipForward
+                size={36}
+                className="cursor-pointer hover:text-gray-400 active:text-gray-500"
+              />
+            </motion.div>
+          </div>
         </div>
       </div>
 

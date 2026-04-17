@@ -128,7 +128,7 @@ const Navigation = () => {
         const response = await api.get("/notifications");
         setNotifications(response.data);
         setUnreadCount(
-          response.data.filter((n: NotificationType) => !n.read).length,
+          response.data.filter((n: NotificationType) => !n.read).length
         );
       } catch (error) {
         // Ignore API failures quietly for polling
@@ -229,7 +229,7 @@ const Navigation = () => {
 
     if (types.length === 0) {
       showWarning(
-        "Please select at least one result type (Albums, Artists, Tracks, etc.) before searching.",
+        "Please select at least one result type (Albums, Artists, Tracks, etc.) before searching."
       );
       return;
     }
@@ -286,6 +286,7 @@ const Navigation = () => {
       >
         Discussion
       </Link>
+
       <Input
         inputClassName="w-full"
         wrapperClassName="w-full! max-w-[600px] min-w-[120px] sm:min-w-[280px] mx-1 sm:mx-2 md:mx-4 mt-0!"
@@ -523,7 +524,7 @@ const Navigation = () => {
                             value={yearMin}
                             onChange={(e) =>
                               setYearMin(
-                                Math.min(Number(e.target.value), yearMax),
+                                Math.min(Number(e.target.value), yearMax)
                               )
                             }
                             disabled={!canFilterYear}
@@ -540,7 +541,7 @@ const Navigation = () => {
                             value={yearMax}
                             onChange={(e) =>
                               setYearMax(
-                                Math.max(Number(e.target.value), yearMin),
+                                Math.max(Number(e.target.value), yearMin)
                               )
                             }
                             disabled={!canFilterYear}
@@ -567,7 +568,10 @@ const Navigation = () => {
             onClick={handleOpenNotifications}
             className="text-white hover:opacity-80 transition-opacity cursor-pointer relative mt-1 mr-2"
           >
-            <Bell strokeWidth={2.5} size={28} />
+            <motion.div whileTap={{ scale: 0.8 }}>
+              <Bell strokeWidth={2.5} size={28} />
+            </motion.div>
+
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-[#1A1E23]"></span>
             )}
@@ -614,12 +618,12 @@ const Navigation = () => {
                           try {
                             await api.delete("/notifications/read");
                             setNotifications((prev) =>
-                              prev.filter((n) => !n.read),
+                              prev.filter((n) => !n.read)
                             );
                           } catch (err) {
                             console.error(
                               "Failed to delete read notifications:",
-                              err,
+                              err
                             );
                           }
                         }}
@@ -638,7 +642,9 @@ const Navigation = () => {
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="text-white hover:opacity-80 transition-opacity cursor-pointer"
           >
-            <UserRound strokeWidth={3} size={35} />
+            <motion.div whileTap={{ scale: 0.8 }}>
+              <UserRound strokeWidth={3} size={35} />
+            </motion.div>
           </button>
 
           {isDropdownOpen && (
@@ -736,12 +742,12 @@ const Navigation = () => {
                             try {
                               await api.delete("/notifications/read");
                               setNotifications((prev) =>
-                                prev.filter((n) => !n.read),
+                                prev.filter((n) => !n.read)
                               );
                             } catch (err) {
                               console.error(
                                 "Failed to delete read notifications:",
-                                err,
+                                err
                               );
                             }
                           }}
