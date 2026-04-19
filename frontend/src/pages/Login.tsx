@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Mail, Lock } from "lucide-react";
+import { User, Lock } from "lucide-react";
 
 import Button from "../components/Button";
 import Input from "../components/Input";
@@ -12,7 +12,7 @@ import api from "../utils/api";
 const Login = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: "",
+    identifier: "",
     password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +34,7 @@ const Login = () => {
 
     try {
       const response = await api.post("/login", {
-        email: formData.email,
+        login: formData.identifier,
         password: formData.password,
       });
 
@@ -70,25 +70,23 @@ const Login = () => {
             </span>
           </div>
 
-          <h1 className="font-semibold text-5xl mt-8 text-white">
-            Bejelentkezés
-          </h1>
+          <h1 className="font-semibold text-5xl mt-8 text-white">Login</h1>
           <form
             onSubmit={handleSubmit}
             className="mt-10 w-full flex flex-col items-center"
           >
             <Input
-              labelTitle="Email"
-              inputType="email"
-              inputName="email"
-              inputPlaceHolder="kisferenc3532@gmail.com"
-              iconLeft={<Mail size={20} />}
+              labelTitle="Email or Username"
+              inputType="text"
+              inputName="identifier"
+              inputPlaceHolder="Enter your email or username"
+              iconLeft={<User size={20} />}
               wrapperClassName="mt-0"
-              value={formData.email}
+              value={formData.identifier}
               onChange={handleChange}
             />
             <Input
-              labelTitle="Jelszó"
+              labelTitle="Password"
               inputType="password"
               inputName="password"
               inputPlaceHolder="•••••••"
@@ -100,19 +98,19 @@ const Login = () => {
             />
 
             <Button
-              labelTitle={isLoading ? "Loading..." : "Bejelentkezés"}
+              labelTitle={isLoading ? "Loading..." : "Login"}
               type="submit"
               disabled={isLoading}
               className="mt-6"
             />
 
             <p className="mt-6 text-white/80">
-              Nincs még fiókod?{" "}
+              Don't have an account?{" "}
               <Link
                 to="/register"
                 className="text-white font-semibold hover:underline"
               >
-                Regisztrálj!
+                Register!
               </Link>
             </p>
           </form>
