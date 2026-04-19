@@ -118,6 +118,7 @@ enum ModerationStatus {
   REPORTED
   DISMISSED
   BLOCKED
+  ROLE_CHANGED
 }
 
 model ModerationLog {

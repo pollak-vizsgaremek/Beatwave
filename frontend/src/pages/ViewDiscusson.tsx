@@ -12,6 +12,7 @@ import {
 import ErrorToast from "../components/ErrorToast";
 import api from "../utils/api";
 import { getLikedPosts, getStoredUser, saveLikedPosts } from "../utils/auth";
+import { normalizeHashtagInput } from "../utils/hashtags";
 import { useErrorToast } from "../utils/useErrorToast";
 import type { CommentType, DiscussionType } from "../utils/Type";
 
@@ -326,7 +327,10 @@ const ViewDiscussion = () => {
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = event.target;
-    setPostForm((prev) => ({ ...prev, [name]: value }));
+    setPostForm((prev) => ({
+      ...prev,
+      [name]: name === "hashtags" ? normalizeHashtagInput(value) : value,
+    }));
   };
 
   const handleSavePost = async (event: React.FormEvent) => {

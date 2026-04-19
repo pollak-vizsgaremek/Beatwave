@@ -10,9 +10,16 @@ type PlaylistItem = {
   image: string | null;
   tracksTotal: number;
   canModify: boolean;
+  containsTrack?: boolean;
+  trackOccurrences?: number;
   owner?: { display_name?: string };
   images?: { url?: string }[];
   tracks?: { total?: number };
+};
+
+type DuplicatePlaylistInfo = {
+  playlistId: string;
+  trackOccurrences: number;
 };
 
 type TrackPlaylistPickerProps = {
@@ -36,6 +43,9 @@ const TrackPlaylistPicker = ({
   const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<string[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [removingPlaylistId, setRemovingPlaylistId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!expanded) {
@@ -47,7 +57,7 @@ const TrackPlaylistPicker = ({
     const fetchPlaylists = async () => {
       try {
         setLoadingPlaylists(true);
-        const response = await spotifyPlaylistController.getPlaylists();
+        const response = await spotifyPlaylistController.getPlaylists(trackUri);
 
         if (!isMounted) {
           return;
@@ -81,7 +91,7 @@ const TrackPlaylistPicker = ({
     return () => {
       isMounted = false;
     };
-  }, [expanded, onError]);
+  }, [expanded, onError, trackUri]);
 
   const togglePlaylist = (playlistId: string) => {
     setSelectedPlaylistIds((prev) =>
@@ -99,9 +109,58 @@ const TrackPlaylistPicker = ({
 
     try {
       setSaving(true);
-      const response = await spotifyPlaylistController.addTrackToPlaylists(
-        selectedPlaylistIds,
-        trackUri,
+      let response;
+      try {
+        response = await spotifyPlaylistController.addTrackToPlaylists(
+          selectedPlaylistIds,
+          trackUri,
+        );
+      } catch (err: any) {
+        const duplicatePlaylists = Array.isArray(
+          err.response?.data?.duplicatePlaylists,
+        )
+          ? (err.response.data.duplicatePlaylists as DuplicatePlaylistInfo[])
+          : [];
+
+        if (err.response?.status !== 409 || duplicatePlaylists.length === 0) {
+          throw err;
+        }
+
+        const duplicateNameMap = new Map(
+          playlists.map((playlist) => [playlist.id, playlist.name]),
+        );
+        const duplicateNames = duplicatePlaylists
+          .map((item) => duplicateNameMap.get(item.playlistId) || "a playlist")
+          .filter(Boolean);
+
+        const shouldContinue = window.confirm(
+          duplicateNames.length === 1
+            ? `"${trackName}" is already in ${duplicateNames[0]}. Add it again anyway?`
+            : `"${trackName}" is already in ${duplicateNames.length} selected playlists. Add it again anyway?`,
+        );
+
+        if (!shouldContinue) {
+          return;
+        }
+
+        response = await spotifyPlaylistController.addTrackToPlaylists(
+          selectedPlaylistIds,
+          trackUri,
+          duplicatePlaylists.map((item) => item.playlistId),
+        );
+      }
+
+      setPlaylists((prev) =>
+        prev.map((playlist) =>
+          selectedPlaylistIds.includes(playlist.id)
+            ? {
+                ...playlist,
+                containsTrack: true,
+                trackOccurrences: (playlist.trackOccurrences ?? 0) + 1,
+                tracksTotal: playlist.tracksTotal + 1,
+              }
+            : playlist,
+        ),
       );
 
       onSuccess?.(
@@ -115,6 +174,40 @@ const TrackPlaylistPicker = ({
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRemove = async (playlistId: string, playlistName: string) => {
+    try {
+      setRemovingPlaylistId(playlistId);
+      await spotifyPlaylistController.removeTrackFromPlaylist(playlistId, trackUri);
+
+      setPlaylists((prev) =>
+        prev.map((playlist) => {
+          if (playlist.id !== playlistId) {
+            return playlist;
+          }
+
+          const removedOccurrences = Math.max(1, playlist.trackOccurrences ?? 1);
+
+          return {
+            ...playlist,
+            containsTrack: false,
+            trackOccurrences: 0,
+            tracksTotal: Math.max(0, playlist.tracksTotal - removedOccurrences),
+          };
+        }),
+      );
+
+      setSelectedPlaylistIds((prev) => prev.filter((id) => id !== playlistId));
+      onSuccess?.(`Removed "${trackName}" from ${playlistName}.`);
+    } catch (err: any) {
+      onError(
+        err.response?.data?.error ||
+          "Failed to remove the track from the playlist.",
+      );
+    } finally {
+      setRemovingPlaylistId(null);
     }
   };
 
@@ -148,6 +241,7 @@ const TrackPlaylistPicker = ({
           <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1">
             {playlists.map((playlist) => {
               const selected = selectedPlaylistIds.includes(playlist.id);
+              const alreadyAdded = Boolean(playlist.containsTrack);
               const ownerName =
                 playlist.ownerName ||
                 playlist.owner?.display_name ||
@@ -158,42 +252,64 @@ const TrackPlaylistPicker = ({
                 playlist.tracksTotal ?? playlist.tracks?.total ?? 0;
 
               return (
-                <button
+                <div
                   key={playlist.id}
-                  type="button"
-                  onClick={() => togglePlaylist(playlist.id)}
-                  className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-left transition-all ${
+                  className={`flex items-center gap-3 rounded-xl border p-3 transition-all ${
                     selected
                       ? "border-spotify-green bg-spotify-green/10"
-                      : "border-white/8 bg-white/3 hover:border-white/20 hover:bg-white/6"
+                      : alreadyAdded
+                        ? "border-amber-400/40 bg-amber-400/8 hover:border-amber-300/60 hover:bg-amber-400/10"
+                        : "border-white/8 bg-white/3 hover:border-white/20 hover:bg-white/6"
                   }`}
                 >
-                  <img
-                    src={playlistImage || "https://placehold.co/56x56"}
-                    alt={playlist.name}
-                    className="h-12 w-12 rounded-lg object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white">
-                      {playlist.name}
-                    </p>
-                    <p className="truncate text-xs text-gray-400">
-                      {ownerName}
-                    </p>
-                  </div>
-                  <div className="shrink-0 rounded-full border border-white/12 bg-white/6 px-2 py-1 text-[11px] font-medium text-gray-300">
-                    {tracksTotal} tracks
-                  </div>
-                  <div
-                    className={`flex h-6 w-6 items-center justify-center rounded-full border ${
-                      selected
-                        ? "border-spotify-green bg-spotify-green text-black"
-                        : "border-white/20 text-transparent"
-                    }`}
+                  <button
+                    type="button"
+                    onClick={() => togglePlaylist(playlist.id)}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
                   >
-                    <Check size={14} />
-                  </div>
-                </button>
+                    <img
+                      src={playlistImage || "https://placehold.co/56x56"}
+                      alt={playlist.name}
+                      className="h-12 w-12 rounded-lg object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-white">
+                        {playlist.name}
+                      </p>
+                      <p className="truncate text-xs text-gray-400">
+                        {ownerName}
+                        {alreadyAdded
+                          ? ` - Already added${(playlist.trackOccurrences ?? 0) > 1 ? ` x${playlist.trackOccurrences}` : ""}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="shrink-0 rounded-full border border-white/12 bg-white/6 px-2 py-1 text-[11px] font-medium text-gray-300">
+                      {tracksTotal} tracks
+                    </div>
+                    <div
+                      className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                        selected
+                          ? "border-spotify-green bg-spotify-green text-black"
+                          : "border-white/20 text-transparent"
+                      }`}
+                    >
+                      <Check size={14} />
+                    </div>
+                  </button>
+
+                  {alreadyAdded && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(playlist.id, playlist.name)}
+                      disabled={removingPlaylistId === playlist.id}
+                      className="shrink-0 rounded-full border border-amber-300/40 bg-amber-300/10 px-3 py-1 text-[11px] font-semibold text-amber-100 transition-colors hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {removingPlaylistId === playlist.id
+                        ? "Removing..."
+                        : "Remove"}
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>

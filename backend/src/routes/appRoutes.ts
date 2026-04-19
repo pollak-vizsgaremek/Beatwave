@@ -15,7 +15,9 @@ import {
   getSpotifyTopItems,
   getSpotifyRecommendations,
   getSpotifyPlaylists,
+  checkTrackInSpotifyPlaylists,
   addTrackToSpotifyPlaylists,
+  removeTrackFromSpotifyPlaylist,
   getSpotifyCurrentlyPlaying,
   getSpotifyRecentlyPlayed,
   skipSpotifyPrevious,
@@ -55,7 +57,10 @@ import {
   getAllUsers,
   getAllPosts,
   getAllComments,
+  getModerationReports,
   getModerationLogs,
+  setUserTimeout,
+  clearUserTimeout,
   deletePost,
   deleteComment,
   dismissReport,
@@ -86,9 +91,19 @@ router.get(
 );
 router.get("/auth/spotify/playlists", verifyToken, getSpotifyPlaylists);
 router.post(
+  "/auth/spotify/playlists/check-track",
+  verifyToken,
+  checkTrackInSpotifyPlaylists,
+);
+router.post(
   "/auth/spotify/playlists/add-track",
   verifyToken,
   addTrackToSpotifyPlaylists,
+);
+router.delete(
+  "/auth/spotify/playlists/remove-track",
+  verifyToken,
+  removeTrackFromSpotifyPlaylist,
 );
 router.get(
   "/auth/spotify/currently-playing",
@@ -132,8 +147,26 @@ router.patch(
   isAdmin,
   setUserBlockedStatus,
 );
+router.patch(
+  "/admin/users/:id/timeout",
+  verifyToken,
+  isAdminOrModerator,
+  setUserTimeout,
+);
+router.delete(
+  "/admin/users/:id/timeout",
+  verifyToken,
+  isAdminOrModerator,
+  clearUserTimeout,
+);
 router.get("/admin/posts", verifyToken, isAdminOrModerator, getAllPosts);
 router.get("/admin/comments", verifyToken, isAdminOrModerator, getAllComments);
+router.get(
+  "/admin/reports",
+  verifyToken,
+  isAdminOrModerator,
+  getModerationReports,
+);
 router.get("/admin/logs", verifyToken, isAdminOrModerator, getModerationLogs);
 router.patch(
   "/admin/reports/:id/dismiss",

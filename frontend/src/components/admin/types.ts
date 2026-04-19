@@ -1,5 +1,6 @@
 import {
   FileText,
+  History,
   MessageSquare,
   Shield,
   Users,
@@ -13,6 +14,8 @@ export interface AdminUser {
   role: string;
   isBlocked: boolean;
   createdAt: string;
+  timeoutUntil?: string | null;
+  timeoutReason?: string | null;
 }
 
 export interface AdminPost {
@@ -56,7 +59,13 @@ export interface AdminLog {
   };
 }
 
-export const VALID_ADMIN_TABS = ["users", "posts", "comments", "logs"] as const;
+export const VALID_ADMIN_TABS = [
+  "users",
+  "posts",
+  "comments",
+  "reports",
+  "logs",
+] as const;
 
 export type AdminTabId = (typeof VALID_ADMIN_TABS)[number];
 
@@ -70,11 +79,14 @@ export const ADMIN_TABS: AdminTab[] = [
   { id: "users", label: "Users", icon: Users },
   { id: "posts", label: "Posts", icon: FileText },
   { id: "comments", label: "Comments", icon: MessageSquare },
-  { id: "logs", label: "Reports", icon: Shield },
+  { id: "reports", label: "Reports", icon: Shield },
+  { id: "logs", label: "Logs", icon: History },
 ];
 
 export const getStatusClasses = (status: string) => {
   switch (status) {
+    case "ROLE_CHANGED":
+      return "bg-indigo-600 text-white";
     case "REPORTED":
       return "bg-amber-600 text-white";
     case "DISMISSED":

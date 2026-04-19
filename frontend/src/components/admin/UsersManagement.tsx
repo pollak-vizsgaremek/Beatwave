@@ -7,6 +7,8 @@ interface UsersManagementProps {
   currentUserId: string | null;
   onRoleChange: (userId: string, role: string) => Promise<void>;
   onToggleBlock: (userId: string, isBlocked: boolean) => Promise<void>;
+  onSetTimeout: (user: AdminUser) => Promise<void>;
+  onClearTimeout: (user: AdminUser) => Promise<void>;
 }
 
 const getRoleBadgeClasses = (role: string) => {
@@ -27,6 +29,8 @@ const UsersManagement = ({
   currentUserId,
   onRoleChange,
   onToggleBlock,
+  onSetTimeout,
+  onClearTimeout,
 }: UsersManagementProps) => {
   if (users.length === 0) {
     return (
@@ -40,6 +44,9 @@ const UsersManagement = ({
         {users.map((user) => {
           const isCurrentUser = user.id === currentUserId;
           const isProcessing = processingUserId === user.id;
+          const hasTimeout =
+            !!user.timeoutUntil &&
+            new Date(user.timeoutUntil).getTime() > Date.now();
 
           return (
             <div key={user.id} className="bg-gray-700 p-3 rounded-lg">
@@ -56,6 +63,11 @@ const UsersManagement = ({
                       BLOCKED
                     </span>
                   )}
+                  {hasTimeout && (
+                    <span className="text-xs px-2 py-1 rounded bg-amber-700 text-white">
+                      TIMEOUT
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -63,6 +75,12 @@ const UsersManagement = ({
               <p className="text-xs text-gray-400">
                 Created {new Date(user.createdAt).toLocaleDateString()}
               </p>
+              {hasTimeout && (
+                <p className="text-xs text-amber-200 mt-1">
+                  Until {new Date(user.timeoutUntil as string).toLocaleString()}
+                  {user.timeoutReason ? ` • ${user.timeoutReason}` : ""}
+                </p>
+              )}
 
               {canManageUsers && (
                 <div className="mt-3 space-y-2">
@@ -94,6 +112,24 @@ const UsersManagement = ({
                         ? "Unblock user"
                         : "Block user"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void onSetTimeout(user)}
+                    disabled={isProcessing || isCurrentUser}
+                    className="w-full rounded px-3 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50"
+                  >
+                    {isCurrentUser ? "Current account" : "Set timeout"}
+                  </button>
+                  {hasTimeout && (
+                    <button
+                      type="button"
+                      onClick={() => void onClearTimeout(user)}
+                      disabled={isProcessing || isCurrentUser}
+                      className="w-full rounded px-3 py-2 text-sm font-medium bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
+                    >
+                      Clear timeout
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -117,6 +153,9 @@ const UsersManagement = ({
             {users.map((user) => {
               const isCurrentUser = user.id === currentUserId;
               const isProcessing = processingUserId === user.id;
+              const hasTimeout =
+                !!user.timeoutUntil &&
+                new Date(user.timeoutUntil).getTime() > Date.now();
 
               return (
                 <tr key={user.id} className="border-b border-gray-700">
@@ -124,7 +163,16 @@ const UsersManagement = ({
                   <td className="p-2">{user.email}</td>
                   <td className="p-2">{user.role}</td>
                   <td className="p-2">
-                    {user.isBlocked ? "Blocked" : "Active"}
+                    {user.isBlocked
+                      ? "Blocked"
+                      : hasTimeout
+                        ? "Timed out"
+                        : "Active"}
+                    {hasTimeout && (
+                      <p className="text-xs text-amber-200 mt-1">
+                        Until {new Date(user.timeoutUntil as string).toLocaleString()}
+                      </p>
+                    )}
                   </td>
                   <td className="p-2">
                     {new Date(user.createdAt).toLocaleDateString()}
@@ -162,6 +210,24 @@ const UsersManagement = ({
                               ? "Unblock"
                               : "Block"}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => void onSetTimeout(user)}
+                          disabled={isProcessing || isCurrentUser}
+                          className="rounded px-3 py-1 text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50"
+                        >
+                          Timeout
+                        </button>
+                        {hasTimeout && (
+                          <button
+                            type="button"
+                            onClick={() => void onClearTimeout(user)}
+                            disabled={isProcessing || isCurrentUser}
+                            className="rounded px-3 py-1 text-white bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
+                          >
+                            Clear timeout
+                          </button>
+                        )}
                       </div>
                     </td>
                   )}

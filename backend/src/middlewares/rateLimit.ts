@@ -19,6 +19,12 @@ const createRateLimiter = ({
   const entries = new Map<string, RateLimitEntry>();
 
   return (req: Request, res: Response, next: NextFunction) => {
+    // Disable app-level rate limiting during local development to avoid
+    // blocking normal UI testing/polling flows.
+    if ((process.env.NODE_ENV || "development") === "development") {
+      return next();
+    }
+
     const forwardedFor = req.headers["x-forwarded-for"];
     const clientIp =
       typeof forwardedFor === "string"
