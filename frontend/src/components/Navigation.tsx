@@ -35,7 +35,7 @@ const Navigation = () => {
   const [searchEpisodes, setSearchEpisodes] = useState(false);
   const [searchPlaylists, setSearchPlaylists] = useState(false);
   const [searchShows, setSearchShows] = useState(false);
-  const [searchTracks, setSearchTracks] = useState(false);
+  const [searchTracks, setSearchTracks] = useState(true);
 
   // Advanced Filters Toggle
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -188,7 +188,8 @@ const Navigation = () => {
     if (location.pathname === "/search") {
       const params = new URLSearchParams(location.search);
       const q = params.get("q") || "";
-      const types = (params.get("type") || "").split(",");
+      const rawType = params.get("type") || "";
+      const types = rawType ? rawType.split(",") : ["track"];
 
       if (q) setSearchQuery(q);
       setSearchAlbums(types.includes("album"));

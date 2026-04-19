@@ -13,10 +13,17 @@ import {
   getSpotifyToken,
   disconnectSpotify,
   getSpotifyTopItems,
+  getSpotifyRecommendations,
+  getSpotifyPlaylists,
+  addTrackToSpotifyPlaylists,
   getSpotifyCurrentlyPlaying,
   getSpotifyRecentlyPlayed,
+  skipSpotifyPrevious,
+  playSpotifyTrack,
+  pauseSpotifyTrack,
+  skipSpotifyNext,
   searchSpotify,
-} from "../controllers/spotifyController";
+} from "../controllers/spotify";
 
 import { verifyToken, isAdmin } from "../middlewares/authMiddleware";
 import {
@@ -64,6 +71,17 @@ router.get("/auth/spotify/token", verifyToken, getSpotifyToken);
 router.delete("/auth/spotify", verifyToken, disconnectSpotify);
 router.get("/auth/spotify/top/:type", verifyToken, getSpotifyTopItems);
 router.get(
+  "/auth/spotify/recommendations",
+  verifyToken,
+  getSpotifyRecommendations,
+);
+router.get("/auth/spotify/playlists", verifyToken, getSpotifyPlaylists);
+router.post(
+  "/auth/spotify/playlists/add-track",
+  verifyToken,
+  addTrackToSpotifyPlaylists,
+);
+router.get(
   "/auth/spotify/currently-playing",
   verifyToken,
   getSpotifyCurrentlyPlaying,
@@ -73,6 +91,10 @@ router.get(
   verifyToken,
   getSpotifyRecentlyPlayed,
 );
+router.post("/auth/spotify/player/previous", verifyToken, skipSpotifyPrevious);
+router.put("/auth/spotify/player/play", verifyToken, playSpotifyTrack);
+router.put("/auth/spotify/player/pause", verifyToken, pauseSpotifyTrack);
+router.post("/auth/spotify/player/next", verifyToken, skipSpotifyNext);
 router.get("/auth/spotify/search", verifyToken, searchSpotify);
 
 router.get("/posts", verifyToken, getPosts);

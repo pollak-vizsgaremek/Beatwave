@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import api from "../utils/api";
 import TopList from "../components/TopList";
 import CurrentTrackCard from "../components/CurrentTrackCard";
+import RecommendedTrackCard from "../components/RecommendedTrackCard";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
+import { spotifyPlayerController } from "../controllers/homeSpotifyController";
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -21,6 +23,23 @@ interface RecentlyPlayed {
   artist: string;
 }
 
+interface RecommendedTrack {
+  id: string;
+  name: string;
+  image: string;
+  artist: string;
+  album: string;
+  duration: string;
+  releaseYear: string;
+  uri: string;
+}
+
+const formatDuration = (durationMs: number) => {
+  const minutes = Math.floor(durationMs / 60000);
+  const seconds = Math.floor((durationMs % 60000) / 1000);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+};
+
 const Home = () => {
   const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
   const [timeRange] = useState(
@@ -30,6 +49,14 @@ const Home = () => {
 
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
   const [loadingTracks, setLoadingTracks] = useState(true);
+
+  const [recommendedTracks, setRecommendedTracks] = useState<
+    RecommendedTrack[]
+  >([]);
+  const [loadingRecommendedTracks, setLoadingRecommendedTracks] = useState(true);
+  const [expandedRecommendedTrackId, setExpandedRecommendedTrackId] = useState<
+    string | null
+  >(null);
 
   const [currentlyPlaying, setCurrentlyPlaying] =
     useState<CurrentlyPlaying | null>(null);
@@ -42,6 +69,7 @@ const Home = () => {
     null,
   );
   const [loadingRecentlyPlayed, setLoadingRecentlyPlayed] = useState(true);
+  const [playbackActionLoading, setPlaybackActionLoading] = useState(false);
 
   const { error, showError } = useErrorToast();
 
@@ -60,6 +88,55 @@ const Home = () => {
     };
 
     fetchSpotifyConnection();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchRecommendedTracks = async () => {
+      try {
+        const response = await api.get("/auth/spotify/recommendations");
+        if (!isMounted) return;
+
+        if (response.data.connected === false) {
+          setRecommendedTracks([]);
+          return;
+        }
+
+        const formattedRecommendedTracks = response.data.items.map(
+          (track: any) => ({
+            id: track.id,
+            name: track.name,
+            image:
+              track.album?.images?.[0]?.url ?? "https://placehold.co/300x300",
+            artist:
+              track.artists?.map((artist: any) => artist.name).join(", ") ??
+              "Unknown artist",
+            album: track.album?.name ?? "Unknown album",
+            duration: formatDuration(track.duration_ms ?? 0),
+            releaseYear: track.album?.release_date?.slice(0, 4) ?? "----",
+            uri: track.uri,
+          }),
+        );
+
+        setSpotifyConnected(true);
+        setRecommendedTracks(formattedRecommendedTracks);
+      } catch (err: any) {
+        if (!isMounted) return;
+        if (err.response?.status !== 404) {
+          showError("Failed to load recommended tracks.");
+        }
+        setRecommendedTracks([]);
+      } finally {
+        if (isMounted) setLoadingRecommendedTracks(false);
+      }
+    };
+
+    fetchRecommendedTracks();
 
     return () => {
       isMounted = false;
@@ -267,6 +344,51 @@ const Home = () => {
     };
   }, [currentlyPlaying?.name]);
 
+  const handleSpotifyAction = async (action: "previous" | "toggle" | "next") => {
+    if (playbackActionLoading || spotifyConnected === false) {
+      return;
+    }
+
+    try {
+      setPlaybackActionLoading(true);
+
+      if (action === "previous") {
+        await spotifyPlayerController.skipPrevious();
+        return;
+      }
+
+      if (action === "next") {
+        await spotifyPlayerController.skipNext();
+        return;
+      }
+
+      if (currentlyPlaying?.is_playing) {
+        await spotifyPlayerController.pause();
+      } else {
+        await spotifyPlayerController.play();
+      }
+
+      setCurrentlyPlaying((prev) =>
+        prev ? { ...prev, is_playing: !prev.is_playing } : prev,
+      );
+    } catch (err: any) {
+      const status = err.response?.status;
+      const errorMessage = err.response?.data?.error;
+
+      if (typeof errorMessage === "string" && errorMessage.trim()) {
+        showError(errorMessage);
+      } else if (status === 404) {
+        showError("No active Spotify device found.");
+      } else if (status === 403) {
+        showError("Spotify did not allow this playback action.");
+      } else {
+        showError("Failed to control Spotify playback.");
+      }
+    } finally {
+      setPlaybackActionLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-20 mb-30">
       <div className="flex flex-col items-center justify-center w-full px-4 sm:px-0">
@@ -335,7 +457,12 @@ const Home = () => {
               >
                 <SkipBack
                   size={36}
-                  className="cursor-pointer hover:text-gray-400 active:text-gray-500"
+                  onClick={() => handleSpotifyAction("previous")}
+                  className={`hover:text-gray-400 active:text-gray-500 ${
+                    playbackActionLoading
+                      ? "opacity-50 cursor-not-allowed pointer-events-none"
+                      : "cursor-pointer"
+                  }`}
                 />
               </motion.div>
 
@@ -345,7 +472,12 @@ const Home = () => {
                   transition={{ type: "spring", stiffness: 300 }}
                 >
                   <Pause
-                    className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                    onClick={() => handleSpotifyAction("toggle")}
+                    className={`animate-pulse hover:text-gray-400 active:text-gray-500 translate-x-1 ${
+                      playbackActionLoading
+                        ? "opacity-50 cursor-not-allowed pointer-events-none"
+                        : "cursor-pointer"
+                    }`}
                     size={36}
                   />
                 </motion.div>
@@ -355,7 +487,12 @@ const Home = () => {
                   transition={{ type: "spring", stiffness: 300 }}
                 >
                   <Play
-                    className="animate-pulse hover:text-gray-400 active:text-gray-500 cursor-pointer translate-x-1"
+                    onClick={() => handleSpotifyAction("toggle")}
+                    className={`animate-pulse hover:text-gray-400 active:text-gray-500 translate-x-1 ${
+                      playbackActionLoading
+                        ? "opacity-50 cursor-not-allowed pointer-events-none"
+                        : "cursor-pointer"
+                    }`}
                     size={36}
                   />
                 </motion.div>
@@ -367,7 +504,12 @@ const Home = () => {
               >
                 <SkipForward
                   size={36}
-                  className="cursor-pointer hover:text-gray-400 active:text-gray-500"
+                  onClick={() => handleSpotifyAction("next")}
+                  className={`hover:text-gray-400 active:text-gray-500 ${
+                    playbackActionLoading
+                      ? "opacity-50 cursor-not-allowed pointer-events-none"
+                      : "cursor-pointer"
+                  }`}
                 />
               </motion.div>
             </div>
@@ -394,6 +536,39 @@ const Home = () => {
         ) : (
           <p className="text-gray-400">
             Connect your Spotify to see your top tracks here.
+          </p>
+        )}
+      </div>
+      <div className="px-4 md:px-20 flex flex-col gap-6">
+        <h2 className="text-3xl font-semibold">Recommended For You</h2>
+        {loadingRecommendedTracks ? (
+          <p className="text-gray-400">Loading recommended tracks...</p>
+        ) : recommendedTracks.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
+            {recommendedTracks.map((track, index) => (
+              <RecommendedTrackCard
+                key={track.id || `${track.name}-${index}`}
+                id={track.id}
+                name={track.name}
+                image={track.image}
+                artist={track.artist}
+                album={track.album}
+                duration={track.duration}
+                releaseYear={track.releaseYear}
+                trackUri={track.uri}
+                expanded={expandedRecommendedTrackId === track.id}
+                onToggle={() =>
+                  setExpandedRecommendedTrackId((prev) =>
+                    prev === track.id ? null : track.id,
+                  )
+                }
+                onError={showError}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-400">
+            No recommendations available right now.
           </p>
         )}
       </div>
