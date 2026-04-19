@@ -215,6 +215,7 @@ export const getSpotifyTopItems = async (
   try {
     const userId = req.userId;
     const type = req.params.type;
+    const requestedTimeRange = String(req.query.timeRange ?? "alltime");
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -226,7 +227,16 @@ export const getSpotifyTopItems = async (
       });
     }
 
-    const cacheKey = `${userId}-${type}`;
+    const spotifyTimeRangeMap: Record<string, string> = {
+      "4week": "short_term",
+      "6month": "medium_term",
+      alltime: "long_term",
+    };
+
+    const spotifyTimeRange =
+      spotifyTimeRangeMap[requestedTimeRange] ?? "long_term";
+
+    const cacheKey = `${userId}-${type}-${spotifyTimeRange}`;
     const cachedEntry = spotifyCache.get<any>(cacheKey);
 
     if (cachedEntry) {
@@ -241,7 +251,7 @@ export const getSpotifyTopItems = async (
     }
 
     const response = await spotifyFetch(
-      `https://api.spotify.com/v1/me/top/${type}?time_range=long_term&limit=10`,
+      `https://api.spotify.com/v1/me/top/${type}?time_range=${spotifyTimeRange}&limit=10`,
       {
         method: "GET",
         headers: {

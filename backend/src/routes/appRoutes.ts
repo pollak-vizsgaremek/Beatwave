@@ -1,7 +1,12 @@
 import { Router } from "express";
 
 import { createUser, authenticateUser } from "../controllers/authController";
-import { getUserProfile, updateUserProfile } from "../controllers/userProfile";
+import {
+  getPublicUserProfile,
+  getUserProfile,
+  updateProfilePrivacy,
+  updateUserProfile,
+} from "../controllers/userProfile";
 import {
   getSpotifyAuthUrl,
   spotifyCallback,
@@ -17,7 +22,12 @@ import { verifyToken, isAdmin } from "../middlewares/authMiddleware";
 import {
   getPostById,
   getPosts,
+  getMyPosts,
   createPost,
+  updateOwnPost,
+  deleteOwnPost,
+  likePost,
+  reportPost,
 } from "../controllers/postController";
 import {
   deleteNotificationsRead,
@@ -44,6 +54,9 @@ router.post("/register", createUser);
 router.post("/login", authenticateUser);
 router.get("/user-profile", verifyToken, getUserProfile);
 router.put("/user-profile", verifyToken, updateUserProfile);
+router.patch("/user-profile/privacy", verifyToken, updateProfilePrivacy);
+router.get("/user-profile/posts", verifyToken, getMyPosts);
+router.get("/user-profile/:id", verifyToken, getPublicUserProfile);
 
 router.get("/auth/spotify/url", verifyToken, getSpotifyAuthUrl);
 router.get("/auth/spotify/callback", spotifyCallback);
@@ -65,6 +78,10 @@ router.get("/auth/spotify/search", verifyToken, searchSpotify);
 router.get("/posts", verifyToken, getPosts);
 router.get("/post/:id", verifyToken, getPostById);
 router.post("/posts", verifyToken, createPost);
+router.put("/post/:id", verifyToken, updateOwnPost);
+router.delete("/post/:id", verifyToken, deleteOwnPost);
+router.post("/post/:id/like", verifyToken, likePost);
+router.post("/post/:id/report", verifyToken, reportPost);
 
 router.get("/post/:id/comments", verifyToken, getCommentsByPostId);
 router.post("/post/:id/comments", verifyToken, createComment);

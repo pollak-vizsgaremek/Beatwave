@@ -88,20 +88,23 @@ export const authenticateUser = async (
   next: NextFunction,
 ) => {
   try {
-    const { email, password } = req.body;
+    const { login, email, username, password } = req.body;
+    const identifier = String(login ?? email ?? username ?? "").trim();
 
-    // Guard against missing fields
-    if (!email || !password) {
+    if (!identifier || !password) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: identifier }, { username: identifier }],
+      },
     });
 
     // Use a single generic error for both "no user" and "wrong password"
     // to prevent user enumeration attacks
-    const INVALID_CREDENTIALS_ERROR = "Érvénytelen email vagy jelszó";
+    const INVALID_CREDENTIALS_ERROR =
+      "Érvénytelen email/felhasználónév vagy jelszó";
 
     if (!user) {
       return res.status(401).json({ error: INVALID_CREDENTIALS_ERROR });

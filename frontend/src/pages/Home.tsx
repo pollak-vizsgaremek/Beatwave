@@ -23,6 +23,9 @@ interface RecentlyPlayed {
 
 const Home = () => {
   const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
+  const [timeRange] = useState(
+    () => localStorage.getItem("spotifyTimeRange") ?? "4week",
+  );
   const [loadingArtists, setLoadingArtists] = useState(true);
 
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
@@ -67,7 +70,9 @@ const Home = () => {
     let isMounted = true;
     const fetchTopArtists = async () => {
       try {
-        const response = await api.get("/auth/spotify/top/artists");
+        const response = await api.get("/auth/spotify/top/artists", {
+          params: { timeRange },
+        });
         if (!isMounted) return;
 
         if (response.data.connected === false) {
@@ -102,13 +107,15 @@ const Home = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [timeRange]);
 
   useEffect(() => {
     let isMounted = true;
     const fetchTopTracks = async () => {
       try {
-        const response = await api.get("/auth/spotify/top/tracks");
+        const response = await api.get("/auth/spotify/top/tracks", {
+          params: { timeRange },
+        });
         if (!isMounted) return;
 
         if (response.data.connected === false) {
@@ -142,7 +149,7 @@ const Home = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [timeRange]);
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;

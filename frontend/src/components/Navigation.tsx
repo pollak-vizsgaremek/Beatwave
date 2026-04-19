@@ -128,7 +128,7 @@ const Navigation = () => {
         const response = await api.get("/notifications");
         setNotifications(response.data);
         setUnreadCount(
-          response.data.filter((n: NotificationType) => !n.read).length
+          response.data.filter((n: NotificationType) => !n.read).length,
         );
       } catch (error) {
         // Ignore API failures quietly for polling
@@ -171,6 +171,17 @@ const Navigation = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  const canAccessAdminPanel = (() => {
+    try {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) return false;
+      const parsedUser = JSON.parse(storedUser);
+      return parsedUser?.role === "ADMIN" || parsedUser?.role === "MODERATOR";
+    } catch {
+      return false;
+    }
+  })();
 
   // Sync filter state from URL when navigating to /search
   useEffect(() => {
@@ -229,7 +240,7 @@ const Navigation = () => {
 
     if (types.length === 0) {
       showWarning(
-        "Please select at least one result type (Albums, Artists, Tracks, etc.) before searching."
+        "Please select at least one result type (Albums, Artists, Tracks, etc.) before searching.",
       );
       return;
     }
@@ -524,7 +535,7 @@ const Navigation = () => {
                             value={yearMin}
                             onChange={(e) =>
                               setYearMin(
-                                Math.min(Number(e.target.value), yearMax)
+                                Math.min(Number(e.target.value), yearMax),
                               )
                             }
                             disabled={!canFilterYear}
@@ -541,7 +552,7 @@ const Navigation = () => {
                             value={yearMax}
                             onChange={(e) =>
                               setYearMax(
-                                Math.max(Number(e.target.value), yearMin)
+                                Math.max(Number(e.target.value), yearMin),
                               )
                             }
                             disabled={!canFilterYear}
@@ -618,12 +629,12 @@ const Navigation = () => {
                           try {
                             await api.delete("/notifications/read");
                             setNotifications((prev) =>
-                              prev.filter((n) => !n.read)
+                              prev.filter((n) => !n.read),
                             );
                           } catch (err) {
                             console.error(
                               "Failed to delete read notifications:",
-                              err
+                              err,
                             );
                           }
                         }}
@@ -656,6 +667,15 @@ const Navigation = () => {
                 <Settings size={18} />
                 <span>Profile</span>
               </button>
+              {canAccessAdminPanel && (
+                <button
+                  onClick={() => handleNavigate("/admin")}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-white hover:bg-accent-dark transition-colors border-b border-accent-dark cursor-pointer"
+                >
+                  <Settings size={18} />
+                  <span>Admin panel</span>
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-600/20 hover:text-red-300 transition-colors last:rounded-b-lg cursor-pointer"
@@ -742,12 +762,12 @@ const Navigation = () => {
                             try {
                               await api.delete("/notifications/read");
                               setNotifications((prev) =>
-                                prev.filter((n) => !n.read)
+                                prev.filter((n) => !n.read),
                               );
                             } catch (err) {
                               console.error(
                                 "Failed to delete read notifications:",
-                                err
+                                err,
                               );
                             }
                           }}
@@ -764,10 +784,22 @@ const Navigation = () => {
                   navigate("/profile");
                   setIsMenuOpen(false);
                 }}
-                className="text-white text-xl mb-6 text-left hover:opacity-80 w-full py-3 px-4 rounded-lg hover:bg-accent-dark/30 transition-colors font-medium"
+                className="text-white text-xl mb-3 text-left hover:opacity-80 w-full py-3 px-4 rounded-lg hover:bg-accent-dark/30 transition-colors font-medium"
               >
                 Profile
               </button>
+
+              {canAccessAdminPanel && (
+                <button
+                  onClick={() => {
+                    navigate("/admin");
+                    setIsMenuOpen(false);
+                  }}
+                  className="text-white text-xl mb-6 text-left hover:opacity-80 w-full py-3 px-4 rounded-lg hover:bg-accent-dark/30 transition-colors font-medium"
+                >
+                  Admin panel
+                </button>
+              )}
             </div>
 
             {/* Bottom section - Log Out button */}

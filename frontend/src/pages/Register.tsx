@@ -135,7 +135,7 @@ const Register = () => {
               onChange={handleChange}
             />
             <Input
-              labelTitle="Felhasználónév"
+              labelTitle="Username"
               inputType="text"
               inputName="username"
               inputPlaceHolder="kisferenc3532"
@@ -145,7 +145,7 @@ const Register = () => {
               onChange={handleChange}
             />
             <Input
-              labelTitle="Jelszó"
+              labelTitle="Password"
               inputType="password"
               inputName="password"
               inputPlaceHolder="•••••••"
@@ -155,7 +155,7 @@ const Register = () => {
               onChange={handleChange}
             />
             <Input
-              labelTitle="Jelszó megerősítése"
+              labelTitle="Confirm Password"
               inputType="password"
               inputName="confirmPassword"
               inputPlaceHolder="•••••••"
@@ -168,19 +168,19 @@ const Register = () => {
             {formData.password.length > 0 &&
               (() => {
                 const reqs = {
-                  "8+ karakter": formData.password.length >= 8,
-                  "Tartalmaz számot": /\d/.test(formData.password),
-                  "Tartalmaz szimbólumot": /[!@#$%^&*(),.?":{}|<>+-]/.test(
+                  "8+ characters": formData.password.length >= 8,
+                  "Contains a number": /\d/.test(formData.password),
+                  "Contains a symbol": /[!@#$%^&*(),.?":{}|<>+-]/.test(
                     formData.password,
                   ),
-                  Nagybetű: /[A-Z]/.test(formData.password),
+                  "Uppercase letter": /[A-Z]/.test(formData.password),
                 };
 
                 return (
                   <div className="mt-3 px-1 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="flex justify-between items-center text-sm mb-2">
                       <span className="text-white/80 font-medium">
-                        Jelszó erőssége
+                        Password Strength
                       </span>
                       <span
                         className={`font-bold transition-colors ${
@@ -192,10 +192,10 @@ const Register = () => {
                         }`}
                       >
                         {strengthScore <= 1
-                          ? "Gyenge"
+                          ? "Weak"
                           : strengthScore <= 3
-                            ? "Közepes"
-                            : "Erős"}
+                            ? "Medium"
+                            : "Strong"}
                       </span>
                     </div>
 
@@ -246,19 +246,19 @@ const Register = () => {
               })()}
 
             <Button
-              labelTitle={isLoading ? "Loading..." : "Regisztrálás"}
+              labelTitle={isLoading ? "Loading..." : "Register"}
               type="submit"
               disabled={!canRegister || isLoading}
               className="mt-3 sm:mt-12"
             />
           </form>
           <p className="mt-6 mb-6 text-white/80">
-            Van már fiókod?{" "}
+            Already have an account?{" "}
             <Link
               to="/login"
               className="text-white font-semibold hover:underline"
             >
-              Jelentkez be!
+              Login!
             </Link>
           </p>
         </div>

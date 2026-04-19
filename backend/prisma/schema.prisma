@@ -26,6 +26,8 @@ model User {
   email        String   @unique
   username     String   @unique
   passwordHash String
+  description  String?  @db.Text
+  isPrivate    Boolean  @default(false)
   role         Role     @default(USER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -112,6 +114,7 @@ model Notification {
 enum ModerationStatus {
   DELETED
   WARNED
+  REPORTED
 }
 
 model ModerationLog {

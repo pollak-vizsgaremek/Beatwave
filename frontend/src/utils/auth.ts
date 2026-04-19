@@ -6,7 +6,7 @@ export const isTokenExpired = (token: string): boolean => {
       atob(base64)
         .split("")
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+        .join(""),
     );
 
     const { exp } = JSON.parse(jsonPayload);
@@ -18,4 +18,37 @@ export const isTokenExpired = (token: string): boolean => {
   } catch (e) {
     return true; // If we can't decode it, treat as expired/invalid
   }
+};
+
+type StoredUser = {
+  id?: string;
+  username?: string;
+  email?: string;
+};
+
+export const getStoredUser = (): StoredUser | null => {
+  try {
+    const rawUser = localStorage.getItem("user");
+    return rawUser ? JSON.parse(rawUser) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getLikedPostsKey = () => {
+  const userId = getStoredUser()?.id ?? "guest";
+  return `likedPosts:${userId}`;
+};
+
+export const getLikedPosts = (): Set<string> => {
+  try {
+    const rawLikes = localStorage.getItem(getLikedPostsKey());
+    return new Set<string>(rawLikes ? JSON.parse(rawLikes) : []);
+  } catch {
+    return new Set<string>();
+  }
+};
+
+export const saveLikedPosts = (likedPosts: Set<string>) => {
+  localStorage.setItem(getLikedPostsKey(), JSON.stringify([...likedPosts]));
 };
