@@ -66,13 +66,34 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      await api.post("/register", {
+      const registerResponse = await api.post("/register", {
         email: formData.email,
         username: formData.username,
         password: formData.password,
       });
 
-      navigate("/login");
+      if (registerResponse.data?.token) {
+        localStorage.setItem("token", registerResponse.data.token);
+        localStorage.setItem(
+          "user",
+          JSON.stringify(registerResponse.data.user || {}),
+        );
+        window.location.href = "/home";
+        return;
+      }
+
+      const response = await api.post("/login", {
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (response.data.token) {
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user || {}));
+        window.location.href = "/home";
+      } else {
+        showError("Registration succeeded, but login response was invalid.");
+      }
     } catch (err: any) {
       showError(
         err.response?.data?.error || err.message || "Registration failed",
@@ -85,7 +106,7 @@ const Register = () => {
   return (
     <div className="flex flex-col sm:flex-row h-screen w-screen bg-linear-to-r from-black to-border">
       <div className="w-full sm:w-1/2 flex items-center justify-center order-2 sm:order-1">
-        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
+        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
           <div className="absolute top-4 left-6 flex items-center gap-2">
             <img
               src="/Beatwave_logo.png"
@@ -97,7 +118,7 @@ const Register = () => {
             </span>
           </div>
           <h1 className="font-semibold text-5xl mt-8 text-white">
-            Regisztrálás
+            Registration
           </h1>
           <form
             onSubmit={handleSubmit}
@@ -114,7 +135,7 @@ const Register = () => {
               onChange={handleChange}
             />
             <Input
-              labelTitle="Felhasználónév"
+              labelTitle="Username"
               inputType="text"
               inputName="username"
               inputPlaceHolder="kisferenc3532"
@@ -124,7 +145,7 @@ const Register = () => {
               onChange={handleChange}
             />
             <Input
-              labelTitle="Jelszó"
+              labelTitle="Password"
               inputType="password"
               inputName="password"
               inputPlaceHolder="•••••••"
@@ -134,7 +155,7 @@ const Register = () => {
               onChange={handleChange}
             />
             <Input
-              labelTitle="Jelszó megerősítése"
+              labelTitle="Confirm Password"
               inputType="password"
               inputName="confirmPassword"
               inputPlaceHolder="•••••••"
@@ -147,19 +168,19 @@ const Register = () => {
             {formData.password.length > 0 &&
               (() => {
                 const reqs = {
-                  "8+ karakter": formData.password.length >= 8,
-                  "Tartalmaz or számot": /\d/.test(formData.password),
-                  "Tartalmaz szimbólumot": /[!@#$%^&*(),.?":{}|<>+-]/.test(
+                  "8+ characters": formData.password.length >= 8,
+                  "Contains a number": /\d/.test(formData.password),
+                  "Contains a symbol": /[!@#$%^&*(),.?":{}|<>+-]/.test(
                     formData.password,
                   ),
-                  Nagybetű: /[A-Z]/.test(formData.password),
+                  "Uppercase letter": /[A-Z]/.test(formData.password),
                 };
 
                 return (
                   <div className="mt-3 px-1 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="flex justify-between items-center text-sm mb-2">
                       <span className="text-white/80 font-medium">
-                        Jelszó erőssége
+                        Password Strength
                       </span>
                       <span
                         className={`font-bold transition-colors ${
@@ -171,10 +192,10 @@ const Register = () => {
                         }`}
                       >
                         {strengthScore <= 1
-                          ? "Gyenge"
+                          ? "Weak"
                           : strengthScore <= 3
-                            ? "Közepes"
-                            : "Erős"}
+                            ? "Medium"
+                            : "Strong"}
                       </span>
                     </div>
 
@@ -225,19 +246,19 @@ const Register = () => {
               })()}
 
             <Button
-              labelTitle={isLoading ? "Loading..." : "Regisztrálás"}
+              labelTitle={isLoading ? "Loading..." : "Register"}
               type="submit"
               disabled={!canRegister || isLoading}
               className="mt-3 sm:mt-12"
             />
           </form>
           <p className="mt-6 mb-6 text-white/80">
-            Van már fiókod?{" "}
+            Already have an account?{" "}
             <Link
               to="/login"
               className="text-white font-semibold hover:underline"
             >
-              Jelentkez be!
+              Login!
             </Link>
           </p>
         </div>

@@ -1,321 +1,685 @@
-import React, { useState, useEffect } from "react";
-import { Users, FileText, MessageSquare, Shield, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import AdminActionModal from "../components/admin/AdminActionModal";
+import AdminTabs from "../components/admin/AdminTabs";
+import CommentsManagement from "../components/admin/CommentsManagement";
+import LogsManagement from "../components/admin/LogsManagement";
+import PostsManagement from "../components/admin/PostsManagement";
+import ReportsManagement from "../components/admin/ReportsManagement";
+import UsersManagement from "../components/admin/UsersManagement";
+import {
+  VALID_ADMIN_TABS,
+  type AdminComment,
+  type AdminLog,
+  type AdminPost,
+  type AdminTabId,
+  type AdminUser,
+} from "../components/admin/types";
+import ErrorToast from "../components/ErrorToast";
 import api from "../utils/api";
+import { useErrorToast } from "../utils/useErrorToast";
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  createdAt: string;
-}
+const ITEMS_PER_PAGE = 8;
 
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  postedAt: string;
-  user: {
-    id: string;
-    username: string;
-  };
-}
+type PendingAdminAction =
+  | { type: "delete-post"; postId: string }
+  | { type: "delete-comment"; commentId: string }
+  | {
+      type: "report-action";
+      reportId: string;
+      action: "dismiss" | "block-user";
+      username: string;
+    }
+  | {
+      type: "change-role";
+      userId: string;
+      username: string;
+      currentRole: string;
+      nextRole: string;
+    }
+  | { type: "toggle-block"; userId: string; username: string; nextBlocked: boolean }
+  | { type: "set-timeout"; user: AdminUser }
+  | { type: "clear-timeout"; user: AdminUser }
+  | null;
 
-interface Comment {
-  id: string;
-  content: string;
-  createdAt: string;
-  user: {
-    id: string;
-    username: string;
-  };
-  post: {
-    id: string;
-    title: string;
-  };
-}
+const getInitialTab = (): AdminTabId => {
+  const requestedTab = new URLSearchParams(window.location.search).get("tab");
 
-interface Log {
-  id: string;
-  action: string;
-  details: string;
-  createdAt: string;
-  moderator: {
-    username: string;
-  };
-  user: {
-    username: string;
-  };
-}
+  if (requestedTab && VALID_ADMIN_TABS.includes(requestedTab as AdminTabId)) {
+    return requestedTab as AdminTabId;
+  }
+
+  return "users";
+};
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === "object" && error && "response" in error) {
+    return (error as any).response?.data?.error || fallback;
+  }
+  return fallback;
+};
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState("users");
-  const [users, setUsers] = useState<User[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [logs, setLogs] = useState<Log[]>([]);
+  const [activeTab, setActiveTab] = useState<AdminTabId>(getInitialTab);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [posts, setPosts] = useState<AdminPost[]>([]);
+  const [comments, setComments] = useState<AdminComment[]>([]);
+  const [reports, setReports] = useState<AdminLog[]>([]);
+  const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [hasModerationAccess, setHasModerationAccess] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [processingReportId, setProcessingReportId] = useState<string | null>(
+    null,
+  );
+  const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAdminAction>(null);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [timeoutMinutesInput, setTimeoutMinutesInput] = useState("60");
+  const [timeoutReasonInput, setTimeoutReasonInput] = useState("");
+  const [pageByTab, setPageByTab] = useState<Record<AdminTabId, number>>({
+    users: 1,
+    posts: 1,
+    comments: 1,
+    reports: 1,
+    logs: 1,
+  });
+
+  const { error, showError } = useErrorToast();
 
   useEffect(() => {
-    checkAdmin();
+    void checkAccess();
   }, []);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchData();
+    if (hasModerationAccess) {
+      void fetchData(activeTab);
     }
-  }, [activeTab, isAdmin]);
+  }, [activeTab, hasModerationAccess]);
 
-  const checkAdmin = async () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", activeTab);
+    window.history.replaceState({}, "", `/admin?${params.toString()}`);
+  }, [activeTab]);
+
+  const checkAccess = async () => {
+    setIsCheckingAccess(true);
+
     try {
-      const res = await api.get("/user-profile");
-      if (res.data.role === "ADMIN") {
-        setIsAdmin(true);
-      } else {
-        window.location.href = "/home";
+      const res = await api.get("/user-profile?includeSpotify=false");
+      setCurrentUserRole(res.data.role);
+      setCurrentUserId(res.data.id);
+
+      if (res.data.role === "ADMIN" || res.data.role === "MODERATOR") {
+        setHasModerationAccess(true);
+        return;
       }
-    } catch (error) {
+
+      window.location.href = "/home";
+    } catch {
       window.location.href = "/login";
+    } finally {
+      setIsCheckingAccess(false);
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = async (tab: AdminTabId = activeTab) => {
     setLoading(true);
+
     try {
-      if (activeTab === "users") {
-        const res = await api.get("/admin/users");
-        setUsers(res.data);
-      } else if (activeTab === "posts") {
-        const res = await api.get("/admin/posts");
-        setPosts(res.data);
-      } else if (activeTab === "comments") {
-        const res = await api.get("/admin/comments");
-        setComments(res.data);
-      } else if (activeTab === "logs") {
-        const res = await api.get("/admin/logs");
-        setLogs(res.data);
+      switch (tab) {
+        case "users": {
+          const res = await api.get("/admin/users");
+          setUsers(res.data);
+          break;
+        }
+        case "posts": {
+          const res = await api.get("/admin/posts");
+          setPosts(res.data);
+          break;
+        }
+        case "comments": {
+          const res = await api.get("/admin/comments");
+          setComments(res.data);
+          break;
+        }
+        case "logs": {
+          const res = await api.get("/admin/logs");
+          setLogs(res.data);
+          break;
+        }
+        case "reports": {
+          const res = await api.get("/admin/reports");
+          setReports(res.data);
+          break;
+        }
       }
-    } catch (error) {
-      console.error("Error fetching data:", error);
+    } catch (err) {
+      if (typeof err === "object" && err && "response" in err) {
+        const status = (err as any).response?.status;
+        if (status === 403) {
+          showError("Your session permissions changed. Please log in again.");
+          setTimeout(() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            window.location.href = "/login";
+          }, 400);
+          return;
+        }
+      }
+      showError("Failed to load admin data. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeletePost = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this post?")) {
-      try {
-        await api.delete(`/admin/posts/${id}`);
-        setPosts(posts.filter((p) => p.id !== id));
-      } catch (error) {
-        console.error("Error deleting post:", error);
+  const closeActionModal = () => {
+    setPendingAction(null);
+    setTimeoutMinutesInput("60");
+    setTimeoutReasonInput("");
+  };
+
+  const requestDeletePost = async (postId: string) => {
+    setPendingAction({ type: "delete-post", postId });
+  };
+
+  const requestDeleteComment = async (commentId: string) => {
+    setPendingAction({ type: "delete-comment", commentId });
+  };
+
+  const requestReportAction = async (
+    reportId: string,
+    action: "dismiss" | "block-user",
+  ) => {
+    const report = reports.find((entry) => entry.id === reportId);
+    setPendingAction({
+      type: "report-action",
+      reportId,
+      action,
+      username: report?.user.username ?? "this user",
+    });
+  };
+
+  const requestRoleChange = async (userId: string, nextRole: string) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) {
+      return;
+    }
+    setPendingAction({
+      type: "change-role",
+      userId,
+      username: target.username,
+      currentRole: target.role,
+      nextRole,
+    });
+  };
+
+  const requestToggleBlock = async (userId: string, nextBlocked: boolean) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) {
+      return;
+    }
+    setPendingAction({
+      type: "toggle-block",
+      userId,
+      username: target.username,
+      nextBlocked,
+    });
+  };
+
+  const requestSetTimeout = async (user: AdminUser) => {
+    setTimeoutMinutesInput("60");
+    setTimeoutReasonInput(user.timeoutReason ?? "");
+    setPendingAction({ type: "set-timeout", user });
+  };
+
+  const requestClearTimeout = async (user: AdminUser) => {
+    setPendingAction({ type: "clear-timeout", user });
+  };
+
+  const timeoutInputInvalid = useMemo(() => {
+    if (!pendingAction || pendingAction.type !== "set-timeout") {
+      return false;
+    }
+
+    const minutes = Number(timeoutMinutesInput.trim());
+    return !Number.isInteger(minutes) || minutes <= 0 || !timeoutReasonInput.trim();
+  }, [pendingAction, timeoutMinutesInput, timeoutReasonInput]);
+
+  const paginateByTab = <T,>(items: T[], tab: AdminTabId) => {
+    const page = pageByTab[tab] ?? 1;
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    return items.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  };
+
+  const activeTabItemCount = useMemo(() => {
+    switch (activeTab) {
+      case "users":
+        return users.length;
+      case "posts":
+        return posts.length;
+      case "comments":
+        return comments.length;
+      case "reports":
+        return reports.length;
+      case "logs":
+        return logs.length;
+    }
+  }, [activeTab, users.length, posts.length, comments.length, reports.length, logs.length]);
+
+  const activePage = pageByTab[activeTab] ?? 1;
+  const totalPages = Math.max(1, Math.ceil(activeTabItemCount / ITEMS_PER_PAGE));
+  const visiblePageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const start = Math.max(1, Math.min(activePage - 2, totalPages - 6));
+    return Array.from({ length: 7 }, (_, index) => start + index);
+  }, [activePage, totalPages]);
+
+  useEffect(() => {
+    if (activePage <= totalPages) {
+      return;
+    }
+
+    setPageByTab((prev) => ({
+      ...prev,
+      [activeTab]: totalPages,
+    }));
+  }, [activePage, activeTab, totalPages]);
+
+  const setPageForActiveTab = (nextPage: number) => {
+    setPageByTab((prev) => ({
+      ...prev,
+      [activeTab]: nextPage,
+    }));
+  };
+
+  const executePendingAction = async () => {
+    if (!pendingAction) {
+      return;
+    }
+
+    setIsSubmittingAction(true);
+
+    try {
+      switch (pendingAction.type) {
+        case "delete-post": {
+          await api.delete(`/admin/posts/${pendingAction.postId}`);
+          setPosts((prev) =>
+            prev.filter((post) => post.id !== pendingAction.postId),
+          );
+          break;
+        }
+
+        case "delete-comment": {
+          await api.delete(`/admin/comments/${pendingAction.commentId}`);
+          setComments((prev) =>
+            prev.filter((comment) => comment.id !== pendingAction.commentId),
+          );
+          break;
+        }
+
+        case "report-action": {
+          setProcessingReportId(pendingAction.reportId);
+          await api.patch(
+            `/admin/reports/${pendingAction.reportId}/${pendingAction.action}`,
+          );
+          await fetchData("reports");
+          setProcessingReportId(null);
+          break;
+        }
+
+        case "change-role": {
+          setProcessingUserId(pendingAction.userId);
+          const res = await api.patch(`/admin/users/${pendingAction.userId}/role`, {
+            role: pendingAction.nextRole,
+          });
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.id === pendingAction.userId
+                ? { ...user, ...res.data.user }
+                : user,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "toggle-block": {
+          setProcessingUserId(pendingAction.userId);
+          const res = await api.patch(`/admin/users/${pendingAction.userId}/block`, {
+            isBlocked: pendingAction.nextBlocked,
+          });
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.id === pendingAction.userId
+                ? { ...user, ...res.data.user }
+                : user,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "set-timeout": {
+          const durationMinutes = Number(timeoutMinutesInput.trim());
+          if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) {
+            showError("Please enter a valid timeout duration in minutes.");
+            return;
+          }
+          if (!timeoutReasonInput.trim()) {
+            showError("Timeout reason is required.");
+            return;
+          }
+
+          setProcessingUserId(pendingAction.user.id);
+          const res = await api.patch(
+            `/admin/users/${pendingAction.user.id}/timeout`,
+            {
+              durationMinutes,
+              reason: timeoutReasonInput.trim(),
+            },
+          );
+          setUsers((prev) =>
+            prev.map((entry) =>
+              entry.id === pendingAction.user.id ? res.data.user : entry,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "clear-timeout": {
+          setProcessingUserId(pendingAction.user.id);
+          const res = await api.delete(
+            `/admin/users/${pendingAction.user.id}/timeout`,
+          );
+          setUsers((prev) =>
+            prev.map((entry) =>
+              entry.id === pendingAction.user.id ? res.data.user : entry,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
       }
+
+      closeActionModal();
+    } catch (err) {
+      if (pendingAction.type === "report-action") {
+        setProcessingReportId(null);
+      }
+      if (
+        pendingAction.type === "change-role" ||
+        pendingAction.type === "toggle-block" ||
+        pendingAction.type === "set-timeout" ||
+        pendingAction.type === "clear-timeout"
+      ) {
+        setProcessingUserId(null);
+      }
+
+      showError(getErrorMessage(err, "Failed to complete admin action."));
+
+      if (
+        pendingAction.type === "change-role" ||
+        pendingAction.type === "toggle-block" ||
+        pendingAction.type === "set-timeout" ||
+        pendingAction.type === "clear-timeout"
+      ) {
+        await fetchData("users");
+      }
+      if (pendingAction.type === "report-action") {
+        await fetchData("reports");
+      }
+    } finally {
+      setIsSubmittingAction(false);
     }
   };
 
-  const handleDeleteComment = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this comment?")) {
-      try {
-        await api.delete(`/admin/comments/${id}`);
-        setComments(comments.filter((c) => c.id !== id));
-      } catch (error) {
-        console.error("Error deleting comment:", error);
-      }
+  const actionModalContent = useMemo(() => {
+    if (!pendingAction) {
+      return {
+        title: "",
+        description: "",
+        confirmLabel: "Confirm",
+        danger: false,
+      };
+    }
+
+    switch (pendingAction.type) {
+      case "delete-post":
+        return {
+          title: "Delete Post",
+          description: "This post will be permanently removed.",
+          confirmLabel: "Delete post",
+          danger: true,
+        };
+      case "delete-comment":
+        return {
+          title: "Delete Comment",
+          description: "This comment will be permanently removed.",
+          confirmLabel: "Delete comment",
+          danger: true,
+        };
+      case "report-action":
+        if (pendingAction.action === "dismiss") {
+          return {
+            title: "Dismiss Report",
+            description: "This report will be marked as handled and dismissed.",
+            confirmLabel: "Dismiss report",
+            danger: false,
+          };
+        }
+        return {
+          title: "Block Reported User",
+          description: `Block @${pendingAction.username} from posting and commenting?`,
+          confirmLabel: "Block user",
+          danger: true,
+        };
+      case "change-role":
+        return {
+          title: "Change User Role",
+          description: `Change @${pendingAction.username} from ${pendingAction.currentRole} to ${pendingAction.nextRole}?`,
+          confirmLabel: "Change role",
+          danger: false,
+        };
+      case "toggle-block":
+        return {
+          title: pendingAction.nextBlocked ? "Block User" : "Unblock User",
+          description: pendingAction.nextBlocked
+            ? `Block @${pendingAction.username} from posting and commenting?`
+            : `Restore posting and commenting access for @${pendingAction.username}?`,
+          confirmLabel: pendingAction.nextBlocked ? "Block user" : "Unblock user",
+          danger: pendingAction.nextBlocked,
+        };
+      case "set-timeout":
+        return {
+          title: "Set Timeout",
+          description: `Set a temporary posting/commenting timeout for @${pendingAction.user.username}.`,
+          confirmLabel: "Set timeout",
+          danger: true,
+        };
+      case "clear-timeout":
+        return {
+          title: "Clear Timeout",
+          description: `Remove the active timeout for @${pendingAction.user.username}?`,
+          confirmLabel: "Clear timeout",
+          danger: false,
+        };
+    }
+  }, [pendingAction]);
+
+  const canManageUsers = currentUserRole === "ADMIN";
+
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case "users":
+        return (
+          <UsersManagement
+            users={paginateByTab(users, "users")}
+            canManageUsers={canManageUsers}
+            processingUserId={processingUserId}
+            currentUserId={currentUserId}
+            onRoleChange={requestRoleChange}
+            onToggleBlock={requestToggleBlock}
+            onSetTimeout={requestSetTimeout}
+            onClearTimeout={requestClearTimeout}
+          />
+        );
+      case "posts":
+        return (
+          <PostsManagement
+            posts={paginateByTab(posts, "posts")}
+            onDeletePost={requestDeletePost}
+          />
+        );
+      case "comments":
+        return (
+          <CommentsManagement
+            comments={paginateByTab(comments, "comments")}
+            onDeleteComment={requestDeleteComment}
+          />
+        );
+      case "reports":
+        return (
+          <ReportsManagement
+            reports={paginateByTab(reports, "reports")}
+            processingReportId={processingReportId}
+            onRequestReportAction={requestReportAction}
+          />
+        );
+      case "logs":
+        return <LogsManagement logs={paginateByTab(logs, "logs")} />;
+      default:
+        return null;
     }
   };
 
-  if (!isAdmin) {
+  if (isCheckingAccess || !hasModerationAccess) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Checking permissions...
+        {isCheckingAccess ? "Checking permissions..." : "Access denied"}
+        <ErrorToast error={error} />
       </div>
     );
   }
 
-  const tabs = [
-    { id: "users", label: "Users", icon: Users },
-    { id: "posts", label: "Posts", icon: FileText },
-    { id: "comments", label: "Comments", icon: MessageSquare },
-    { id: "logs", label: "Logs", icon: Shield },
-  ];
-
   return (
-    <div className="min-h-screen bg-black text-white p-2 sm:p-4 md:p-6">
+    <div className="min-h-screen text-white p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
-          Admin Panel
+          Moderation Panel
         </h1>
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-1 sm:gap-2 mb-4 sm:mb-6 justify-center">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === tab.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
-            >
-              <tab.icon size={16} className="sm:w-[18px] sm:h-[18px]" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <AdminTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        {/* Content */}
         <div className="bg-gray-800 rounded-lg p-2 sm:p-4">
           {loading ? (
             <div className="text-center py-8">Loading...</div>
           ) : (
-            <>
-              {activeTab === "users" && (
-                <>
-                  {/* Mobile card view */}
-                  <div className="block sm:hidden space-y-3">
-                    {users.map((user) => (
-                      <div key={user.id} className="bg-gray-700 p-3 rounded-lg">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-semibold text-white">
-                            {user.username}
-                          </h3>
-                          <span
-                            className={`text-xs px-2 py-1 rounded ${
-                              user.role === "ADMIN"
-                                ? "bg-red-600"
-                                : user.role === "MODERATOR"
-                                  ? "bg-yellow-600"
-                                  : "bg-blue-600"
-                            }`}
-                          >
-                            {user.role}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-300 mb-1">
-                          {user.email}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Created:{" "}
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Desktop table view */}
-                  <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-600">
-                          <th className="text-left p-2">Username</th>
-                          <th className="text-left p-2">Email</th>
-                          <th className="text-left p-2">Role</th>
-                          <th className="text-left p-2">Created</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((user) => (
-                          <tr
-                            key={user.id}
-                            className="border-b border-gray-700"
-                          >
-                            <td className="p-2">{user.username}</td>
-                            <td className="p-2">{user.email}</td>
-                            <td className="p-2">{user.role}</td>
-                            <td className="p-2">
-                              {new Date(user.createdAt).toLocaleDateString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-
-              {activeTab === "posts" && (
-                <div className="space-y-3 sm:space-y-4">
-                  {posts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="bg-gray-700 p-3 sm:p-4 rounded-lg relative"
-                    >
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        className="absolute top-3 right-3 sm:relative sm:top-auto sm:right-auto bg-red-600 hover:bg-red-700 p-2 rounded text-white sm:self-center flex-shrink-0"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <div className="pr-12 sm:pr-0">
-                        <h3 className="font-semibold text-sm sm:text-base">
-                          {post.title}
-                        </h3>
-                        <p className="text-sm text-gray-300 mt-1">
-                          {post.content}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-2">
-                          By {post.user.username} •{" "}
-                          {new Date(post.postedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === "comments" && (
-                <div className="space-y-3 sm:space-y-4">
-                  {comments.map((comment) => (
-                    <div
-                      key={comment.id}
-                      className="bg-gray-700 p-3 sm:p-4 rounded-lg relative"
-                    >
-                      <button
-                        onClick={() => handleDeleteComment(comment.id)}
-                        className="absolute top-3 right-3 sm:relative sm:top-auto sm:right-auto bg-red-600 hover:bg-red-700 p-2 rounded text-white sm:self-center flex-shrink-0"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <div className="pr-12 sm:pr-0">
-                        <p className="text-sm text-gray-300">
-                          {comment.content}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-2">
-                          By {comment.user.username} on "{comment.post.title}" •{" "}
-                          {new Date(comment.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === "logs" && (
-                <div className="space-y-3 sm:space-y-4">
-                  {logs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="bg-gray-700 p-3 sm:p-4 rounded-lg"
-                    >
-                      <p className="font-semibold text-sm sm:text-base">
-                        {log.action}
-                      </p>
-                      <p className="text-sm text-gray-300 mt-1">
-                        {log.details}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        By {log.moderator.username} on {log.user.username} •{" "}
-                        {new Date(log.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
+            renderActiveTab()
           )}
         </div>
+
+        {!loading && activeTabItemCount > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPageForActiveTab(Math.max(1, activePage - 1))}
+              disabled={activePage === 1}
+              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+            >
+              Prev
+            </button>
+
+            {visiblePageNumbers.map((page) => (
+              <button
+                key={page}
+                type="button"
+                onClick={() => setPageForActiveTab(page)}
+                className={`px-3 py-1 rounded ${
+                  page === activePage
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setPageForActiveTab(Math.min(totalPages, activePage + 1))
+              }
+              disabled={activePage === totalPages}
+              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
+
+      <AdminActionModal
+        isOpen={!!pendingAction}
+        title={actionModalContent.title}
+        description={actionModalContent.description}
+        confirmLabel={actionModalContent.confirmLabel}
+        danger={actionModalContent.danger}
+        isSubmitting={isSubmittingAction}
+        confirmDisabled={timeoutInputInvalid}
+        onClose={closeActionModal}
+        onConfirm={() => {
+          void executePendingAction();
+        }}
+      >
+        {pendingAction?.type === "set-timeout" ? (
+          <div className="space-y-3">
+            <div>
+              <label
+                htmlFor="timeout-minutes"
+                className="block text-sm text-gray-300 mb-1"
+              >
+                Duration (minutes)
+              </label>
+              <input
+                id="timeout-minutes"
+                type="number"
+                min={1}
+                value={timeoutMinutesInput}
+                onChange={(event) => setTimeoutMinutesInput(event.target.value)}
+                className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="timeout-reason"
+                className="block text-sm text-gray-300 mb-1"
+              >
+                Reason
+              </label>
+              <textarea
+                id="timeout-reason"
+                value={timeoutReasonInput}
+                onChange={(event) => setTimeoutReasonInput(event.target.value)}
+                maxLength={110}
+                rows={3}
+                className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white resize-none"
+              />
+              <p className="text-xs text-gray-400 mt-1 text-right">
+                {timeoutReasonInput.length}/110
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </AdminActionModal>
+
+      <ErrorToast error={error} />
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface ErrorToastProps {
   error: string | null;
+  variant?: "error" | "success";
 }
 
 /**
@@ -15,7 +16,9 @@ interface ErrorToastProps {
  *   ...
  *   <ErrorToast error={error} />
  */
-const ErrorToast = ({ error }: ErrorToastProps) => {
+const ErrorToast = ({ error, variant = "error" }: ErrorToastProps) => {
+  const isSuccess = variant === "success";
+
   return (
     <AnimatePresence>
       {error && (
@@ -24,9 +27,13 @@ const ErrorToast = ({ error }: ErrorToastProps) => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 50, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium whitespace-nowrap"
+          className={`fixed bottom-10 left-1/2 -translate-x-1/2 text-white px-6 py-3 rounded-full shadow-lg z-50 flex items-center gap-2 text-sm font-medium whitespace-nowrap ${isSuccess ? "bg-emerald-500/90" : "bg-red-500/90"}`}
         >
-          <AlertCircle size={16} className="shrink-0" />
+          {isSuccess ? (
+            <CheckCircle2 size={16} className="shrink-0" />
+          ) : (
+            <AlertCircle size={16} className="shrink-0" />
+          )}
           {error}
         </motion.div>
       )}

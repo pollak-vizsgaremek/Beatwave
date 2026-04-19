@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import api from "../utils/api";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
+import TrackPlaylistPicker from "../components/TrackPlaylistPicker";
 
 interface SpotifyImage {
   url: string;
@@ -27,6 +28,7 @@ interface SpotifyAlbum {
 
 interface SpotifyTrack {
   id: string;
+  uri: string;
   name: string;
   album: { images: SpotifyImage[]; name: string };
   artists: { name: string }[];
@@ -86,6 +88,7 @@ const SearchResult = () => {
   const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
   const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({});
+  const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
 
   // All errors shown as the bottom toast
   const { error, showError } = useErrorToast();
@@ -181,6 +184,7 @@ const SearchResult = () => {
       setVisibleCounts({});
       setHasMore({});
       setLoadingMore({});
+      setExpandedTrackId(null);
 
       try {
         const response = await api.get("/auth/spotify/search", {
@@ -280,27 +284,51 @@ const SearchResult = () => {
               .map((track) => (
                 <div
                   key={track.id}
-                  className="flex items-center gap-4 bg-card hover:bg-accent-dark transition-colors rounded-xl p-3 cursor-pointer"
+                  className={`rounded-xl border p-3 transition-all ${
+                    expandedTrackId === track.id
+                      ? "border-spotify-green bg-accent-dark/60 scale-[1.01]"
+                      : "border-transparent bg-card hover:bg-accent-dark"
+                  }`}
                 >
-                  <img
-                    src={
-                      track.album.images?.[0]?.url ||
-                      "https://placehold.co/48x48"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedTrackId((prev) =>
+                        prev === track.id ? null : track.id,
+                      )
                     }
-                    alt={track.name}
-                    className="w-12 h-12 rounded-lg object-cover shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">
-                      {track.name}
-                    </p>
-                    <p className="text-gray-400 text-sm truncate">
-                      {track.artists.map((a) => a.name).join(", ")}
-                    </p>
-                  </div>
-                  <span className="text-gray-500 text-sm shrink-0">
-                    {formatDuration(track.duration_ms)}
-                  </span>
+                    className="flex w-full cursor-pointer items-center gap-4 text-left"
+                  >
+                    <img
+                      src={
+                        track.album.images?.[0]?.url ||
+                        "https://placehold.co/48x48"
+                      }
+                      alt={track.name}
+                      className="w-12 h-12 rounded-lg object-cover shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">
+                        {track.name}
+                      </p>
+                      <p className="text-gray-400 text-sm truncate">
+                        {track.artists.map((a) => a.name).join(", ")}
+                      </p>
+                    </div>
+                    <span className="text-gray-500 text-sm shrink-0">
+                      {formatDuration(track.duration_ms)}
+                    </span>
+                  </button>
+
+                  {expandedTrackId === track.id && (
+                    <TrackPlaylistPicker
+                      trackUri={track.uri}
+                      trackName={track.name}
+                      expanded={expandedTrackId === track.id}
+                      onToggle={() => setExpandedTrackId(null)}
+                      onError={showError}
+                    />
+                  )}
                 </div>
               ))}
           </div>

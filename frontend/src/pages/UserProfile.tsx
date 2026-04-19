@@ -1,36 +1,99 @@
-import { PencilLine, X } from "lucide-react";
-import { useState, useEffect } from "react";
-import api from "../utils/api";
-import Input from "../components/Input";
-import Button from "../components/Button";
-import { Link } from 'react-router';
+import { useEffect, useRef, useState } from "react";
 import ErrorToast from "../components/ErrorToast";
+import EditPostModal from "../components/profile/EditPostModal";
+import EditProfileModal from "../components/profile/EditProfileModal";
+import ProfileContent from "../components/profile/ProfileContent";
+import ProfileSummaryCard from "../components/profile/ProfileSummaryCard";
+import SettingsContent from "../components/profile/SettingsContent";
+import type {
+  PostFormData,
+  UserProfileData,
+} from "../components/profile/types";
+import api from "../utils/api";
+import { normalizeHashtagInput } from "../utils/hashtags";
+import type { DiscussionType } from "../utils/Type";
 import { useErrorToast } from "../utils/useErrorToast";
-
-interface User {
-  username: string;
-  email: string;
-  spotifyConnected: boolean;
-  soundCloudConnected: boolean;
-}
 
 const UserProfile = () => {
   const [isOnProfile, setIsOnProfile] = useState(true);
   const [spotiHover, setSpotiHover] = useState(false);
   const [soundHover, setSoundHover] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState(
+    () => localStorage.getItem("spotifyTimeRange") ?? "4week",
+  );
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [confirmUsername, setConfirmUsername] = useState("");
+  const [description, setDescription] = useState("");
   const [password, setPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+
+  const [userPosts, setUserPosts] = useState<DiscussionType[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [postForm, setPostForm] = useState<PostFormData>({
+    title: "",
+    topic: "",
+    hashtags: "",
+    text: "",
+  });
+  const [isSavingPost, setIsSavingPost] = useState(false);
+  const [openPostMenuId, setOpenPostMenuId] = useState<string | null>(null);
+  const postMenuRef = useRef<HTMLDivElement | null>(null);
 
   const { error, showError } = useErrorToast();
 
-  const handleUpdateUsername = async (e: React.FormEvent) => {
+  const resetModal = () => {
+    setNewUsername("");
+    setNewEmail("");
+    setConfirmUsername("");
+    setDescription("");
+    setPassword("");
+  };
+
+  const closeEditModal = () => {
+    setIsModalOpen(false);
+    resetModal();
+  };
+
+  const openEditModal = () => {
+    setNewUsername(user?.username || "");
+    setNewEmail(user?.email || "");
+    setConfirmUsername(user?.username || "");
+    setDescription(user?.description || "");
+    setPassword("");
+    setIsModalOpen(true);
+  };
+
+  const openPostEditModal = (post: DiscussionType) => {
+    setEditingPostId(post.id);
+    setPostForm({
+      title: post.title || "",
+      topic: post.topic || "",
+      hashtags: post.hashtags || "",
+      text: post.text || "",
+    });
+    setOpenPostMenuId(null);
+    setIsPostModalOpen(true);
+  };
+
+  const resetPostModal = () => {
+    setEditingPostId(null);
+    setPostForm({ title: "", topic: "", hashtags: "", text: "" });
+    setIsPostModalOpen(false);
+  };
+
+  const handleTogglePostMenu = (postId: string) => {
+    setOpenPostMenuId((prev) => (prev === postId ? null : postId));
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (newUsername !== confirmUsername) {
@@ -47,26 +110,77 @@ const UserProfile = () => {
     try {
       const response = await api.put("/user-profile", {
         username: newUsername,
-        password: password,
+        email: newEmail,
+        description,
+        password,
       });
+
       setUser((prev) =>
-        prev ? { ...prev, username: response.data.username } : null,
+        prev
+          ? {
+              ...prev,
+              username: response.data.username,
+              email: response.data.email,
+              description: response.data.description ?? null,
+            }
+          : null,
       );
-      setIsModalOpen(false);
-      resetModal();
+
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        localStorage.setItem(
+          "user",
+          JSON.stringify({
+            ...parsedUser,
+            username: response.data.username,
+            email: response.data.email,
+          }),
+        );
+      }
+
+      closeEditModal();
     } catch (err: any) {
-      showError(
-        err.response?.data?.error || "Hiba történt a frissítés során",
-      );
+      showError(err.response?.data?.error || "Hiba történt a frissítés során");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const resetModal = () => {
-    setNewUsername("");
-    setConfirmUsername("");
-    setPassword("");
+  const handlePostFieldChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+    setPostForm((prev) => ({
+      ...prev,
+      [name]: name === "hashtags" ? normalizeHashtagInput(value) : value,
+    }));
+  };
+
+  const handlePrivacyToggle = async () => {
+    if (!user || isUpdatingPrivacy) {
+      return;
+    }
+
+    setIsUpdatingPrivacy(true);
+    try {
+      const response = await api.patch("/user-profile/privacy", {
+        isPrivate: !user.isPrivate,
+      });
+
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              isPrivate: response.data.isPrivate,
+            }
+          : prev,
+      );
+    } catch (err: any) {
+      showError(err.response?.data?.error || "Failed to update privacy.");
+    } finally {
+      setIsUpdatingPrivacy(false);
+    }
   };
 
   const handleConnectSpotify = async () => {
@@ -87,8 +201,7 @@ const UserProfile = () => {
       setSpotiHover(false);
     } catch (err: any) {
       showError(
-        err.response?.data?.error ||
-          "Failed to disconnect Spotify. Try again.",
+        err.response?.data?.error || "Failed to disconnect Spotify. Try again.",
       );
     }
   };
@@ -98,19 +211,97 @@ const UserProfile = () => {
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      try {
-        const response = await api.get("/user-profile");
-        setUser(response.data);
-      } catch (err: any) {
-        showError(
-          err.response?.data?.error || "Failed to load profile.",
-        );
-      } finally {
-        setLoading(false);
+      const [profileResult, postsResult] = await Promise.allSettled([
+        api.get("/user-profile?includeSpotify=false"),
+        api.get("/user-profile/posts"),
+      ]);
+
+      if (profileResult.status === "fulfilled") {
+        setUser(profileResult.value.data);
+      } else {
+        const profileError = profileResult.reason as any;
+        showError(profileError?.response?.data?.error || "Failed to load profile.");
+      }
+      setLoading(false);
+
+      if (postsResult.status === "fulfilled") {
+        setUserPosts(postsResult.value.data);
+      } else {
+        const postsError = postsResult.reason as any;
+        showError(postsError?.response?.data?.error || "Failed to load your posts.");
+      }
+      setLoadingPosts(false);
+    };
+
+    void fetchUserProfile();
+  }, []);
+
+  const handleTimeRangeChange = (
+    event: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const value = event.target.value;
+    setTimeRange(value);
+    localStorage.setItem("spotifyTimeRange", value);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        postMenuRef.current &&
+        !postMenuRef.current.contains(event.target as Node)
+      ) {
+        setOpenPostMenuId(null);
       }
     };
-    fetchUserProfile();
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
+
+  const handleSavePost = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingPostId) {
+      return;
+    }
+
+    setIsSavingPost(true);
+    try {
+      const response = await api.put(`/post/${editingPostId}`, postForm);
+      setUserPosts((prev) =>
+        prev.map((post) =>
+          post.id === editingPostId ? { ...post, ...response.data } : post,
+        ),
+      );
+      resetPostModal();
+    } catch (err: any) {
+      showError(err.response?.data?.error || "Failed to update post.");
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    setOpenPostMenuId(null);
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this post?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await api.delete(`/post/${postId}`);
+      setUserPosts((prev) => prev.filter((post) => post.id !== postId));
+    } catch (err: any) {
+      showError(err.response?.data?.error || "Failed to delete post.");
+    }
+  };
 
   if (loading) {
     return (
@@ -121,9 +312,9 @@ const UserProfile = () => {
   }
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="flex flex-col items-center justify-center mt-20 w-4/7">
-        <div className="flex gap-4 self-start ml-10 mb-2 text-2xl">
+    <div className="flex flex-col items-center px-4">
+      <div className="flex flex-col items-center justify-center mt-12 w-full max-w-5xl">
+        <div className="flex gap-4 self-start mb-3 text-xl sm:text-2xl">
           <button
             className={`pointer hover:font-medium hover:underline underline-offset-2 ${
               isOnProfile ? "font-medium underline" : ""
@@ -133,7 +324,7 @@ const UserProfile = () => {
             Profile
           </button>
           <button
-            className={`pointer hover:font-medium hover:underline underline-offset-2${
+            className={`pointer hover:font-medium hover:underline underline-offset-2 ${
               isOnProfile ? "" : "font-medium underline"
             }`}
             onClick={() => setIsOnProfile(false)}
@@ -141,160 +332,67 @@ const UserProfile = () => {
             Settings
           </button>
         </div>
-        <div className="bg-card-black w-full h-auto p-3 flex flex-row rounded-3xl">
-          <div className="w-2/5 p-2 h-full flex flex-col justify-center ">
-            <div className="flex justify-center items-center flex-col">
-              <div className="bg-accent mt-2 p-2 w-32 h-32 rounded-full flex justify-center items-center">
-                pfp-pic
-              </div>
-              <div
-                className="flex justify-center items-center mt-2 text-lg text-amber-600 cursor-pointer hover:text-amber-500"
-                onClick={() => setIsModalOpen(true)}
-              >
-                {user?.username || "Felhasználó"}{" "}
-                <PencilLine size={14} className="ml-1" />
-              </div>
-            </div>
-            <div className="flex justify-center items-center flex-col mt-2">
-              {connectedToSpotify ? (
-                <div
-                  onPointerEnter={() => setSpotiHover(true)}
-                  onPointerLeave={() => setSpotiHover(false)}
-                  onClick={handleDisconnectSpotify}
-                  className={`flex justify-center bg-spotify-green mt-2 p-3 rounded-2xl text-black font-semibold text-lg w-3/4 hover:bg-spotify-green/85 outline-1 hover:outline-2 cursor-pointer transition-colors ${
-                    spotiHover ? "bg-red-700! text-white outline-black" : ""
-                  }`}
-                >
-                  {spotiHover ? (
-                    <p className="flex flex-row items-center">
-                      Leválasztás <X />
-                    </p>
-                  ) : (
-                    <p>Spotify</p>
-                  )}
-                </div>
-              ) : (
-                <div
-                  onClick={handleConnectSpotify}
-                  className="flex justify-center bg-gray-400 border-spotify-green border-2 mt-2 p-3 rounded-2xl text-black w-3/4 text-center cursor-pointer hover:bg-gray-500 transition-colors"
-                  title="Kattints a Spotify összekapcsolásához"
-                >
-                  Csatlakozás a Spotify-hoz
-                </div>
-              )}
 
-              {connectedToSoundCloud ? (
-                <div
-                  onPointerEnter={() => setSoundHover(true)}
-                  onPointerLeave={() => setSoundHover(false)}
-                  className={`flex justify-center bg-soundcloud-orange mt-4 p-3 rounded-2xl text-white font-semibold text-lg w-3/4 hover:bg-soundcloud-orange/85 outline-white outline-1 hover:outline-2 ${
-                    soundHover ? "bg-red-700! text-white outline-black!" : ""
-                  }`}
-                >
-                  {soundHover ? (
-                    <p className="flex flex-row items-center">
-                      Leválasztás <X />
-                    </p>
-                  ) : (
-                    <p>SoundCloud</p>
-                  )}
-                </div>
-              ) : (
-                <div className="flex justify-center bg-gray-400 border-soundcloud-orange border-2 mt-4 p-3 rounded-2xl text-black w-3/4 text-center">
-                  {soundHover && connectedToSoundCloud ? (
-                    <p className="flex flex-row items-center">Összkapcsolás</p>
-                  ) : (
-                    <p>SoundCloud fiókod nincs hozzá kapcsolva</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="w-3/4 p-2 h-full ">
-            {/* Fixed: use defaultValue on <select> instead of `selected` on <option> */}
-            <select
-              name="timeRange"
-              defaultValue="4week"
-              className="w-2/5 p-3 rounded-2xl bg-card border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            >
-              <option value="4week">4 weeks</option>
-              <option value="6month">6 months</option>
-              <option value="alltime">All time</option>
-            </select>
+        <div className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl">
+          <ProfileSummaryCard user={user} />
 
-            <Link to="/admin">
-              <Button
-                labelTitle="admin"
-                className="mt-6! outline-1 border-none hover:outline-white hover:outline-1 hover:outline-offset-2"
+          <div className="flex-1 p-2">
+            {isOnProfile ? (
+              <ProfileContent
+                loadingPosts={loadingPosts}
+                userPosts={userPosts}
+                openPostMenuId={openPostMenuId}
+                postMenuRef={postMenuRef}
+                onTogglePostMenu={handleTogglePostMenu}
+                onOpenPostEdit={openPostEditModal}
+                onDeletePost={handleDeletePost}
               />
-            </Link>
+            ) : (
+              <SettingsContent
+                connectedToSpotify={connectedToSpotify}
+                connectedToSoundCloud={connectedToSoundCloud}
+                spotiHover={spotiHover}
+                soundHover={soundHover}
+                timeRange={timeRange}
+                isPrivate={user?.isPrivate ?? false}
+                isUpdatingPrivacy={isUpdatingPrivacy}
+                onOpenEditModal={openEditModal}
+                onTogglePrivacy={handlePrivacyToggle}
+                onConnectSpotify={handleConnectSpotify}
+                onDisconnectSpotify={handleDisconnectSpotify}
+                onSpotifyHoverChange={setSpotiHover}
+                onSoundHoverChange={setSoundHover}
+                onTimeRangeChange={handleTimeRangeChange}
+              />
+            )}
           </div>
         </div>
 
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-card w-[600px] p-4 rounded-3xl relative border border-border flex flex-col items-center">
-              <button
-                onClick={() => {
-                  setIsModalOpen(false);
-                  resetModal();
-                }}
-                className="absolute top-4 right-4 text-white hover:text-red-500 cursor-pointer"
-              >
-                <X size={40} />
-              </button>
+        <EditProfileModal
+          isOpen={isModalOpen}
+          newUsername={newUsername}
+          newEmail={newEmail}
+          confirmUsername={confirmUsername}
+          description={description}
+          password={password}
+          isUpdating={isUpdating}
+          onClose={closeEditModal}
+          onSubmit={handleUpdateProfile}
+          onUsernameChange={setNewUsername}
+          onEmailChange={setNewEmail}
+          onConfirmUsernameChange={setConfirmUsername}
+          onDescriptionChange={setDescription}
+          onPasswordChange={setPassword}
+        />
 
-              <h2 className="text-3xl font-semibold text-white mb-6 mt-8">
-                Felhasználónév módosítása
-              </h2>
-
-              <form
-                onSubmit={handleUpdateUsername}
-                className="w-full flex flex-col items-center"
-              >
-                <Input
-                  labelTitle="Új felhasználónév"
-                  inputName="newUsername"
-                  inputType="text"
-                  inputPlaceHolder="Új név"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
-                  wrapperClassName="!mt-2"
-                  labelClassName="!font-normal"
-                />
-
-                <Input
-                  labelTitle="Felhasználónév megerősítése"
-                  inputName="confirmUsername"
-                  inputType="text"
-                  inputPlaceHolder="Új név újra"
-                  value={confirmUsername}
-                  onChange={(e) => setConfirmUsername(e.target.value)}
-                  wrapperClassName="!mt-5"
-                  labelClassName="!font-normal"
-                />
-
-                <Input
-                  labelTitle="Jelenlegi jelszó"
-                  inputName="password"
-                  inputType="password"
-                  inputPlaceHolder="Jelszó"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  wrapperClassName="!mt-5"
-                  labelClassName="!font-normal"
-                />
-
-                <Button
-                  labelTitle={isUpdating ? "Mentés..." : "Mentés"}
-                  type="submit"
-                  disabled={isUpdating}
-                  className="mt-6 mb-4"
-                />
-              </form>
-            </div>
-          </div>
-        )}
+        <EditPostModal
+          isOpen={isPostModalOpen}
+          postForm={postForm}
+          isSavingPost={isSavingPost}
+          onClose={resetPostModal}
+          onSubmit={handleSavePost}
+          onFieldChange={handlePostFieldChange}
+        />
       </div>
 
       <ErrorToast error={error} />

@@ -30,6 +30,7 @@ interface DiscussionType {
   id: string;
   text: string;
   likeAmount: number;
+  isLiked?: boolean;
   hashtags: string;
   postedAt: Date;
   userId: string;
@@ -39,7 +40,7 @@ interface DiscussionType {
     id: string;
     username: string;
   };
-};
+}
 
 interface CommentType {
   id: string;
@@ -68,4 +69,10 @@ interface NotificationType {
   triggeredById: string | null;
 }
 
-export type { InputProps, ButtonProps, DiscussionType, CommentType, NotificationType };
+export type {
+  InputProps,
+  ButtonProps,
+  DiscussionType,
+  CommentType,
+  NotificationType,
+};

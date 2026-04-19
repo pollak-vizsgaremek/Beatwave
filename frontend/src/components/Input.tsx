@@ -16,7 +16,6 @@ const Input = ({
   value,
   checked,
   disabled,
-  defaultChecked,
   onChange,
   onKeyDown,
 }: InputProps) => {
