@@ -106,7 +106,7 @@ const Register = () => {
   return (
     <div className="flex flex-col sm:flex-row h-screen w-screen bg-linear-to-r from-black to-border">
       <div className="w-full sm:w-1/2 flex items-center justify-center order-2 sm:order-1">
-        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-[#336890]/70 border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
+        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
           <div className="absolute top-4 left-6 flex items-center gap-2">
             <img
               src="/Beatwave_logo.png"
@@ -118,7 +118,7 @@ const Register = () => {
             </span>
           </div>
           <h1 className="font-semibold text-5xl mt-8 text-white">
-            Regisztrálás
+            Registration
           </h1>
           <form
             onSubmit={handleSubmit}

@@ -25,7 +25,11 @@ import {
   searchSpotify,
 } from "../controllers/spotify";
 
-import { verifyToken, isAdmin } from "../middlewares/authMiddleware";
+import {
+  verifyToken,
+  isAdmin,
+  isAdminOrModerator,
+} from "../middlewares/authMiddleware";
 import {
   getPostById,
   getPosts,
@@ -45,6 +49,7 @@ import {
   createComment,
   getCommentsByPostId,
   likeComment,
+  reportComment,
 } from "../controllers/commentController";
 import {
   getAllUsers,
@@ -53,6 +58,10 @@ import {
   getModerationLogs,
   deletePost,
   deleteComment,
+  dismissReport,
+  blockReportedUser,
+  updateUserRole,
+  setUserBlockedStatus,
 } from "../controllers/adminController";
 
 const router = Router();
@@ -108,17 +117,42 @@ router.post("/post/:id/report", verifyToken, reportPost);
 router.get("/post/:id/comments", verifyToken, getCommentsByPostId);
 router.post("/post/:id/comments", verifyToken, createComment);
 router.post("/comment/:id/like", verifyToken, likeComment);
+router.post("/comment/:id/report", verifyToken, reportComment);
 
 router.get("/notifications", verifyToken, getNotifications);
 router.patch("/notifications/read", verifyToken, markNotificationsRead);
 router.delete("/notifications/read", verifyToken, deleteNotificationsRead);
 
-// Admin routes
-router.get("/admin/users", verifyToken, isAdmin, getAllUsers);
-router.get("/admin/posts", verifyToken, isAdmin, getAllPosts);
-router.get("/admin/comments", verifyToken, isAdmin, getAllComments);
-router.get("/admin/logs", verifyToken, isAdmin, getModerationLogs);
-router.delete("/admin/posts/:id", verifyToken, isAdmin, deletePost);
-router.delete("/admin/comments/:id", verifyToken, isAdmin, deleteComment);
+// Admin + moderation routes
+router.get("/admin/users", verifyToken, isAdminOrModerator, getAllUsers);
+router.patch("/admin/users/:id/role", verifyToken, isAdmin, updateUserRole);
+router.patch(
+  "/admin/users/:id/block",
+  verifyToken,
+  isAdmin,
+  setUserBlockedStatus,
+);
+router.get("/admin/posts", verifyToken, isAdminOrModerator, getAllPosts);
+router.get("/admin/comments", verifyToken, isAdminOrModerator, getAllComments);
+router.get("/admin/logs", verifyToken, isAdminOrModerator, getModerationLogs);
+router.patch(
+  "/admin/reports/:id/dismiss",
+  verifyToken,
+  isAdminOrModerator,
+  dismissReport,
+);
+router.patch(
+  "/admin/reports/:id/block-user",
+  verifyToken,
+  isAdminOrModerator,
+  blockReportedUser,
+);
+router.delete("/admin/posts/:id", verifyToken, isAdminOrModerator, deletePost);
+router.delete(
+  "/admin/comments/:id",
+  verifyToken,
+  isAdminOrModerator,
+  deleteComment,
+);
 
 export default router;

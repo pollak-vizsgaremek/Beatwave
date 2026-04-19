@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from "express";
+import { notifyModerationTeam } from "../lib/moderationNotifications";
 import { prisma } from "../lib/prisma";
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_TEXT_LENGTH = 10000;
 const MAX_TOPIC_LENGTH = 100;
 const MAX_REPORT_REASON_LENGTH = 1000;
+const BLOCKED_USER_MESSAGE =
+  "Your account has been blocked from posting and commenting.";
 
 const USER_SELECT = {
   id: true,
@@ -31,6 +34,23 @@ const validatePostInput = (title: unknown, text: unknown, topic: unknown) => {
   }
   if (text.trim().length > MAX_TEXT_LENGTH) {
     return `Post text must be at most ${MAX_TEXT_LENGTH} characters.`;
+  }
+
+  return null;
+};
+
+const ensureUserCanPostOrComment = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, isBlocked: true },
+  });
+
+  if (!user) {
+    return { status: 404, error: "User not found" };
+  }
+
+  if (user.isBlocked) {
+    return { status: 403, error: BLOCKED_USER_MESSAGE };
   }
 
   return null;
@@ -131,6 +151,13 @@ export const createPost = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    const blockedState = await ensureUserCanPostOrComment(req.userId);
+    if (blockedState) {
+      return res
+        .status(blockedState.status)
+        .json({ error: blockedState.error });
+    }
+
     const validationError = validatePostInput(title, text, topic);
     if (validationError) {
       return res.status(400).json({ error: validationError });
@@ -166,6 +193,13 @@ export const updateOwnPost = async (
 
     if (!req.userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const blockedState = await ensureUserCanPostOrComment(req.userId);
+    if (blockedState) {
+      return res
+        .status(blockedState.status)
+        .json({ error: blockedState.error });
     }
 
     const validationError = validatePostInput(title, text, topic);
@@ -295,6 +329,8 @@ export const reportPost = async (
       return res.status(404).json({ error: "User not found" });
     }
 
+    const trimmedReason = reason.trim();
+
     await prisma.moderationLog.create({
       data: {
         status: "REPORTED",
@@ -302,8 +338,14 @@ export const reportPost = async (
         moderatorId: req.userId,
         userId: existingPost.userId,
         postId: existingPost.id,
-        details: `@${reporter.username} reported post "${existingPost.title}" by @${existingPost.user.username}. Reason: ${reason.trim()}`,
+        details: `@${reporter.username} reported post "${existingPost.title}" by @${existingPost.user.username}. Reason: ${trimmedReason}`,
       },
+    });
+
+    await notifyModerationTeam({
+      message: `New reported post: "${existingPost.title}" by @${existingPost.user.username}. Reason: ${trimmedReason}`,
+      triggeredById: req.userId,
+      excludeUserIds: [req.userId],
     });
 
     res.status(200).json({ message: "Post reported successfully" });

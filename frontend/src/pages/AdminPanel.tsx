@@ -1,100 +1,102 @@
-import { useState, useEffect } from "react";
-import { Users, FileText, MessageSquare, Shield, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import AdminTabs from "../components/admin/AdminTabs";
+import CommentsManagement from "../components/admin/CommentsManagement";
+import PostsManagement from "../components/admin/PostsManagement";
+import ReportsManagement from "../components/admin/ReportsManagement";
+import UsersManagement from "../components/admin/UsersManagement";
+import {
+  VALID_ADMIN_TABS,
+  type AdminComment,
+  type AdminLog,
+  type AdminPost,
+  type AdminTabId,
+  type AdminUser,
+} from "../components/admin/types";
 import api from "../utils/api";
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  createdAt: string;
-}
+const getInitialTab = (): AdminTabId => {
+  const requestedTab = new URLSearchParams(window.location.search).get("tab");
 
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  postedAt: string;
-  user: {
-    id: string;
-    username: string;
-  };
-}
+  if (requestedTab && VALID_ADMIN_TABS.includes(requestedTab as AdminTabId)) {
+    return requestedTab as AdminTabId;
+  }
 
-interface Comment {
-  id: string;
-  content: string;
-  createdAt: string;
-  user: {
-    id: string;
-    username: string;
-  };
-  post: {
-    id: string;
-    title: string;
-  };
-}
-
-interface Log {
-  id: string;
-  action: string;
-  details: string;
-  createdAt: string;
-  moderator: {
-    username: string;
-  };
-  user: {
-    username: string;
-  };
-}
+  return "users";
+};
 
 const AdminPanel = () => {
-  const [activeTab, setActiveTab] = useState("users");
-  const [users, setUsers] = useState<User[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [logs, setLogs] = useState<Log[]>([]);
+  const [activeTab, setActiveTab] = useState<AdminTabId>(getInitialTab);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [posts, setPosts] = useState<AdminPost[]>([]);
+  const [comments, setComments] = useState<AdminComment[]>([]);
+  const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [hasModerationAccess, setHasModerationAccess] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [processingReportId, setProcessingReportId] = useState<string | null>(
+    null,
+  );
+  const [processingUserId, setProcessingUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    checkAdmin();
+    void checkAccess();
   }, []);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchData();
+    if (hasModerationAccess) {
+      void fetchData(activeTab);
     }
-  }, [activeTab, isAdmin]);
+  }, [activeTab, hasModerationAccess]);
 
-  const checkAdmin = async () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    params.set("tab", activeTab);
+    window.history.replaceState({}, "", `/admin?${params.toString()}`);
+  }, [activeTab]);
+
+  const checkAccess = async () => {
     try {
       const res = await api.get("/user-profile");
-      if (res.data.role === "ADMIN") {
-        setIsAdmin(true);
-      } else {
-        window.location.href = "/home";
+      setCurrentUserRole(res.data.role);
+      setCurrentUserId(res.data.id);
+
+      if (res.data.role === "ADMIN" || res.data.role === "MODERATOR") {
+        setHasModerationAccess(true);
+        return;
       }
-    } catch (error) {
+
+      window.location.href = "/home";
+    } catch {
       window.location.href = "/login";
     }
   };
 
-  const fetchData = async () => {
+  const fetchData = async (tab: AdminTabId = activeTab) => {
     setLoading(true);
+
     try {
-      if (activeTab === "users") {
-        const res = await api.get("/admin/users");
-        setUsers(res.data);
-      } else if (activeTab === "posts") {
-        const res = await api.get("/admin/posts");
-        setPosts(res.data);
-      } else if (activeTab === "comments") {
-        const res = await api.get("/admin/comments");
-        setComments(res.data);
-      } else if (activeTab === "logs") {
-        const res = await api.get("/admin/logs");
-        setLogs(res.data);
+      switch (tab) {
+        case "users": {
+          const res = await api.get("/admin/users");
+          setUsers(res.data);
+          break;
+        }
+        case "posts": {
+          const res = await api.get("/admin/posts");
+          setPosts(res.data);
+          break;
+        }
+        case "comments": {
+          const res = await api.get("/admin/comments");
+          setComments(res.data);
+          break;
+        }
+        case "logs": {
+          const res = await api.get("/admin/logs");
+          setLogs(res.data);
+          break;
+        }
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -104,28 +106,124 @@ const AdminPanel = () => {
   };
 
   const handleDeletePost = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this post?")) {
-      try {
-        await api.delete(`/admin/posts/${id}`);
-        setPosts(posts.filter((p) => p.id !== id));
-      } catch (error) {
-        console.error("Error deleting post:", error);
-      }
+    if (!window.confirm("Are you sure you want to delete this post?")) {
+      return;
+    }
+
+    try {
+      await api.delete(`/admin/posts/${id}`);
+      setPosts((prev) => prev.filter((post) => post.id !== id));
+    } catch (error) {
+      console.error("Error deleting post:", error);
     }
   };
 
   const handleDeleteComment = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this comment?")) {
-      try {
-        await api.delete(`/admin/comments/${id}`);
-        setComments(comments.filter((c) => c.id !== id));
-      } catch (error) {
-        console.error("Error deleting comment:", error);
-      }
+    if (!window.confirm("Are you sure you want to delete this comment?")) {
+      return;
+    }
+
+    try {
+      await api.delete(`/admin/comments/${id}`);
+      setComments((prev) => prev.filter((comment) => comment.id !== id));
+    } catch (error) {
+      console.error("Error deleting comment:", error);
     }
   };
 
-  if (!isAdmin) {
+  const handleReportAction = async (
+    reportId: string,
+    action: "dismiss" | "block-user",
+  ) => {
+    setProcessingReportId(reportId);
+
+    try {
+      await api.patch(`/admin/reports/${reportId}/${action}`);
+      await fetchData("logs");
+    } catch (error) {
+      console.error("Error handling report:", error);
+      window.alert("Failed to handle the report. Please try again.");
+    } finally {
+      setProcessingReportId(null);
+    }
+  };
+
+  const handleUserRoleChange = async (userId: string, role: string) => {
+    setProcessingUserId(userId);
+
+    try {
+      const res = await api.patch(`/admin/users/${userId}/role`, { role });
+      setUsers((prev) =>
+        prev.map((user) => (user.id === userId ? res.data.user : user)),
+      );
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      window.alert("Failed to update the user role. Please try again.");
+      await fetchData("users");
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
+  const handleUserBlockToggle = async (userId: string, isBlocked: boolean) => {
+    setProcessingUserId(userId);
+
+    try {
+      const res = await api.patch(`/admin/users/${userId}/block`, {
+        isBlocked,
+      });
+      setUsers((prev) =>
+        prev.map((user) => (user.id === userId ? res.data.user : user)),
+      );
+    } catch (error) {
+      console.error("Error updating user block status:", error);
+      window.alert("Failed to update the user status. Please try again.");
+      await fetchData("users");
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
+  const canManageUsers = currentUserRole === "ADMIN";
+
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case "users":
+        return (
+          <UsersManagement
+            users={users}
+            canManageUsers={canManageUsers}
+            processingUserId={processingUserId}
+            currentUserId={currentUserId}
+            onRoleChange={handleUserRoleChange}
+            onToggleBlock={handleUserBlockToggle}
+          />
+        );
+      case "posts":
+        return (
+          <PostsManagement posts={posts} onDeletePost={handleDeletePost} />
+        );
+      case "comments":
+        return (
+          <CommentsManagement
+            comments={comments}
+            onDeleteComment={handleDeleteComment}
+          />
+        );
+      case "logs":
+        return (
+          <ReportsManagement
+            logs={logs}
+            processingReportId={processingReportId}
+            onReportAction={handleReportAction}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  if (!hasModerationAccess) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         Checking permissions...
@@ -133,186 +231,20 @@ const AdminPanel = () => {
     );
   }
 
-  const tabs = [
-    { id: "users", label: "Users", icon: Users },
-    { id: "posts", label: "Posts", icon: FileText },
-    { id: "comments", label: "Comments", icon: MessageSquare },
-    { id: "logs", label: "Logs", icon: Shield },
-  ];
-
   return (
-    <div className="min-h-screen bg-black text-white p-2 sm:p-4 md:p-6">
+    <div className="min-h-screen text-white p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
-          Admin Panel
+          Moderation Panel
         </h1>
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-1 sm:gap-2 mb-4 sm:mb-6 justify-center">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === tab.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
-            >
-              <tab.icon size={16} className="sm:w-[18px] sm:h-[18px]" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <AdminTabs activeTab={activeTab} onChange={setActiveTab} />
 
-        {/* Content */}
         <div className="bg-gray-800 rounded-lg p-2 sm:p-4">
           {loading ? (
             <div className="text-center py-8">Loading...</div>
           ) : (
-            <>
-              {activeTab === "users" && (
-                <>
-                  {/* Mobile card view */}
-                  <div className="block sm:hidden space-y-3">
-                    {users.map((user) => (
-                      <div key={user.id} className="bg-gray-700 p-3 rounded-lg">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-semibold text-white">
-                            {user.username}
-                          </h3>
-                          <span
-                            className={`text-xs px-2 py-1 rounded ${
-                              user.role === "ADMIN"
-                                ? "bg-red-600"
-                                : user.role === "MODERATOR"
-                                  ? "bg-yellow-600"
-                                  : "bg-blue-600"
-                            }`}
-                          >
-                            {user.role}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-300 mb-1">
-                          {user.email}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Created:{" "}
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Desktop table view */}
-                  <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-600">
-                          <th className="text-left p-2">Username</th>
-                          <th className="text-left p-2">Email</th>
-                          <th className="text-left p-2">Role</th>
-                          <th className="text-left p-2">Created</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map((user) => (
-                          <tr
-                            key={user.id}
-                            className="border-b border-gray-700"
-                          >
-                            <td className="p-2">{user.username}</td>
-                            <td className="p-2">{user.email}</td>
-                            <td className="p-2">{user.role}</td>
-                            <td className="p-2">
-                              {new Date(user.createdAt).toLocaleDateString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-
-              {activeTab === "posts" && (
-                <div className="space-y-3 sm:space-y-4">
-                  {posts.map((post) => (
-                    <div
-                      key={post.id}
-                      className="bg-gray-700 p-3 sm:p-4 rounded-lg relative"
-                    >
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        className="absolute top-3 right-3 sm:relative sm:top-auto sm:right-auto bg-red-600 hover:bg-red-700 p-2 rounded text-white sm:self-center flex-shrink-0"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <div className="pr-12 sm:pr-0">
-                        <h3 className="font-semibold text-sm sm:text-base">
-                          {post.title}
-                        </h3>
-                        <p className="text-sm text-gray-300 mt-1">
-                          {post.content}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-2">
-                          By {post.user.username} •{" "}
-                          {new Date(post.postedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === "comments" && (
-                <div className="space-y-3 sm:space-y-4">
-                  {comments.map((comment) => (
-                    <div
-                      key={comment.id}
-                      className="bg-gray-700 p-3 sm:p-4 rounded-lg relative"
-                    >
-                      <button
-                        onClick={() => handleDeleteComment(comment.id)}
-                        className="absolute top-3 right-3 sm:relative sm:top-auto sm:right-auto bg-red-600 hover:bg-red-700 p-2 rounded text-white sm:self-center flex-shrink-0"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <div className="pr-12 sm:pr-0">
-                        <p className="text-sm text-gray-300">
-                          {comment.content}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-2">
-                          By {comment.user.username} on "{comment.post.title}" •{" "}
-                          {new Date(comment.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {activeTab === "logs" && (
-                <div className="space-y-3 sm:space-y-4">
-                  {logs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="bg-gray-700 p-3 sm:p-4 rounded-lg"
-                    >
-                      <p className="font-semibold text-sm sm:text-base">
-                        {log.action}
-                      </p>
-                      <p className="text-sm text-gray-300 mt-1">
-                        {log.details}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        By {log.moderator.username} on {log.user.username} •{" "}
-                        {new Date(log.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
+            renderActiveTab()
           )}
         </div>
       </div>

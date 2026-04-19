@@ -2,10 +2,67 @@ import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma";
 import config from "../config/config";
+import {
+  getValidSpotifyToken,
+  safeJsonParse,
+  spotifyFetch,
+} from "../lib/spotifyUtils";
 
 const MAX_USERNAME_LENGTH = 50;
 const MAX_DESCRIPTION_LENGTH = 300;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type SpotifyProfileResponse = {
+  images?: Array<{
+    url?: string;
+    height?: number | null;
+    width?: number | null;
+  }>;
+};
+
+const getSpotifyProfileImage = async (
+  userId: string,
+): Promise<string | null> => {
+  try {
+    const token = await getValidSpotifyToken(userId);
+
+    if (!token) {
+      return null;
+    }
+
+    const response = await spotifyFetch(
+      "https://api.spotify.com/v1/me",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      userId,
+    );
+
+    if (!response.ok) {
+      console.warn(
+        `Failed to fetch Spotify profile image for user ${userId}: ${response.status}`,
+      );
+      return null;
+    }
+
+    const data = ((await safeJsonParse(response)) ??
+      {}) as SpotifyProfileResponse;
+
+    return (
+      data.images?.find((image) => typeof image?.url === "string" && image.url)
+        ?.url ?? null
+    );
+  } catch (error) {
+    console.error(
+      `Error fetching Spotify profile image for user ${userId}:`,
+      error,
+    );
+    return null;
+  }
+};
 
 export const getUserProfile = async (
   req: Request,
@@ -34,6 +91,13 @@ export const getUserProfile = async (
       return res.status(404).json({ error: "Felhasználó nem található" });
     }
 
+    const spotifyConnected = user.connectedApps.some(
+      (app) => app.platform === "Spotify",
+    );
+    const spotifyProfileImage = spotifyConnected
+      ? await getSpotifyProfileImage(user.id)
+      : null;
+
     const userData = {
       id: user.id,
       username: user.username,
@@ -41,9 +105,8 @@ export const getUserProfile = async (
       description: user.description,
       isPrivate: user.isPrivate,
       role: user.role,
-      spotifyConnected: user.connectedApps.some(
-        (app) => app.platform === "Spotify",
-      ),
+      spotifyConnected,
+      spotifyProfileImage,
       soundCloudConnected: user.connectedApps.some(
         (app) => app.platform === "SoundCloud",
       ),
@@ -92,6 +155,8 @@ export const getPublicUserProfile = async (
       return res.status(404).json({ error: "Felhasználó nem található" });
     }
 
+    const spotifyProfileImage = await getSpotifyProfileImage(user.id);
+
     if (user.isPrivate && !viewerIsOwner) {
       return res.status(200).json({
         id: user.id,
@@ -99,10 +164,14 @@ export const getPublicUserProfile = async (
         description: user.description,
         isPrivate: true,
         posts: [],
+        spotifyProfileImage,
       });
     }
 
-    res.status(200).json(user);
+    res.status(200).json({
+      ...user,
+      spotifyProfileImage,
+    });
   } catch (error) {
     next(error);
   }
