@@ -44,3 +44,14 @@ export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   }
   next();
 };
+
+export const isAdminOrModerator = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  if (req.role !== "ADMIN" && req.role !== "MODERATOR") {
+    return res.status(403).json({ error: "Nincs jogosultságod" });
+  }
+  next();
+};

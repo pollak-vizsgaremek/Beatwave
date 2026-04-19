@@ -28,6 +28,7 @@ model User {
   passwordHash String
   description  String?  @db.Text
   isPrivate    Boolean  @default(false)
+  isBlocked    Boolean  @default(false)
   role         Role     @default(USER)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -115,6 +116,8 @@ enum ModerationStatus {
   DELETED
   WARNED
   REPORTED
+  DISMISSED
+  BLOCKED
 }
 
 model ModerationLog {

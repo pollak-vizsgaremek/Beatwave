@@ -13,6 +13,7 @@ type PublicProfileData = {
   username: string;
   description?: string | null;
   isPrivate: boolean;
+  spotifyProfileImage?: string | null;
   posts: DiscussionType[];
 };
 
@@ -64,13 +65,24 @@ const ViewProfile = () => {
           </div>
         ) : !profile ? (
           <div className="flex justify-center mt-14">
-            <p className="text-white text-lg">This profile could not be found.</p>
+            <p className="text-white text-lg">
+              This profile could not be found.
+            </p>
           </div>
         ) : (
           <div className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl mt-4">
             <div className="lg:w-1/3 p-2 flex flex-col items-center border-b lg:border-b-0 lg:border-r border-white/10">
-              <div className="bg-accent mt-2 w-32 h-32 rounded-full flex justify-center items-center text-black text-3xl font-bold uppercase">
-                {avatarLabel}
+              <div className="bg-accent mt-2 w-32 h-32 rounded-full flex justify-center items-center text-black text-3xl font-bold uppercase overflow-hidden">
+                {profile.spotifyProfileImage ? (
+                  <img
+                    src={profile.spotifyProfileImage}
+                    alt={`${profile.username} Spotify profile`}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  avatarLabel
+                )}
               </div>
               <div className="flex justify-center items-center mt-4 text-2xl font-semibold text-white text-center break-all">
                 @{profile.username}
@@ -123,7 +135,9 @@ const ViewProfile = () => {
                       </p>
 
                       {post.hashtags ? (
-                        <p className="text-sm text-gray-400 mt-3">{post.hashtags}</p>
+                        <p className="text-sm text-gray-400 mt-3">
+                          {post.hashtags}
+                        </p>
                       ) : null}
                     </Link>
                   ))}

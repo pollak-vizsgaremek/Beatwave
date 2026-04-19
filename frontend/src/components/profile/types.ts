@@ -5,6 +5,7 @@ export interface UserProfileData {
   description?: string | null;
   isPrivate: boolean;
   spotifyConnected: boolean;
+  spotifyProfileImage?: string | null;
   soundCloudConnected: boolean;
 }
 
