@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { notifyModerationTeam } from "../lib/moderationNotifications";
 import { prisma } from "../lib/prisma";
+import { getActiveUserTimeout } from "../lib/userTimeout";
 
 // Shared user select — only expose what the frontend needs, never email or passwordHash
 const USER_SELECT = {
@@ -25,6 +26,14 @@ const ensureUserCanComment = async (userId: string) => {
 
   if (user.isBlocked) {
     return { status: 403, error: BLOCKED_USER_MESSAGE };
+  }
+
+  const timeout = await getActiveUserTimeout(userId);
+  if (timeout) {
+    return {
+      status: 403,
+      error: `You are timed out from posting and commenting until ${timeout.until.toISOString()}. Reason: ${timeout.reason}`,
+    };
   }
 
   return null;

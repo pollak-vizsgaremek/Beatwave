@@ -4,7 +4,9 @@ export { getSpotifyTopItems } from "./topItemsController";
 export { getSpotifyRecommendations } from "./recommendationsController";
 export {
   getSpotifyPlaylists,
+  checkTrackInSpotifyPlaylists,
   addTrackToSpotifyPlaylists,
+  removeTrackFromSpotifyPlaylist,
 } from "./playlistController";
 export {
   getSpotifyCurrentlyPlaying,

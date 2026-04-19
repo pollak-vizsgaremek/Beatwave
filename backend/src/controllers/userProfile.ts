@@ -70,6 +70,8 @@ export const getUserProfile = async (
   next: NextFunction,
 ) => {
   try {
+    const includeSpotify = req.query.includeSpotify === "true";
+
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: {
@@ -94,7 +96,7 @@ export const getUserProfile = async (
     const spotifyConnected = user.connectedApps.some(
       (app) => app.platform === "Spotify",
     );
-    const spotifyProfileImage = spotifyConnected
+    const spotifyProfileImage = includeSpotify && spotifyConnected
       ? await getSpotifyProfileImage(user.id)
       : null;
 
@@ -124,6 +126,7 @@ export const getPublicUserProfile = async (
   next: NextFunction,
 ) => {
   try {
+    const includeSpotify = req.query.includeSpotify === "true";
     const { id } = req.params;
 
     const viewerIsOwner = req.userId === id;
@@ -155,7 +158,9 @@ export const getPublicUserProfile = async (
       return res.status(404).json({ error: "Felhasználó nem található" });
     }
 
-    const spotifyProfileImage = await getSpotifyProfileImage(user.id);
+    const spotifyProfileImage = includeSpotify
+      ? await getSpotifyProfileImage(user.id)
+      : null;
 
     if (user.isPrivate && !viewerIsOwner) {
       return res.status(200).json({

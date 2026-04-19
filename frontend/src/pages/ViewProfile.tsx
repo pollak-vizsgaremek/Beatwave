@@ -26,7 +26,7 @@ const ViewProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await api.get(`/user-profile/${id}`);
+        const response = await api.get(`/user-profile/${id}?includeSpotify=false`);
         setProfile(response.data);
       } catch (err: any) {
         showError(err.response?.data?.error || "Failed to load user profile.");

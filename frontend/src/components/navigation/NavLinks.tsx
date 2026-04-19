@@ -2,7 +2,7 @@ import { Link } from "react-router";
 
 const NavLinks = () => {
   return (
-    <>
+    <div className="flex items-center gap-4 md:gap-8 shrink-0">
       <Link
         to="/home"
         className="text-white text-lg sm:text-xl md:text-2xl font-bold shrink-0"
@@ -16,7 +16,7 @@ const NavLinks = () => {
       >
         Discussion
       </Link>
-    </>
+    </div>
   );
 };
 

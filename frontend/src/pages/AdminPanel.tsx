@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import AdminActionModal from "../components/admin/AdminActionModal";
 import AdminTabs from "../components/admin/AdminTabs";
 import CommentsManagement from "../components/admin/CommentsManagement";
+import LogsManagement from "../components/admin/LogsManagement";
 import PostsManagement from "../components/admin/PostsManagement";
 import ReportsManagement from "../components/admin/ReportsManagement";
 import UsersManagement from "../components/admin/UsersManagement";
@@ -12,7 +14,32 @@ import {
   type AdminTabId,
   type AdminUser,
 } from "../components/admin/types";
+import ErrorToast from "../components/ErrorToast";
 import api from "../utils/api";
+import { useErrorToast } from "../utils/useErrorToast";
+
+const ITEMS_PER_PAGE = 8;
+
+type PendingAdminAction =
+  | { type: "delete-post"; postId: string }
+  | { type: "delete-comment"; commentId: string }
+  | {
+      type: "report-action";
+      reportId: string;
+      action: "dismiss" | "block-user";
+      username: string;
+    }
+  | {
+      type: "change-role";
+      userId: string;
+      username: string;
+      currentRole: string;
+      nextRole: string;
+    }
+  | { type: "toggle-block"; userId: string; username: string; nextBlocked: boolean }
+  | { type: "set-timeout"; user: AdminUser }
+  | { type: "clear-timeout"; user: AdminUser }
+  | null;
 
 const getInitialTab = (): AdminTabId => {
   const requestedTab = new URLSearchParams(window.location.search).get("tab");
@@ -24,20 +51,42 @@ const getInitialTab = (): AdminTabId => {
   return "users";
 };
 
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === "object" && error && "response" in error) {
+    return (error as any).response?.data?.error || fallback;
+  }
+  return fallback;
+};
+
 const AdminPanel = () => {
   const [activeTab, setActiveTab] = useState<AdminTabId>(getInitialTab);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [posts, setPosts] = useState<AdminPost[]>([]);
   const [comments, setComments] = useState<AdminComment[]>([]);
+  const [reports, setReports] = useState<AdminLog[]>([]);
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasModerationAccess, setHasModerationAccess] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [processingReportId, setProcessingReportId] = useState<string | null>(
     null,
   );
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAdminAction>(null);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [timeoutMinutesInput, setTimeoutMinutesInput] = useState("60");
+  const [timeoutReasonInput, setTimeoutReasonInput] = useState("");
+  const [pageByTab, setPageByTab] = useState<Record<AdminTabId, number>>({
+    users: 1,
+    posts: 1,
+    comments: 1,
+    reports: 1,
+    logs: 1,
+  });
+
+  const { error, showError } = useErrorToast();
 
   useEffect(() => {
     void checkAccess();
@@ -56,8 +105,10 @@ const AdminPanel = () => {
   }, [activeTab]);
 
   const checkAccess = async () => {
+    setIsCheckingAccess(true);
+
     try {
-      const res = await api.get("/user-profile");
+      const res = await api.get("/user-profile?includeSpotify=false");
       setCurrentUserRole(res.data.role);
       setCurrentUserId(res.data.id);
 
@@ -69,6 +120,8 @@ const AdminPanel = () => {
       window.location.href = "/home";
     } catch {
       window.location.href = "/login";
+    } finally {
+      setIsCheckingAccess(false);
     }
   };
 
@@ -97,92 +150,368 @@ const AdminPanel = () => {
           setLogs(res.data);
           break;
         }
+        case "reports": {
+          const res = await api.get("/admin/reports");
+          setReports(res.data);
+          break;
+        }
       }
-    } catch (error) {
-      console.error("Error fetching data:", error);
+    } catch (err) {
+      if (typeof err === "object" && err && "response" in err) {
+        const status = (err as any).response?.status;
+        if (status === 403) {
+          showError("Your session permissions changed. Please log in again.");
+          setTimeout(() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            window.location.href = "/login";
+          }, 400);
+          return;
+        }
+      }
+      showError("Failed to load admin data. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeletePost = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this post?")) {
-      return;
-    }
-
-    try {
-      await api.delete(`/admin/posts/${id}`);
-      setPosts((prev) => prev.filter((post) => post.id !== id));
-    } catch (error) {
-      console.error("Error deleting post:", error);
-    }
+  const closeActionModal = () => {
+    setPendingAction(null);
+    setTimeoutMinutesInput("60");
+    setTimeoutReasonInput("");
   };
 
-  const handleDeleteComment = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this comment?")) {
-      return;
-    }
-
-    try {
-      await api.delete(`/admin/comments/${id}`);
-      setComments((prev) => prev.filter((comment) => comment.id !== id));
-    } catch (error) {
-      console.error("Error deleting comment:", error);
-    }
+  const requestDeletePost = async (postId: string) => {
+    setPendingAction({ type: "delete-post", postId });
   };
 
-  const handleReportAction = async (
+  const requestDeleteComment = async (commentId: string) => {
+    setPendingAction({ type: "delete-comment", commentId });
+  };
+
+  const requestReportAction = async (
     reportId: string,
     action: "dismiss" | "block-user",
   ) => {
-    setProcessingReportId(reportId);
+    const report = reports.find((entry) => entry.id === reportId);
+    setPendingAction({
+      type: "report-action",
+      reportId,
+      action,
+      username: report?.user.username ?? "this user",
+    });
+  };
+
+  const requestRoleChange = async (userId: string, nextRole: string) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) {
+      return;
+    }
+    setPendingAction({
+      type: "change-role",
+      userId,
+      username: target.username,
+      currentRole: target.role,
+      nextRole,
+    });
+  };
+
+  const requestToggleBlock = async (userId: string, nextBlocked: boolean) => {
+    const target = users.find((user) => user.id === userId);
+    if (!target) {
+      return;
+    }
+    setPendingAction({
+      type: "toggle-block",
+      userId,
+      username: target.username,
+      nextBlocked,
+    });
+  };
+
+  const requestSetTimeout = async (user: AdminUser) => {
+    setTimeoutMinutesInput("60");
+    setTimeoutReasonInput(user.timeoutReason ?? "");
+    setPendingAction({ type: "set-timeout", user });
+  };
+
+  const requestClearTimeout = async (user: AdminUser) => {
+    setPendingAction({ type: "clear-timeout", user });
+  };
+
+  const timeoutInputInvalid = useMemo(() => {
+    if (!pendingAction || pendingAction.type !== "set-timeout") {
+      return false;
+    }
+
+    const minutes = Number(timeoutMinutesInput.trim());
+    return !Number.isInteger(minutes) || minutes <= 0 || !timeoutReasonInput.trim();
+  }, [pendingAction, timeoutMinutesInput, timeoutReasonInput]);
+
+  const paginateByTab = <T,>(items: T[], tab: AdminTabId) => {
+    const page = pageByTab[tab] ?? 1;
+    const startIndex = (page - 1) * ITEMS_PER_PAGE;
+    return items.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  };
+
+  const activeTabItemCount = useMemo(() => {
+    switch (activeTab) {
+      case "users":
+        return users.length;
+      case "posts":
+        return posts.length;
+      case "comments":
+        return comments.length;
+      case "reports":
+        return reports.length;
+      case "logs":
+        return logs.length;
+    }
+  }, [activeTab, users.length, posts.length, comments.length, reports.length, logs.length]);
+
+  const activePage = pageByTab[activeTab] ?? 1;
+  const totalPages = Math.max(1, Math.ceil(activeTabItemCount / ITEMS_PER_PAGE));
+  const visiblePageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const start = Math.max(1, Math.min(activePage - 2, totalPages - 6));
+    return Array.from({ length: 7 }, (_, index) => start + index);
+  }, [activePage, totalPages]);
+
+  useEffect(() => {
+    if (activePage <= totalPages) {
+      return;
+    }
+
+    setPageByTab((prev) => ({
+      ...prev,
+      [activeTab]: totalPages,
+    }));
+  }, [activePage, activeTab, totalPages]);
+
+  const setPageForActiveTab = (nextPage: number) => {
+    setPageByTab((prev) => ({
+      ...prev,
+      [activeTab]: nextPage,
+    }));
+  };
+
+  const executePendingAction = async () => {
+    if (!pendingAction) {
+      return;
+    }
+
+    setIsSubmittingAction(true);
 
     try {
-      await api.patch(`/admin/reports/${reportId}/${action}`);
-      await fetchData("logs");
-    } catch (error) {
-      console.error("Error handling report:", error);
-      window.alert("Failed to handle the report. Please try again.");
+      switch (pendingAction.type) {
+        case "delete-post": {
+          await api.delete(`/admin/posts/${pendingAction.postId}`);
+          setPosts((prev) =>
+            prev.filter((post) => post.id !== pendingAction.postId),
+          );
+          break;
+        }
+
+        case "delete-comment": {
+          await api.delete(`/admin/comments/${pendingAction.commentId}`);
+          setComments((prev) =>
+            prev.filter((comment) => comment.id !== pendingAction.commentId),
+          );
+          break;
+        }
+
+        case "report-action": {
+          setProcessingReportId(pendingAction.reportId);
+          await api.patch(
+            `/admin/reports/${pendingAction.reportId}/${pendingAction.action}`,
+          );
+          await fetchData("reports");
+          setProcessingReportId(null);
+          break;
+        }
+
+        case "change-role": {
+          setProcessingUserId(pendingAction.userId);
+          const res = await api.patch(`/admin/users/${pendingAction.userId}/role`, {
+            role: pendingAction.nextRole,
+          });
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.id === pendingAction.userId
+                ? { ...user, ...res.data.user }
+                : user,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "toggle-block": {
+          setProcessingUserId(pendingAction.userId);
+          const res = await api.patch(`/admin/users/${pendingAction.userId}/block`, {
+            isBlocked: pendingAction.nextBlocked,
+          });
+          setUsers((prev) =>
+            prev.map((user) =>
+              user.id === pendingAction.userId
+                ? { ...user, ...res.data.user }
+                : user,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "set-timeout": {
+          const durationMinutes = Number(timeoutMinutesInput.trim());
+          if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) {
+            showError("Please enter a valid timeout duration in minutes.");
+            return;
+          }
+          if (!timeoutReasonInput.trim()) {
+            showError("Timeout reason is required.");
+            return;
+          }
+
+          setProcessingUserId(pendingAction.user.id);
+          const res = await api.patch(
+            `/admin/users/${pendingAction.user.id}/timeout`,
+            {
+              durationMinutes,
+              reason: timeoutReasonInput.trim(),
+            },
+          );
+          setUsers((prev) =>
+            prev.map((entry) =>
+              entry.id === pendingAction.user.id ? res.data.user : entry,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "clear-timeout": {
+          setProcessingUserId(pendingAction.user.id);
+          const res = await api.delete(
+            `/admin/users/${pendingAction.user.id}/timeout`,
+          );
+          setUsers((prev) =>
+            prev.map((entry) =>
+              entry.id === pendingAction.user.id ? res.data.user : entry,
+            ),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+      }
+
+      closeActionModal();
+    } catch (err) {
+      if (pendingAction.type === "report-action") {
+        setProcessingReportId(null);
+      }
+      if (
+        pendingAction.type === "change-role" ||
+        pendingAction.type === "toggle-block" ||
+        pendingAction.type === "set-timeout" ||
+        pendingAction.type === "clear-timeout"
+      ) {
+        setProcessingUserId(null);
+      }
+
+      showError(getErrorMessage(err, "Failed to complete admin action."));
+
+      if (
+        pendingAction.type === "change-role" ||
+        pendingAction.type === "toggle-block" ||
+        pendingAction.type === "set-timeout" ||
+        pendingAction.type === "clear-timeout"
+      ) {
+        await fetchData("users");
+      }
+      if (pendingAction.type === "report-action") {
+        await fetchData("reports");
+      }
     } finally {
-      setProcessingReportId(null);
+      setIsSubmittingAction(false);
     }
   };
 
-  const handleUserRoleChange = async (userId: string, role: string) => {
-    setProcessingUserId(userId);
-
-    try {
-      const res = await api.patch(`/admin/users/${userId}/role`, { role });
-      setUsers((prev) =>
-        prev.map((user) => (user.id === userId ? res.data.user : user)),
-      );
-    } catch (error) {
-      console.error("Error updating user role:", error);
-      window.alert("Failed to update the user role. Please try again.");
-      await fetchData("users");
-    } finally {
-      setProcessingUserId(null);
+  const actionModalContent = useMemo(() => {
+    if (!pendingAction) {
+      return {
+        title: "",
+        description: "",
+        confirmLabel: "Confirm",
+        danger: false,
+      };
     }
-  };
 
-  const handleUserBlockToggle = async (userId: string, isBlocked: boolean) => {
-    setProcessingUserId(userId);
-
-    try {
-      const res = await api.patch(`/admin/users/${userId}/block`, {
-        isBlocked,
-      });
-      setUsers((prev) =>
-        prev.map((user) => (user.id === userId ? res.data.user : user)),
-      );
-    } catch (error) {
-      console.error("Error updating user block status:", error);
-      window.alert("Failed to update the user status. Please try again.");
-      await fetchData("users");
-    } finally {
-      setProcessingUserId(null);
+    switch (pendingAction.type) {
+      case "delete-post":
+        return {
+          title: "Delete Post",
+          description: "This post will be permanently removed.",
+          confirmLabel: "Delete post",
+          danger: true,
+        };
+      case "delete-comment":
+        return {
+          title: "Delete Comment",
+          description: "This comment will be permanently removed.",
+          confirmLabel: "Delete comment",
+          danger: true,
+        };
+      case "report-action":
+        if (pendingAction.action === "dismiss") {
+          return {
+            title: "Dismiss Report",
+            description: "This report will be marked as handled and dismissed.",
+            confirmLabel: "Dismiss report",
+            danger: false,
+          };
+        }
+        return {
+          title: "Block Reported User",
+          description: `Block @${pendingAction.username} from posting and commenting?`,
+          confirmLabel: "Block user",
+          danger: true,
+        };
+      case "change-role":
+        return {
+          title: "Change User Role",
+          description: `Change @${pendingAction.username} from ${pendingAction.currentRole} to ${pendingAction.nextRole}?`,
+          confirmLabel: "Change role",
+          danger: false,
+        };
+      case "toggle-block":
+        return {
+          title: pendingAction.nextBlocked ? "Block User" : "Unblock User",
+          description: pendingAction.nextBlocked
+            ? `Block @${pendingAction.username} from posting and commenting?`
+            : `Restore posting and commenting access for @${pendingAction.username}?`,
+          confirmLabel: pendingAction.nextBlocked ? "Block user" : "Unblock user",
+          danger: pendingAction.nextBlocked,
+        };
+      case "set-timeout":
+        return {
+          title: "Set Timeout",
+          description: `Set a temporary posting/commenting timeout for @${pendingAction.user.username}.`,
+          confirmLabel: "Set timeout",
+          danger: true,
+        };
+      case "clear-timeout":
+        return {
+          title: "Clear Timeout",
+          description: `Remove the active timeout for @${pendingAction.user.username}?`,
+          confirmLabel: "Clear timeout",
+          danger: false,
+        };
     }
-  };
+  }, [pendingAction]);
 
   const canManageUsers = currentUserRole === "ADMIN";
 
@@ -191,42 +520,50 @@ const AdminPanel = () => {
       case "users":
         return (
           <UsersManagement
-            users={users}
+            users={paginateByTab(users, "users")}
             canManageUsers={canManageUsers}
             processingUserId={processingUserId}
             currentUserId={currentUserId}
-            onRoleChange={handleUserRoleChange}
-            onToggleBlock={handleUserBlockToggle}
+            onRoleChange={requestRoleChange}
+            onToggleBlock={requestToggleBlock}
+            onSetTimeout={requestSetTimeout}
+            onClearTimeout={requestClearTimeout}
           />
         );
       case "posts":
         return (
-          <PostsManagement posts={posts} onDeletePost={handleDeletePost} />
+          <PostsManagement
+            posts={paginateByTab(posts, "posts")}
+            onDeletePost={requestDeletePost}
+          />
         );
       case "comments":
         return (
           <CommentsManagement
-            comments={comments}
-            onDeleteComment={handleDeleteComment}
+            comments={paginateByTab(comments, "comments")}
+            onDeleteComment={requestDeleteComment}
+          />
+        );
+      case "reports":
+        return (
+          <ReportsManagement
+            reports={paginateByTab(reports, "reports")}
+            processingReportId={processingReportId}
+            onRequestReportAction={requestReportAction}
           />
         );
       case "logs":
-        return (
-          <ReportsManagement
-            logs={logs}
-            processingReportId={processingReportId}
-            onReportAction={handleReportAction}
-          />
-        );
+        return <LogsManagement logs={paginateByTab(logs, "logs")} />;
       default:
         return null;
     }
   };
 
-  if (!hasModerationAccess) {
+  if (isCheckingAccess || !hasModerationAccess) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        Checking permissions...
+        {isCheckingAccess ? "Checking permissions..." : "Access denied"}
+        <ErrorToast error={error} />
       </div>
     );
   }
@@ -247,7 +584,102 @@ const AdminPanel = () => {
             renderActiveTab()
           )}
         </div>
+
+        {!loading && activeTabItemCount > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPageForActiveTab(Math.max(1, activePage - 1))}
+              disabled={activePage === 1}
+              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+            >
+              Prev
+            </button>
+
+            {visiblePageNumbers.map((page) => (
+              <button
+                key={page}
+                type="button"
+                onClick={() => setPageForActiveTab(page)}
+                className={`px-3 py-1 rounded ${
+                  page === activePage
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                setPageForActiveTab(Math.min(totalPages, activePage + 1))
+              }
+              disabled={activePage === totalPages}
+              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
+
+      <AdminActionModal
+        isOpen={!!pendingAction}
+        title={actionModalContent.title}
+        description={actionModalContent.description}
+        confirmLabel={actionModalContent.confirmLabel}
+        danger={actionModalContent.danger}
+        isSubmitting={isSubmittingAction}
+        confirmDisabled={timeoutInputInvalid}
+        onClose={closeActionModal}
+        onConfirm={() => {
+          void executePendingAction();
+        }}
+      >
+        {pendingAction?.type === "set-timeout" ? (
+          <div className="space-y-3">
+            <div>
+              <label
+                htmlFor="timeout-minutes"
+                className="block text-sm text-gray-300 mb-1"
+              >
+                Duration (minutes)
+              </label>
+              <input
+                id="timeout-minutes"
+                type="number"
+                min={1}
+                value={timeoutMinutesInput}
+                onChange={(event) => setTimeoutMinutesInput(event.target.value)}
+                className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="timeout-reason"
+                className="block text-sm text-gray-300 mb-1"
+              >
+                Reason
+              </label>
+              <textarea
+                id="timeout-reason"
+                value={timeoutReasonInput}
+                onChange={(event) => setTimeoutReasonInput(event.target.value)}
+                maxLength={110}
+                rows={3}
+                className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white resize-none"
+              />
+              <p className="text-xs text-gray-400 mt-1 text-right">
+                {timeoutReasonInput.length}/110
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </AdminActionModal>
+
+      <ErrorToast error={error} />
     </div>
   );
 };

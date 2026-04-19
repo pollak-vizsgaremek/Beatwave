@@ -72,13 +72,14 @@ const Home = () => {
   const [playbackActionLoading, setPlaybackActionLoading] = useState(false);
 
   const { error, showError } = useErrorToast();
+  const { error: successMessage, showError: showSuccess } = useErrorToast();
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchSpotifyConnection = async () => {
       try {
-        const response = await api.get("/user-profile");
+        const response = await api.get("/user-profile?includeSpotify=false");
         if (!isMounted) return;
         setSpotifyConnected(response.data.spotifyConnected ?? false);
       } catch {
@@ -544,7 +545,10 @@ const Home = () => {
         {loadingRecommendedTracks ? (
           <p className="text-gray-400">Loading recommended tracks...</p>
         ) : recommendedTracks.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-5">
+          <motion.div
+            layout
+            className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5"
+          >
             {recommendedTracks.map((track, index) => (
               <RecommendedTrackCard
                 key={track.id || `${track.name}-${index}`}
@@ -562,10 +566,11 @@ const Home = () => {
                     prev === track.id ? null : track.id,
                   )
                 }
+                onSuccess={showSuccess}
                 onError={showError}
               />
             ))}
-          </div>
+          </motion.div>
         ) : (
           <p className="text-gray-400">
             No recommendations available right now.
@@ -574,6 +579,7 @@ const Home = () => {
       </div>
 
       <ErrorToast error={error} />
+      <ErrorToast error={successMessage} variant="success" />
     </div>
   );
 };

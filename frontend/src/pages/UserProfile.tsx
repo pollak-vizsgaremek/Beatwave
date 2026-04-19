@@ -10,6 +10,7 @@ import type {
   UserProfileData,
 } from "../components/profile/types";
 import api from "../utils/api";
+import { normalizeHashtagInput } from "../utils/hashtags";
 import type { DiscussionType } from "../utils/Type";
 import { useErrorToast } from "../utils/useErrorToast";
 
@@ -150,7 +151,10 @@ const UserProfile = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setPostForm((prev) => ({ ...prev, [name]: value }));
+    setPostForm((prev) => ({
+      ...prev,
+      [name]: name === "hashtags" ? normalizeHashtagInput(value) : value,
+    }));
   };
 
   const handlePrivacyToggle = async () => {
@@ -207,22 +211,29 @@ const UserProfile = () => {
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      try {
-        const [profileResponse, postsResponse] = await Promise.all([
-          api.get("/user-profile"),
-          api.get("/user-profile/posts"),
-        ]);
-        setUser(profileResponse.data);
-        setUserPosts(postsResponse.data);
-      } catch (err: any) {
-        showError(err.response?.data?.error || "Failed to load profile.");
-      } finally {
-        setLoading(false);
-        setLoadingPosts(false);
+      const [profileResult, postsResult] = await Promise.allSettled([
+        api.get("/user-profile?includeSpotify=false"),
+        api.get("/user-profile/posts"),
+      ]);
+
+      if (profileResult.status === "fulfilled") {
+        setUser(profileResult.value.data);
+      } else {
+        const profileError = profileResult.reason as any;
+        showError(profileError?.response?.data?.error || "Failed to load profile.");
       }
+      setLoading(false);
+
+      if (postsResult.status === "fulfilled") {
+        setUserPosts(postsResult.value.data);
+      } else {
+        const postsError = postsResult.reason as any;
+        showError(postsError?.response?.data?.error || "Failed to load your posts.");
+      }
+      setLoadingPosts(false);
     };
 
-    fetchUserProfile();
+    void fetchUserProfile();
   }, []);
 
   const handleTimeRangeChange = (

@@ -18,26 +18,33 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  },
+  (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const status = error?.response?.status;
+    const message = String(error?.response?.data?.error ?? "").toLowerCase();
+    const isAuthFailure =
+      status === 401 ||
+      (status === 403 &&
+        (message.includes("ervenytelen token") ||
+          message.includes("érvénytelen token") ||
+          message.includes("invalid token")));
+
+    if (isAuthFailure) {
       const url = error.config?.url;
       if (url && !url.includes("/login") && !url.includes("/register")) {
-        // Only log in dev — don't leak request URLs in production
         if (import.meta.env.DEV) {
-          console.error("401 Unauthorized Intercepted from URL:", url);
+          console.error("Auth failure intercepted from URL:", url);
         }
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         window.location.href = "/login";
       }
     }
+
     return Promise.reject(error);
   },
 );

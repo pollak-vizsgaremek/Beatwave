@@ -2,20 +2,20 @@ import { Ban, CheckCircle2 } from "lucide-react";
 import { getStatusClasses, type AdminLog } from "./types";
 
 interface ReportsManagementProps {
-  logs: AdminLog[];
+  reports: AdminLog[];
   processingReportId: string | null;
-  onReportAction: (
+  onRequestReportAction: (
     reportId: string,
     action: "dismiss" | "block-user",
   ) => Promise<void>;
 }
 
 const ReportsManagement = ({
-  logs,
+  reports,
   processingReportId,
-  onReportAction,
+  onRequestReportAction,
 }: ReportsManagementProps) => {
-  if (logs.length === 0) {
+  if (reports.length === 0) {
     return (
       <div className="text-center py-8 text-gray-300">No reports found.</div>
     );
@@ -23,7 +23,7 @@ const ReportsManagement = ({
 
   return (
     <div className="space-y-3 sm:space-y-4">
-      {logs.map((log) => (
+      {reports.map((log) => (
         <div key={log.id} className="bg-gray-700 p-3 sm:p-4 rounded-lg">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold text-sm sm:text-base">{log.action}</p>
@@ -44,7 +44,7 @@ const ReportsManagement = ({
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void onReportAction(log.id, "dismiss")}
+                onClick={() => void onRequestReportAction(log.id, "dismiss")}
                 disabled={processingReportId === log.id}
                 className="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 disabled:opacity-50 px-3 py-2 rounded text-sm"
               >
@@ -53,15 +53,7 @@ const ReportsManagement = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Block @${log.user.username} from posting and commenting?`,
-                    )
-                  ) {
-                    void onReportAction(log.id, "block-user");
-                  }
-                }}
+                onClick={() => void onRequestReportAction(log.id, "block-user")}
                 disabled={processingReportId === log.id}
                 className="inline-flex items-center gap-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 px-3 py-2 rounded text-sm"
               >

@@ -21,22 +21,22 @@ const CommentsManagement = ({
       {comments.map((comment) => (
         <div
           key={comment.id}
-          className="bg-gray-700 p-3 sm:p-4 rounded-lg relative"
+          className="bg-gray-700 p-3 sm:p-4 rounded-lg flex items-start justify-between gap-3"
         >
-          <button
-            type="button"
-            onClick={() => onDeleteComment(comment.id)}
-            className="absolute top-3 right-3 sm:relative sm:top-auto sm:right-auto bg-red-600 hover:bg-red-700 p-2 rounded text-white sm:self-center shrink-0"
-          >
-            <Trash2 size={16} />
-          </button>
-          <div className="pr-12 sm:pr-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm text-gray-300">{comment.content}</p>
             <p className="text-xs text-gray-400 mt-2">
               By {comment.user.username} on "{comment.post.title}" •{" "}
               {new Date(comment.createdAt).toLocaleDateString()}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => onDeleteComment(comment.id)}
+            className="bg-red-600 hover:bg-red-700 p-2 rounded text-white self-start shrink-0"
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
       ))}
     </div>

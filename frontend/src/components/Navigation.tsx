@@ -35,6 +35,7 @@ const searchTypeParamMap: Record<keyof SearchTypeState, string> = {
 const Navigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isDiscussionRoute = location.pathname.startsWith("/discussion");
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -373,45 +374,53 @@ const Navigation = () => {
   };
 
   return (
-    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-3 sm:gap-4 md:gap-8 items-center justify-between px-4 sm:px-4 md:px-8 w-full sm:w-[95%] xl:w-3/4 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30 relative py-5 sm:py-3 min-h-[92px] sm:min-h-[68px]">
-      <NavLinks />
+    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-3 sm:gap-4 md:gap-8 items-center justify-between px-4 sm:px-4 md:px-8 w-full sm:w-[95%] xl:w-3/4 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30 relative py-5 sm:py-3 min-h-[92px] sm:min-h-[68px] overflow-x-clip">
+      <div className="flex flex-1 min-w-0 items-center justify-start">
+        <NavLinks />
+      </div>
 
-      <SearchBar
-        searchQuery={searchQuery}
-        isFilterOpen={isFilterOpen}
-        filterRef={filterRef}
-        onSearch={handleSearch}
-        onSearchKeyDown={handleSearchKeyDown}
-        onSearchQueryChange={setSearchQuery}
-        onToggleFilter={() => setIsFilterOpen((prev) => !prev)}
-        filterPanelProps={{
-          isOpen: isFilterOpen,
-          isActiveSpotify,
-          isActiveSoundCloud,
-          showAdvancedFilters,
-          searchTypes,
-          setSearchTypes: searchTypeSetters,
-          filters,
-          setFilters: filterSetters,
-          availability,
-          onToggleAdvancedFilters: () =>
-            setShowAdvancedFilters((prev) => !prev),
-          onToggleSpotify: () => {
-            setIsActiveSpotify((prev) => !prev);
-            if (!isActiveSpotify && isActiveSoundCloud) {
-              setIsActiveSoundCloud(false);
-            }
-          },
-          onToggleSoundCloud: () => {
-            if (isActiveSpotify && !isActiveSoundCloud) {
-              setIsActiveSpotify(false);
-            }
-            setIsActiveSoundCloud((prev) => !prev);
-          },
-        }}
-      />
+      {!isDiscussionRoute ? (
+        <div className="flex flex-1 min-w-0 items-center justify-center">
+          <SearchBar
+            searchQuery={searchQuery}
+            isFilterOpen={isFilterOpen}
+            filterRef={filterRef}
+            onSearch={handleSearch}
+            onSearchKeyDown={handleSearchKeyDown}
+            onSearchQueryChange={setSearchQuery}
+            onToggleFilter={() => setIsFilterOpen((prev) => !prev)}
+            filterPanelProps={{
+              isOpen: isFilterOpen,
+              isActiveSpotify,
+              isActiveSoundCloud,
+              showAdvancedFilters,
+              searchTypes,
+              setSearchTypes: searchTypeSetters,
+              filters,
+              setFilters: filterSetters,
+              availability,
+              onToggleAdvancedFilters: () =>
+                setShowAdvancedFilters((prev) => !prev),
+              onToggleSpotify: () => {
+                setIsActiveSpotify((prev) => !prev);
+                if (!isActiveSpotify && isActiveSoundCloud) {
+                  setIsActiveSoundCloud(false);
+                }
+              },
+              onToggleSoundCloud: () => {
+                if (isActiveSpotify && !isActiveSoundCloud) {
+                  setIsActiveSpotify(false);
+                }
+                setIsActiveSoundCloud((prev) => !prev);
+              },
+            }}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-1 min-w-0 items-center justify-center" />
+      )}
 
-      <div className="hidden md:flex gap-2 sm:gap-4 md:gap-5 items-center shrink-0">
+      <div className="hidden md:flex flex-1 min-w-0 gap-2 sm:gap-4 md:gap-5 items-center justify-end">
         <NotificationsMenu
           notificationsRef={notificationsRef}
           isOpen={isNotificationsOpen}

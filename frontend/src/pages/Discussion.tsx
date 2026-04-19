@@ -1,9 +1,17 @@
 import { Link, useNavigate } from "react-router";
-import { EllipsisVertical, Heart, MessageCircle, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  EllipsisVertical,
+  Heart,
+  MessageCircle,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
+import { getNormalizedHashtags, normalizeHashtagInput } from "../utils/hashtags";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 import formatRelative from "../utils/DateFormatting";
@@ -38,10 +46,133 @@ const Discussion = () => {
   const [toastVariant, setToastVariant] = useState<"error" | "success">(
     "error",
   );
+  const [discussionSearchQuery, setDiscussionSearchQuery] = useState("");
+  const [isDiscussionFilterOpen, setIsDiscussionFilterOpen] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState("all");
+  const [selectedAuthorId, setSelectedAuthorId] = useState("all");
+  const [selectedSort, setSelectedSort] = useState<
+    "newest" | "oldest" | "mostLiked"
+  >("newest");
+  const [discussionHashtagFilter, setDiscussionHashtagFilter] = useState("");
+  const [onlyMyPosts, setOnlyMyPosts] = useState(false);
+  const [onlyLikedPosts, setOnlyLikedPosts] = useState(false);
   const postMenuRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const currentUserId = getStoredUser()?.id ?? null;
   const { error, showError } = useErrorToast();
+
+  const topicOptions = useMemo(() => {
+    const topicMap = new Map<string, string>();
+
+    postsData.forEach((post) => {
+      const topic = post.topic?.trim();
+      if (!topic) return;
+      const key = topic.toLowerCase();
+      if (!topicMap.has(key)) {
+        topicMap.set(key, topic);
+      }
+    });
+
+    return Array.from(topicMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [postsData]);
+
+  const authorOptions = useMemo(() => {
+    const authorMap = new Map<string, string>();
+
+    postsData.forEach((post) => {
+      if (!authorMap.has(post.user.id)) {
+        authorMap.set(post.user.id, post.user.username);
+      }
+    });
+
+    return Array.from(authorMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [postsData]);
+
+  const filteredPosts = useMemo(() => {
+    const normalizedQuery = discussionSearchQuery.trim().toLowerCase();
+    const requiredHashtags = getNormalizedHashtags(discussionHashtagFilter);
+
+    const base = postsData.filter((post) => {
+      if (onlyMyPosts && post.userId !== currentUserId) {
+        return false;
+      }
+
+      if (onlyLikedPosts && !post.isLiked) {
+        return false;
+      }
+
+      if (selectedTopic !== "all") {
+        const postTopic = post.topic?.trim().toLowerCase() || "";
+        if (postTopic !== selectedTopic) {
+          return false;
+        }
+      }
+
+      if (selectedAuthorId !== "all" && post.user.id !== selectedAuthorId) {
+        return false;
+      }
+
+      if (normalizedQuery) {
+        const searchable = (post.title || "").toLowerCase();
+
+        if (!searchable.includes(normalizedQuery)) {
+          return false;
+        }
+      }
+
+      if (requiredHashtags.length > 0) {
+        const postHashtags = getNormalizedHashtags(post.hashtags || "");
+        const hasAllRequiredHashtags = requiredHashtags.every((hashtag) =>
+          postHashtags.includes(hashtag),
+        );
+
+        if (!hasAllRequiredHashtags) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return [...base].sort((a, b) => {
+      if (selectedSort === "mostLiked") {
+        return (b.likeAmount || 0) - (a.likeAmount || 0);
+      }
+
+      const first = new Date(a.postedAt).getTime();
+      const second = new Date(b.postedAt).getTime();
+
+      if (selectedSort === "oldest") {
+        return first - second;
+      }
+
+      return second - first;
+    });
+  }, [
+    currentUserId,
+    discussionSearchQuery,
+    onlyLikedPosts,
+    onlyMyPosts,
+    postsData,
+    discussionHashtagFilter,
+    selectedAuthorId,
+    selectedSort,
+    selectedTopic,
+  ]);
+
+  const resetDiscussionFilters = () => {
+    setDiscussionSearchQuery("");
+    setSelectedTopic("all");
+    setSelectedAuthorId("all");
+    setSelectedSort("newest");
+    setDiscussionHashtagFilter("");
+    setOnlyMyPosts(false);
+    setOnlyLikedPosts(false);
+  };
 
   const showToastError = (message: string) => {
     setToastVariant("error");
@@ -175,7 +306,10 @@ const Discussion = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setPostForm((prev) => ({ ...prev, [name]: value }));
+    setPostForm((prev) => ({
+      ...prev,
+      [name]: name === "hashtags" ? normalizeHashtagInput(value) : value,
+    }));
   };
 
   const handleSavePost = async (e: React.FormEvent) => {
@@ -296,15 +430,150 @@ const Discussion = () => {
         </Link>
       </div>
 
-      <div className="flex flex-col justify-center self-center w-full ml-0 md:ml-20">
-        <h1 className="mt-4 text-4xl font-semibold text-left w-full">Posts</h1>
-        <div className="grid flex-row items-center justify-center w-full max-w-[420px] md:max-w-none mx-auto gap-4 mt-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="w-full px-4 md:px-10 xl:px-20">
+        <h1 className="mt-4 text-4xl font-semibold text-left w-full max-w-[1400px] mx-auto">
+          Posts
+        </h1>
+
+        <div className="w-full max-w-[1400px] mx-auto mt-4">
+          <div className="rounded-2xl border border-white/10 bg-card-black p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="relative flex-1">
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  type="text"
+                  placeholder="Search in discussions..."
+                  value={discussionSearchQuery}
+                  onChange={(event) => setDiscussionSearchQuery(event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-card px-10 py-2 text-white outline-none transition-colors focus:border-spotify-green"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDiscussionFilterOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10 cursor-pointer"
+                >
+                  <SlidersHorizontal size={16} />
+                  Filters
+                </button>
+                <button
+                  type="button"
+                  onClick={resetDiscussionFilters}
+                  className="rounded-xl border border-white/15 px-3 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10 cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            {isDiscussionFilterOpen && (
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <label className="flex flex-col gap-1 text-sm text-gray-300">
+                  Topic
+                  <select
+                    value={selectedTopic}
+                    onChange={(event) => setSelectedTopic(event.target.value)}
+                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                  >
+                    <option value="all">All topics</option>
+                    {topicOptions.map((topic) => (
+                      <option key={topic.value} value={topic.value}>
+                        {topic.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-sm text-gray-300">
+                  Author
+                  <select
+                    value={selectedAuthorId}
+                    onChange={(event) => setSelectedAuthorId(event.target.value)}
+                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                  >
+                    <option value="all">All authors</option>
+                    {authorOptions.map((author) => (
+                      <option key={author.value} value={author.value}>
+                        {author.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-sm text-gray-300">
+                  Sort
+                  <select
+                    value={selectedSort}
+                    onChange={(event) =>
+                      setSelectedSort(
+                        event.target.value as "newest" | "oldest" | "mostLiked",
+                      )
+                    }
+                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                  >
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                    <option value="mostLiked">Most liked</option>
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1 text-sm text-gray-300">
+                  Hashtags
+                  <input
+                    type="text"
+                    value={discussionHashtagFilter}
+                    onChange={(event) =>
+                      setDiscussionHashtagFilter(
+                        normalizeHashtagInput(event.target.value),
+                      )
+                    }
+                    placeholder="#music #rock"
+                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                  />
+                </label>
+
+                <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-card px-3 py-2 text-sm text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={onlyMyPosts}
+                    onChange={(event) => setOnlyMyPosts(event.target.checked)}
+                    className="h-4 w-4 accent-spotify-green"
+                  />
+                  Only my posts
+                </label>
+
+                <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-card px-3 py-2 text-sm text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={onlyLikedPosts}
+                    onChange={(event) => setOnlyLikedPosts(event.target.checked)}
+                    className="h-4 w-4 accent-spotify-green"
+                  />
+                  Only liked posts
+                </label>
+              </div>
+            )}
+
+            <p className="mt-3 text-sm text-gray-400">
+              Showing {filteredPosts.length} of {postsData.length} posts
+            </p>
+          </div>
+        </div>
+
+        <div className="grid flex-row items-center justify-center w-full max-w-[1400px] mx-auto gap-4 mt-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {loadingPosts ? (
             <p>Loading posts...</p>
           ) : postsData.length === 0 ? (
-            <p>No posts yet</p>
+            <p>No posts yet.</p>
+          ) : filteredPosts.length === 0 ? (
+            <p>No posts match the current search and filters.</p>
           ) : (
-            postsData.map((post) => (
+            filteredPosts.map((post) => (
               // Fixed: key is now on the <Link> wrapper, not the inner <div>
               <Link
                 key={post.id}
