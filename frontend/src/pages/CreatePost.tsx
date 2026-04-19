@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 
 import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
+import { normalizeHashtagInput } from "../utils/hashtags";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 
@@ -33,15 +34,7 @@ const CreateDiscusson = () => {
     let newCursor = selectionStart;
 
     if (name === "hashtags") {
-      const words = value.split(" ");
-      const formattedWords = words.map((word) => {
-        if (word.length > 0 && !word.startsWith("#")) {
-          return "#" + word;
-        }
-        return word;
-      });
-
-      newValue = formattedWords.join(" ");
+      newValue = normalizeHashtagInput(value);
 
       if (newCursor !== null && newValue.length > value.length) {
         newCursor += newValue.length - value.length;

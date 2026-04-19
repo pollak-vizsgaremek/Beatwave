@@ -13,7 +13,8 @@ import SearchResult from "./pages/SearchResult";
 import CreateDiscusson from "./pages/CreatePost";
 import Error404 from "./pages/Error404";
 import ViewDiscussion from "./pages/ViewDiscusson";
-import AdminPanel from './pages/AdminPanel';
+import ViewProfile from "./pages/ViewProfile";
+import AdminPanel from "./pages/AdminPanel";
 
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route index element={<Home />} path="home" />
             <Route element={<UserProfile />} path="profile" />
+            <Route element={<ViewProfile />} path="profile/:id" />
             <Route element={<SearchResult />} path="search" />
             <Route element={<Discussion />} path="discussion" />
             <Route element={<CreateDiscusson />} path="discussion/create" />

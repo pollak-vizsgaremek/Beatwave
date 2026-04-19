@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
+import { notifyModerationTeam } from "../lib/moderationNotifications";
 import { prisma } from "../lib/prisma";
+import { getActiveUserTimeout } from "../lib/userTimeout";
 
 // Shared user select — only expose what the frontend needs, never email or passwordHash
 const USER_SELECT = {
@@ -8,6 +10,34 @@ const USER_SELECT = {
 } as const;
 
 const MAX_COMMENT_LENGTH = 2000;
+const MAX_REPORT_REASON_LENGTH = 1000;
+const BLOCKED_USER_MESSAGE =
+  "Your account has been blocked from posting and commenting.";
+
+const ensureUserCanComment = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, isBlocked: true },
+  });
+
+  if (!user) {
+    return { status: 404, error: "User not found" };
+  }
+
+  if (user.isBlocked) {
+    return { status: 403, error: BLOCKED_USER_MESSAGE };
+  }
+
+  const timeout = await getActiveUserTimeout(userId);
+  if (timeout) {
+    return {
+      status: 403,
+      error: `You are timed out from posting and commenting until ${timeout.until.toISOString()}. Reason: ${timeout.reason}`,
+    };
+  }
+
+  return null;
+};
 
 export const getCommentsByPostId = async (
   req: Request,
@@ -67,6 +97,13 @@ export const createComment = async (
 
     if (!req.userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const blockedState = await ensureUserCanComment(req.userId);
+    if (blockedState) {
+      return res
+        .status(blockedState.status)
+        .json({ error: blockedState.error });
     }
 
     // Input validation
@@ -139,6 +176,90 @@ export const createComment = async (
     }
 
     res.status(201).json(newComment);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reportComment = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!reason || typeof reason !== "string" || !reason.trim()) {
+      return res
+        .status(400)
+        .json({ error: "Please provide a reason for the report" });
+    }
+
+    if (reason.trim().length > MAX_REPORT_REASON_LENGTH) {
+      return res.status(400).json({
+        error: `Report reason must be at most ${MAX_REPORT_REASON_LENGTH} characters.`,
+      });
+    }
+
+    const existingComment = await prisma.comment.findUnique({
+      where: { id },
+      include: {
+        user: { select: USER_SELECT },
+        post: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    if (!existingComment) {
+      return res.status(404).json({ error: "Comment not found" });
+    }
+
+    if (existingComment.userId === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot report your own comment" });
+    }
+
+    const reporter = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: USER_SELECT,
+    });
+
+    if (!reporter) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const contentType = existingComment.previousCommentId ? "reply" : "comment";
+    const trimmedReason = reason.trim();
+
+    await prisma.moderationLog.create({
+      data: {
+        status: "REPORTED",
+        action: "REPORT_COMMENT",
+        moderatorId: req.userId,
+        userId: existingComment.userId,
+        postId: existingComment.postId,
+        commentId: existingComment.id,
+        details: `@${reporter.username} reported a ${contentType} by @${existingComment.user.username} on post "${existingComment.post.title}". Reason: ${trimmedReason}`,
+      },
+    });
+
+    await notifyModerationTeam({
+      message: `New reported ${contentType} by @${existingComment.user.username} on "${existingComment.post.title}". Reason: ${trimmedReason}`,
+      triggeredById: req.userId,
+      excludeUserIds: [req.userId],
+    });
+
+    res.status(200).json({ message: "Comment reported successfully" });
   } catch (error) {
     next(error);
   }

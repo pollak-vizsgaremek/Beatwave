@@ -1,5 +1,54 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
+import {
+  buildTimeoutLogDetails,
+  CLEAR_USER_TIMEOUT_ACTION,
+  getActiveTimeoutMap,
+  getActiveUserTimeout,
+  TIMEOUT_USER_ACTION,
+} from "../lib/userTimeout";
+
+const VALID_USER_ROLES = ["USER", "MODERATOR", "ADMIN"] as const;
+const MAX_TIMEOUT_MINUTES = 60 * 24 * 30;
+const MAX_TIMEOUT_REASON_LENGTH = 110;
+
+const getPendingReport = async (reportId: string) => {
+  const report = await prisma.moderationLog.findUnique({
+    where: { id: reportId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          isBlocked: true,
+        },
+      },
+    },
+  });
+
+  if (!report) {
+    return {
+      report: null,
+      error: { status: 404, message: "Report not found" },
+    };
+  }
+
+  if (!report.action.startsWith("REPORT_")) {
+    return {
+      report: null,
+      error: { status: 400, message: "This moderation item is not a report" },
+    };
+  }
+
+  if (report.status !== "REPORTED") {
+    return {
+      report: null,
+      error: { status: 400, message: "This report has already been handled" },
+    };
+  }
+
+  return { report, error: null };
+};
 
 export const getAllUsers = async (
   req: Request,
@@ -13,6 +62,7 @@ export const getAllUsers = async (
         username: true,
         email: true,
         role: true,
+        isBlocked: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -21,7 +71,373 @@ export const getAllUsers = async (
       },
     });
 
-    res.status(200).json(users);
+    const timeoutMap = await getActiveTimeoutMap(users.map((user) => user.id));
+
+    res.status(200).json(
+      users.map((user) => {
+        const timeout = timeoutMap.get(user.id);
+        return {
+          ...user,
+          timeoutUntil: timeout ? timeout.until.toISOString() : null,
+          timeoutReason: timeout ? timeout.reason : null,
+        };
+      }),
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const setUserTimeout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { durationMinutes, reason } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (id === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot set a timeout on your own account" });
+    }
+
+    const minutes = Number(durationMinutes);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES) {
+      return res.status(400).json({
+        error: `durationMinutes must be an integer between 1 and ${MAX_TIMEOUT_MINUTES}`,
+      });
+    }
+
+    if (!reason || typeof reason !== "string" || !reason.trim()) {
+      return res.status(400).json({ error: "Timeout reason is required" });
+    }
+
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length > MAX_TIMEOUT_REASON_LENGTH) {
+      return res.status(400).json({
+        error: `Timeout reason must be at most ${MAX_TIMEOUT_REASON_LENGTH} characters`,
+      });
+    }
+
+    const [targetUser, moderator] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+          isBlocked: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, username: true },
+      }),
+    ]);
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Moderator not found" });
+    }
+
+    const until = new Date(Date.now() + minutes * 60 * 1000);
+
+    await prisma.$transaction([
+      prisma.moderationLog.create({
+        data: {
+          status: "WARNED",
+          action: TIMEOUT_USER_ACTION,
+          moderatorId: req.userId,
+          userId: targetUser.id,
+          details: buildTimeoutLogDetails(
+            targetUser.username,
+            moderator.username,
+            until,
+            trimmedReason,
+          ),
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          type: "account_timeout",
+          message: `You are timed out from posting and commenting until ${until.toISOString()}. Reason: ${trimmedReason}`,
+          userId: targetUser.id,
+          triggeredById: req.userId,
+        },
+      }),
+    ]);
+
+    res.status(200).json({
+      message: "User timeout set successfully",
+      user: {
+        ...targetUser,
+        timeoutUntil: until.toISOString(),
+        timeoutReason: trimmedReason,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const clearUserTimeout = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (id === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot clear your own timeout from this panel" });
+    }
+
+    const [targetUser, moderator, activeTimeout] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+          isBlocked: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, username: true },
+      }),
+      getActiveUserTimeout(id),
+    ]);
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Moderator not found" });
+    }
+
+    if (!activeTimeout) {
+      return res.status(400).json({ error: "User has no active timeout" });
+    }
+
+    await prisma.$transaction([
+      prisma.moderationLog.create({
+        data: {
+          status: "WARNED",
+          action: CLEAR_USER_TIMEOUT_ACTION,
+          moderatorId: req.userId,
+          userId: targetUser.id,
+          details: `TIMEOUT_CLEARED|${activeTimeout.until.toISOString()}`,
+        },
+      }),
+      prisma.notification.create({
+        data: {
+          type: "account_timeout_cleared",
+          message: "Your timeout has been lifted. You can post and comment again.",
+          userId: targetUser.id,
+          triggeredById: req.userId,
+        },
+      }),
+    ]);
+
+    res.status(200).json({
+      message: "User timeout cleared successfully",
+      user: {
+        ...targetUser,
+        timeoutUntil: null,
+        timeoutReason: null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateUserRole = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!role || !VALID_USER_ROLES.includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    if (id === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot change your own role here" });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        email: true,
+        isBlocked: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { role },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        email: true,
+        isBlocked: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await prisma.moderationLog.create({
+      data: {
+        action: "UPDATE_USER_ROLE",
+        moderatorId: req.userId,
+        userId: existingUser.id,
+        details: `Changed @${existingUser.username}'s role from ${existingUser.role} to ${role}.`,
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        type: "role_changed",
+        message: `Your role has been updated to ${role}.`,
+        userId: existingUser.id,
+        triggeredById: req.userId,
+      },
+    });
+
+    res
+      .status(200)
+      .json({ message: "User role updated successfully", user: updatedUser });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const setUserBlockedStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { isBlocked } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (typeof isBlocked !== "boolean") {
+      return res.status(400).json({ error: "isBlocked must be a boolean" });
+    }
+
+    if (id === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot block your own account here" });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        email: true,
+        isBlocked: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { isBlocked },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        email: true,
+        isBlocked: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await prisma.moderationLog.create({
+      data: {
+        status: isBlocked ? "BLOCKED" : "WARNED",
+        action: isBlocked ? "BLOCK_USER_MANUAL" : "UNBLOCK_USER",
+        moderatorId: req.userId,
+        userId: existingUser.id,
+        details: isBlocked
+          ? `Blocked @${existingUser.username} from posting and commenting from the users tab.`
+          : `Unblocked @${existingUser.username} and restored posting and commenting access.`,
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        type: isBlocked ? "account_blocked" : "account_unblocked",
+        message: isBlocked
+          ? "Your account has been blocked from posting and commenting by an admin."
+          : "Your posting and commenting access has been restored by an admin.",
+        userId: existingUser.id,
+        triggeredById: req.userId,
+      },
+    });
+
+    res.status(200).json({
+      message: isBlocked
+        ? "User blocked successfully"
+        : "User unblocked successfully",
+      user: updatedUser,
+    });
   } catch (error) {
     next(error);
   }
@@ -34,7 +450,11 @@ export const getAllPosts = async (
 ) => {
   try {
     const posts = await prisma.post.findMany({
-      include: {
+      select: {
+        id: true,
+        title: true,
+        text: true,
+        postedAt: true,
         user: {
           select: {
             id: true,
@@ -83,19 +503,56 @@ export const getAllComments = async (
       },
     });
 
-    // Filter out comments with missing posts (in case of orphaned data)
     const validComments = comments
       .filter((comment) => comment.post !== null)
       .map((comment) => ({
         id: comment.id,
-        content: comment.text, // Map text to content for frontend
-        createdAt: comment.commentedAt, // Map commentedAt to createdAt
+        content: comment.text,
+        createdAt: comment.commentedAt,
         postId: comment.postId,
         user: comment.user,
         post: comment.post,
       }));
 
     res.status(200).json(validComments);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getModerationReports = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const reports = await prisma.moderationLog.findMany({
+      where: {
+        action: {
+          startsWith: "REPORT_",
+        },
+      },
+      include: {
+        moderator: {
+          select: {
+            id: true,
+            username: true,
+          },
+        },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            isBlocked: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.status(200).json(reports);
   } catch (error) {
     next(error);
   }
@@ -108,6 +565,13 @@ export const getModerationLogs = async (
 ) => {
   try {
     const logs = await prisma.moderationLog.findMany({
+      where: {
+        NOT: {
+          action: {
+            startsWith: "REPORT_",
+          },
+        },
+      },
       include: {
         moderator: {
           select: {
@@ -119,6 +583,7 @@ export const getModerationLogs = async (
           select: {
             id: true,
             username: true,
+            isBlocked: true,
           },
         },
       },
@@ -133,6 +598,140 @@ export const getModerationLogs = async (
   }
 };
 
+export const dismissReport = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const result = await getPendingReport(id);
+    if (result.error) {
+      return res
+        .status(result.error.status)
+        .json({ error: result.error.message });
+    }
+
+    const report = result.report;
+    if (!report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    const moderator = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { username: true },
+    });
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Moderator not found" });
+    }
+
+    await prisma.$transaction([
+      prisma.moderationLog.update({
+        where: { id: report.id },
+        data: {
+          status: "DISMISSED",
+          details: `${report.details} Review outcome: dismissed by @${moderator.username}.`,
+        },
+      }),
+      prisma.moderationLog.create({
+        data: {
+          status: "DISMISSED",
+          action: "DISMISS_REPORT",
+          moderatorId: req.userId,
+          userId: report.userId,
+          postId: report.postId,
+          commentId: report.commentId,
+          details: `Dismissed report ${report.id} against @${report.user.username}.`,
+        },
+      }),
+    ]);
+
+    res.status(200).json({ message: "Report dismissed successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const blockReportedUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const result = await getPendingReport(id);
+    if (result.error) {
+      return res
+        .status(result.error.status)
+        .json({ error: result.error.message });
+    }
+
+    const report = result.report;
+    if (!report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    const moderator = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { username: true },
+    });
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Moderator not found" });
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: report.userId },
+        data: { isBlocked: true },
+      }),
+      prisma.moderationLog.update({
+        where: { id: report.id },
+        data: {
+          status: "BLOCKED",
+          details: `${report.details} Review outcome: user blocked by @${moderator.username}.`,
+        },
+      }),
+      prisma.moderationLog.create({
+        data: {
+          status: "BLOCKED",
+          action: "BLOCK_USER",
+          moderatorId: req.userId,
+          userId: report.userId,
+          postId: report.postId,
+          commentId: report.commentId,
+          details: `Blocked @${report.user.username} from posting and commenting after report review.`,
+        },
+      }),
+    ]);
+
+    await prisma.notification.create({
+      data: {
+        type: "account_blocked",
+        message:
+          "Your account has been blocked from posting and commenting by the moderation team.",
+        userId: report.userId,
+        triggeredById: req.userId,
+      },
+    });
+
+    res.status(200).json({ message: "User blocked successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deletePost = async (
   req: Request,
   res: Response,
@@ -141,7 +740,6 @@ export const deletePost = async (
   try {
     const { id } = req.params;
 
-    // Get the post owner before deleting
     const post = await prisma.post.findUnique({
       where: { id },
       select: { userId: true },
@@ -151,19 +749,17 @@ export const deletePost = async (
       return res.status(404).json({ error: "Post not found" });
     }
 
-    // Delete associated comments first (cascade might not be set up)
     await prisma.comment.deleteMany({
       where: { postId: id },
     });
 
-    // Delete the post
     await prisma.post.delete({
       where: { id },
     });
 
-    // Log the moderation action
     await prisma.moderationLog.create({
       data: {
+        status: "DELETED",
         action: "DELETE_POST",
         moderatorId: req.userId!,
         userId: post.userId,
@@ -185,7 +781,6 @@ export const deleteComment = async (
   try {
     const { id } = req.params;
 
-    // Get the comment owner before deleting
     const comment = await prisma.comment.findUnique({
       where: { id },
       select: { userId: true },
@@ -195,24 +790,21 @@ export const deleteComment = async (
       return res.status(404).json({ error: "Comment not found" });
     }
 
-    // Delete associated likes and replies first
     await prisma.commentLike.deleteMany({
       where: { commentId: id },
     });
 
-    // Delete replies to this comment
     await prisma.comment.deleteMany({
       where: { previousCommentId: id },
     });
 
-    // Delete the comment
     await prisma.comment.delete({
       where: { id },
     });
 
-    // Log
     await prisma.moderationLog.create({
       data: {
+        status: "DELETED",
         action: "DELETE_COMMENT",
         moderatorId: req.userId!,
         userId: comment.userId,
