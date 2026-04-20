@@ -1,0 +1,287 @@
+import bcrypt from "bcrypt";
+import type { Express } from "express";
+import jwt from "jsonwebtoken";
+import request from "supertest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const setTestEnv = () => {
+  const defaults: Record<string, string> = {
+    NODE_ENV: "test",
+    JWT_SECRET: "test-jwt-secret",
+    PASSWORD_PEPPER: "test-password-pepper",
+    SPOTIFY_CLIENT_ID: "test-spotify-client-id",
+    SPOTIFY_CLIENT_SECRET: "test-spotify-client-secret",
+    SPOTIFY_REDIRECT_URI: "http://localhost:6969/auth/spotify/callback",
+    DATABASE_URL: "mysql://root:@localhost:3306/beatwave_test",
+    FRONTEND_URL: "http://localhost:5173",
+  };
+
+  Object.entries(defaults).forEach(([key, value]) => {
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  });
+};
+
+setTestEnv();
+
+const prismaMock = {
+  user: {
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    create: vi.fn(),
+  },
+  post: {
+    findUnique: vi.fn(),
+    create: vi.fn(),
+  },
+  comment: {
+    findFirst: vi.fn(),
+    create: vi.fn(),
+  },
+  notification: {
+    create: vi.fn(),
+  },
+  moderationLog: {
+    findFirst: vi.fn(),
+  },
+  revokedToken: {
+    deleteMany: vi.fn(),
+    findUnique: vi.fn(),
+    upsert: vi.fn(),
+  },
+};
+
+const makeAuthCookie = (
+  userId: string,
+  role: "USER" | "MODERATOR" | "ADMIN" = "USER",
+) => {
+  const token = jwt.sign(
+    { id: userId, username: "test-user", role },
+    process.env.JWT_SECRET as string,
+    { expiresIn: "1h" },
+  );
+
+  return `beatwave_token=${token}`;
+};
+
+const getSetCookieHeader = (headers: Record<string, unknown>) => {
+  const raw = headers["set-cookie"];
+  if (!raw) {
+    return [];
+  }
+
+  return Array.isArray(raw) ? raw : [String(raw)];
+};
+
+const allowUserToContribute = (userId: string) => {
+  prismaMock.user.findUnique.mockResolvedValueOnce({
+    id: userId,
+    isBlocked: false,
+  });
+  prismaMock.moderationLog.findFirst.mockResolvedValueOnce(null);
+};
+
+const seedCommonDefaults = () => {
+  prismaMock.revokedToken.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.revokedToken.findUnique.mockResolvedValue(null);
+  prismaMock.revokedToken.upsert.mockResolvedValue({
+    id: "revoked-1",
+    tokenHash: "hash",
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    revokedAt: new Date(),
+  });
+  prismaMock.notification.create.mockResolvedValue({ id: "notification-1" });
+};
+
+describe("Non-Spotify backend endpoints", () => {
+  let app: Express;
+
+  beforeAll(async () => {
+    vi.doMock("../src/lib/prisma", () => ({
+      prisma: prismaMock,
+    }));
+
+    app = (await import("../src/app")).default;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    seedCommonDefaults();
+  });
+
+  it("POST /register creates a user", async () => {
+    prismaMock.user.findFirst.mockResolvedValueOnce(null);
+    prismaMock.user.create.mockResolvedValueOnce({
+      id: "user-1",
+      username: "alice",
+      email: "alice@example.com",
+      passwordHash: "hashed-password",
+      role: "USER",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const res = await request(app).post("/register").send({
+      username: "alice",
+      email: "alice@example.com",
+      password: "Password1!",
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.username).toBe("alice");
+    expect(res.body.email).toBe("alice@example.com");
+    expect(res.body.passwordHash).toBeUndefined();
+  });
+
+  it("POST /login authenticates and sets auth cookie", async () => {
+    const plainPassword = "Password1!";
+    const passwordHash = await bcrypt.hash(
+      `${plainPassword}${process.env.PASSWORD_PEPPER}`,
+      12,
+    );
+
+    prismaMock.user.findFirst.mockResolvedValueOnce({
+      id: "user-1",
+      username: "alice",
+      email: "alice@example.com",
+      role: "USER",
+      passwordHash,
+    });
+
+    const res = await request(app).post("/login").send({
+      login: "alice@example.com",
+      password: plainPassword,
+    });
+
+    const setCookie = getSetCookieHeader(
+      res.headers as Record<string, unknown>,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Login successful");
+    expect(setCookie?.some((cookie) => cookie.startsWith("beatwave_token="))).toBe(true);
+  });
+
+  it("POST /logout revokes token and clears cookie", async () => {
+    const res = await request(app)
+      .post("/logout")
+      .set("Cookie", makeAuthCookie("user-1"));
+
+    const setCookie = getSetCookieHeader(
+      res.headers as Record<string, unknown>,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("Logout successful");
+    expect(prismaMock.revokedToken.upsert).toHaveBeenCalledTimes(1);
+    expect(setCookie?.some((cookie) => cookie.includes("beatwave_token=;"))).toBe(true);
+  });
+
+  it("GET /user-profile returns profile data for authenticated user", async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: "user-1",
+      username: "alice",
+      email: "alice@example.com",
+      description: "About Alice",
+      isPrivate: false,
+      role: "USER",
+      spotifyTimeRange: "MEDIUM",
+      connectedApps: [],
+    });
+
+    const res = await request(app)
+      .get("/user-profile")
+      .set("Cookie", makeAuthCookie("user-1"));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(
+      expect.objectContaining({
+        id: "user-1",
+        username: "alice",
+        spotifyConnected: false,
+        soundCloudConnected: false,
+      }),
+    );
+  });
+
+  it("POST /posts creates a discussion post", async () => {
+    allowUserToContribute("user-1");
+
+    prismaMock.post.create.mockResolvedValueOnce({
+      id: "post-1",
+      title: "Test title",
+      topic: "General",
+      text: "Test post body",
+      hashtags: "#test",
+      userId: "user-1",
+      user: {
+        id: "user-1",
+        username: "alice",
+      },
+    });
+
+    const res = await request(app)
+      .post("/posts")
+      .set("Cookie", makeAuthCookie("user-1"))
+      .send({
+        title: "Test title",
+        topic: "General",
+        text: "Test post body",
+        hashtags: "#test",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe("post-1");
+  });
+
+  it("POST /post/:id/comments creates a top-level comment", async () => {
+    allowUserToContribute("user-1");
+
+    prismaMock.post.findUnique.mockResolvedValueOnce({
+      id: "post-1",
+      title: "Test title",
+      userId: "owner-1",
+      user: {
+        id: "owner-1",
+        username: "owner",
+      },
+    });
+
+    prismaMock.comment.create.mockResolvedValueOnce({
+      id: "comment-1",
+      text: "Nice post!",
+      postId: "post-1",
+      userId: "user-1",
+      previousCommentId: null,
+      user: {
+        id: "user-1",
+        username: "alice",
+      },
+      replies: [],
+    });
+
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      username: "alice",
+    });
+
+    const res = await request(app)
+      .post("/post/post-1/comments")
+      .set("Cookie", makeAuthCookie("user-1"))
+      .send({
+        text: "Nice post!",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe("comment-1");
+    expect(prismaMock.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "post_comment",
+          userId: "owner-1",
+          triggeredById: "user-1",
+        }),
+      }),
+    );
+  });
+});

@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Mail, Lock, User, CheckCircle2, Circle } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
@@ -8,10 +9,11 @@ import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
-import { setStoredUser } from "../utils/auth";
+import { createSessionUser, useSession } from "../context/SessionContext";
 
 const Register = () => {
   const navigate = useNavigate();
+  const { setCurrentUser } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const { error, showError } = useErrorToast();
 
@@ -27,14 +29,12 @@ const Register = () => {
         });
         if (!mounted) return;
 
-        setStoredUser({
-          id: response.data.id,
-          username: response.data.username,
-          email: response.data.email,
-          role: response.data.role,
-        });
+        setCurrentUser(createSessionUser(response.data));
         navigate("/home");
       } catch {
+        if (mounted) {
+          setCurrentUser(null);
+        }
         // Expected for signed-out visitors.
       }
     };
@@ -44,7 +44,7 @@ const Register = () => {
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [navigate, setCurrentUser]);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -104,21 +104,11 @@ const Register = () => {
       });
 
       if (response.data.user) {
-        setStoredUser({
-          id: response.data.user.id,
-          username: response.data.user.username,
-          email: response.data.user.email,
-          role: response.data.user.role,
-        });
+        setCurrentUser(createSessionUser(response.data.user));
         navigate("/home");
       } else {
         const profileResponse = await api.get("/user-profile?includeSpotify=false");
-        setStoredUser({
-          id: profileResponse.data.id,
-          username: profileResponse.data.username,
-          email: profileResponse.data.email,
-          role: profileResponse.data.role,
-        });
+        setCurrentUser(createSessionUser(profileResponse.data));
         navigate("/home");
       }
     } catch (err: any) {
@@ -133,7 +123,12 @@ const Register = () => {
   return (
     <div className="flex flex-col sm:flex-row h-screen w-screen bg-linear-to-r from-black to-border">
       <div className="w-full sm:w-1/2 flex items-center justify-center order-2 sm:order-1">
-        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10"
+        >
           <div className="absolute top-4 left-6 flex items-center gap-2">
             <img
               src="/Beatwave_logo.png"
@@ -288,7 +283,7 @@ const Register = () => {
               Login!
             </Link>
           </p>
-        </div>
+        </motion.div>
       </div>
       <div className="w-full sm:w-1/2 relative order-1 sm:order-2 mb-4 sm:mb-0 max-h-[40vh] sm:max-h-none overflow-hidden">
         <MusicWave />

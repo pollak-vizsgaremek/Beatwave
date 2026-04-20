@@ -16,6 +16,7 @@ import {
   type AdminUser,
 } from "../components/admin/types";
 import ErrorToast from "../components/ErrorToast";
+import { useSession } from "../context/SessionContext";
 import api from "../utils/api";
 import { useErrorToast } from "../utils/useErrorToast";
 
@@ -62,6 +63,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 const AdminPanel = () => {
   const navigate = useNavigate();
+  const { setCurrentUser } = useSession();
   const [activeTab, setActiveTab] = useState<AdminTabId>(getInitialTab);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [posts, setPosts] = useState<AdminPost[]>([]);
@@ -167,7 +169,7 @@ const AdminPanel = () => {
           showError("Your session permissions changed. Please log in again.");
           setTimeout(() => {
             localStorage.removeItem("token");
-            localStorage.removeItem("user");
+            setCurrentUser(null);
             window.location.href = "/login";
           }, 400);
           return;

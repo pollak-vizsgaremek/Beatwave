@@ -3,9 +3,10 @@ import { Outlet } from "react-router";
 
 import Navigation from "./Navigation";
 import api from "../utils/api";
-import { setStoredUser } from "../utils/auth";
+import { createSessionUser, useSession } from "../context/SessionContext";
 
 const ProtectedRoute = () => {
+  const { setCurrentUser } = useSession();
   const [authState, setAuthState] = useState<"checking" | "allowed" | "blocked">(
     "checking",
   );
@@ -20,19 +21,14 @@ const ProtectedRoute = () => {
           return;
         }
 
-        setStoredUser({
-          id: response.data.id,
-          username: response.data.username,
-          email: response.data.email,
-          role: response.data.role,
-        });
+        setCurrentUser(createSessionUser(response.data));
         setAuthState("allowed");
       } catch {
         if (!mounted) {
           return;
         }
 
-        setStoredUser(null);
+        setCurrentUser(null);
         setAuthState("blocked");
       }
     };
@@ -42,7 +38,7 @@ const ProtectedRoute = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [setCurrentUser]);
 
   if (authState === "checking") {
     return null;

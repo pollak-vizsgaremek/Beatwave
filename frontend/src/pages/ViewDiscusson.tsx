@@ -12,7 +12,7 @@ import {
 } from "../components/discussion/DiscussionModals";
 import ErrorToast from "../components/ErrorToast";
 import api from "../utils/api";
-import { getStoredUser } from "../utils/auth";
+import { useSession } from "../context/SessionContext";
 import { normalizeHashtagInput } from "../utils/hashtags";
 import { useErrorToast } from "../utils/useErrorToast";
 import type { CommentType, DiscussionType } from "../utils/Type";
@@ -30,6 +30,7 @@ const EMPTY_POST_FORM = {
 const ViewDiscussion = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { currentUser } = useSession();
 
   const [postData, setPostData] = useState<DiscussionType | null>(null);
   const [loadingPost, setLoadingPost] = useState(true);
@@ -67,7 +68,7 @@ const ViewDiscussion = () => {
   const deleteRedirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
-  const currentUserId = getStoredUser()?.id ?? null;
+  const currentUserId = currentUser?.id ?? null;
   const { error, showError } = useErrorToast();
 
   const showToastError = (message: string) => {

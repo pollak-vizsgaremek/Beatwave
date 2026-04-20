@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import ErrorToast from "../components/ErrorToast";
 import EditPostModal from "../components/profile/EditPostModal";
 import EditProfileModal from "../components/profile/EditProfileModal";
 import ProfileContent from "../components/profile/ProfileContent";
 import ProfileSummaryCard from "../components/profile/ProfileSummaryCard";
 import SettingsContent from "../components/profile/SettingsContent";
+import { useSession } from "../context/SessionContext";
 import type {
   PostFormData,
   SpotifyTimeRange,
@@ -37,6 +39,7 @@ const normalizeSpotifyTimeRange = (value: unknown): SpotifyTimeRange => {
 };
 
 const UserProfile = () => {
+  const { setCurrentUser } = useSession();
   const [isOnProfile, setIsOnProfile] = useState(true);
   const [spotiHover, setSpotiHover] = useState(false);
   const [soundHover, setSoundHover] = useState(false);
@@ -145,19 +148,15 @@ const UserProfile = () => {
             }
           : null,
       );
-
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...parsedUser,
-            username: response.data.username,
-            email: response.data.email,
-          }),
-        );
-      }
+      setCurrentUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              username: response.data.username,
+              email: response.data.email,
+            }
+          : prev,
+      );
 
       closeEditModal();
     } catch (err: any) {
@@ -377,40 +376,63 @@ const UserProfile = () => {
           </button>
         </div>
 
-        <div className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl shadow-lg border border-white/5"
+        >
           <ProfileSummaryCard user={user} />
 
-          <div className="flex-1 p-2">
-            {isOnProfile ? (
-              <ProfileContent
-                loadingPosts={loadingPosts}
-                userPosts={userPosts}
-                openPostMenuId={openPostMenuId}
-                postMenuRef={postMenuRef}
-                onTogglePostMenu={handleTogglePostMenu}
-                onOpenPostEdit={openPostEditModal}
-                onDeletePost={handleDeletePost}
-              />
-            ) : (
-              <SettingsContent
-                connectedToSpotify={connectedToSpotify}
-                connectedToSoundCloud={connectedToSoundCloud}
-                spotiHover={spotiHover}
-                soundHover={soundHover}
-                timeRange={timeRange}
-                isPrivate={user?.isPrivate ?? false}
-                isUpdatingPrivacy={isUpdatingPrivacy}
-                onOpenEditModal={openEditModal}
-                onTogglePrivacy={handlePrivacyToggle}
-                onConnectSpotify={handleConnectSpotify}
-                onDisconnectSpotify={handleDisconnectSpotify}
-                onSpotifyHoverChange={setSpotiHover}
-                onSoundHoverChange={setSoundHover}
-                onTimeRangeChange={handleTimeRangeChange}
-              />
-            )}
+          <div className="flex-1 p-2 overflow-hidden relative">
+            <AnimatePresence mode="wait">
+              {isOnProfile ? (
+                <motion.div
+                  key="profile"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ProfileContent
+                    loadingPosts={loadingPosts}
+                    userPosts={userPosts}
+                    openPostMenuId={openPostMenuId}
+                    postMenuRef={postMenuRef}
+                    onTogglePostMenu={handleTogglePostMenu}
+                    onOpenPostEdit={openPostEditModal}
+                    onDeletePost={handleDeletePost}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="settings"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <SettingsContent
+                    connectedToSpotify={connectedToSpotify}
+                    connectedToSoundCloud={connectedToSoundCloud}
+                    spotiHover={spotiHover}
+                    soundHover={soundHover}
+                    timeRange={timeRange}
+                    isPrivate={user?.isPrivate ?? false}
+                    isUpdatingPrivacy={isUpdatingPrivacy}
+                    onOpenEditModal={openEditModal}
+                    onTogglePrivacy={handlePrivacyToggle}
+                    onConnectSpotify={handleConnectSpotify}
+                    onDisconnectSpotify={handleDisconnectSpotify}
+                    onSpotifyHoverChange={setSpotiHover}
+                    onSoundHoverChange={setSoundHover}
+                    onTimeRangeChange={handleTimeRangeChange}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
 
         <EditProfileModal
           isOpen={isModalOpen}

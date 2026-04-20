@@ -1,5 +1,5 @@
 import { Menu } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import ErrorToast from "./ErrorToast";
@@ -16,6 +16,7 @@ import type {
   SearchTypeState,
 } from "./navigation/types";
 import api from "../utils/api";
+import { useSession } from "../context/SessionContext";
 import type { NotificationType } from "../utils/Type";
 import { useErrorToast } from "../utils/useErrorToast";
 
@@ -35,6 +36,7 @@ const searchTypeParamMap: Record<keyof SearchTypeState, string> = {
 const Navigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentUser, setCurrentUser } = useSession();
   const isDiscussionRoute = location.pathname.startsWith("/discussion");
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -133,17 +135,8 @@ const Navigation = () => {
     tagHipster: searchAlbums,
   };
 
-const canAccessAdminPanel = useMemo(() => {
-  try {
-    const rawUser = localStorage.getItem("user");
-    if (!rawUser) return false;
-
-    const user = JSON.parse(rawUser) as { role?: string };
-    return user.role === "ADMIN" || user.role === "MODERATOR";
-  } catch {
-    return false;
-  }
-}, []);
+  const canAccessAdminPanel =
+    currentUser?.role === "ADMIN" || currentUser?.role === "MODERATOR";
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -246,7 +239,6 @@ const canAccessAdminPanel = useMemo(() => {
 
   const clearLocalSession = () => {
     localStorage.removeItem("token");
-    localStorage.removeItem("user");
     localStorage.removeItem("spotifyTimeRange");
 
     Object.keys(localStorage).forEach((key) => {
@@ -306,6 +298,7 @@ const canAccessAdminPanel = useMemo(() => {
       }
     } finally {
       clearLocalSession();
+      setCurrentUser(null);
       closeAllMenus();
       navigate("/login");
     }
