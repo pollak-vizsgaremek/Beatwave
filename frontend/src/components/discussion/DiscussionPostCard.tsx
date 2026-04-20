@@ -9,6 +9,7 @@ interface DiscussionPostCardProps {
   currentUserId: string | null;
   showAllText: boolean;
   isPostMenuOpen: boolean;
+  isDeletingPost: boolean;
   isLikingPost: boolean;
   isReportingContent: boolean;
   postMenuRef: RefObject<HTMLDivElement | null>;
@@ -26,6 +27,7 @@ const DiscussionPostCard = ({
   currentUserId,
   showAllText,
   isPostMenuOpen,
+  isDeletingPost,
   isLikingPost,
   isReportingContent,
   postMenuRef,
@@ -84,9 +86,10 @@ const DiscussionPostCard = ({
                     <button
                       type="button"
                       onClick={onDelete}
+                      disabled={isDeletingPost}
                       className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 cursor-pointer"
                     >
-                      Delete post
+                      {isDeletingPost ? "Deleting..." : "Delete post"}
                     </button>
                   </>
                 ) : (

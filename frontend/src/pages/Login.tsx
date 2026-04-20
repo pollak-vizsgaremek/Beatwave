@@ -8,6 +8,7 @@ import MusicWave from "../components/MusicWave";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
+import { setStoredUser } from "../utils/auth";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -19,9 +20,34 @@ const Login = () => {
   const { error, showError } = useErrorToast();
 
   useEffect(() => {
-    if (localStorage.getItem("token")) {
-      navigate("/home");
-    }
+    let mounted = true;
+
+    const checkSession = async () => {
+      try {
+        const response = await api.get("/user-profile?includeSpotify=false", {
+          headers: {
+            "X-Skip-Auth-Redirect": "1",
+          },
+        });
+        if (!mounted) return;
+
+        setStoredUser({
+          id: response.data.id,
+          username: response.data.username,
+          email: response.data.email,
+          role: response.data.role,
+        });
+        navigate("/home");
+      } catch {
+        // User is not logged in yet, stay on login page.
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      mounted = false;
+    };
   }, [navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,11 +64,23 @@ const Login = () => {
         password: formData.password,
       });
 
-      if (response.data.token) {
-        localStorage.setItem("token", response.data.token);
+      if (response.data.user) {
+        setStoredUser({
+          id: response.data.user.id,
+          username: response.data.user.username,
+          email: response.data.user.email,
+          role: response.data.user.role,
+        });
         navigate("/home");
       } else {
-        showError("Invalid response from server");
+        const profileResponse = await api.get("/user-profile?includeSpotify=false");
+        setStoredUser({
+          id: profileResponse.data.id,
+          username: profileResponse.data.username,
+          email: profileResponse.data.email,
+          role: profileResponse.data.role,
+        });
+        navigate("/home");
       }
     } catch (err: any) {
       showError(err.response?.data?.error || "Invalid credentials");

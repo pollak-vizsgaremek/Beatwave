@@ -11,6 +11,17 @@ type RateLimitEntry = {
   resetAt: number;
 };
 
+const MAX_RATE_LIMIT_ENTRIES = 10_000;
+
+const cleanupExpiredEntries = (entries: Map<string, RateLimitEntry>) => {
+  const now = Date.now();
+  for (const [key, entry] of entries.entries()) {
+    if (entry.resetAt <= now) {
+      entries.delete(key);
+    }
+  }
+};
+
 const createRateLimiter = ({
   maxRequests,
   windowMs,
@@ -19,18 +30,17 @@ const createRateLimiter = ({
   const entries = new Map<string, RateLimitEntry>();
 
   return (req: Request, res: Response, next: NextFunction) => {
-    // Disable app-level rate limiting during local development to avoid
-    // blocking normal UI testing/polling flows.
+    // Keep local development unblocked.
     if ((process.env.NODE_ENV || "development") === "development") {
       return next();
     }
 
-    const forwardedFor = req.headers["x-forwarded-for"];
-    const clientIp =
-      typeof forwardedFor === "string"
-        ? forwardedFor.split(",")[0].trim()
-        : req.ip || "unknown";
-    const key = `${clientIp}:${req.path}`;
+    if (entries.size > MAX_RATE_LIMIT_ENTRIES) {
+      cleanupExpiredEntries(entries);
+    }
+
+    const clientIp = req.ip || "unknown";
+    const key = clientIp;
     const now = Date.now();
 
     const existingEntry = entries.get(key);
@@ -47,14 +57,12 @@ const createRateLimiter = ({
       const retryAfterSeconds = Math.ceil(
         (existingEntry.resetAt - now) / 1000,
       );
-
       res.setHeader("Retry-After", String(retryAfterSeconds));
       return res.status(429).json({ error: message });
     }
 
     existingEntry.count += 1;
     entries.set(key, existingEntry);
-
     next();
   };
 };

@@ -1,12 +1,13 @@
 import { X } from "lucide-react";
 import Button from "../Button";
+import type { SpotifyTimeRange } from "./types";
 
 interface SettingsContentProps {
   connectedToSpotify: boolean;
   connectedToSoundCloud: boolean;
   spotiHover: boolean;
   soundHover: boolean;
-  timeRange: string;
+  timeRange: SpotifyTimeRange;
   isPrivate: boolean;
   isUpdatingPrivacy: boolean;
   onOpenEditModal: () => void;
@@ -55,9 +56,12 @@ const SettingsContent = ({
       <div className="bg-card rounded-2xl p-5 border border-white/10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">Profile privacy</h3>
+            <h3 className="text-lg font-semibold text-white">
+              Profile privacy
+            </h3>
             <p className="text-gray-400 mt-1">
-              When private, other users will see “this profile is private” instead of your posts.
+              When private, other users will see “this profile is private”
+              instead of your posts.
             </p>
           </div>
           <button
@@ -150,9 +154,9 @@ const SettingsContent = ({
           onChange={onTimeRangeChange}
           className="w-full md:w-2/3 p-3 rounded-2xl bg-card-black border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
         >
-          <option value="4week">Last 4 weeks</option>
-          <option value="6month">Last 6 months</option>
-          <option value="alltime">All time</option>
+          <option value="SHORT">Last 4 weeks</option>
+          <option value="MEDIUM">Last 6 months</option>
+          <option value="LONG">All time</option>
         </select>
       </div>
     </div>

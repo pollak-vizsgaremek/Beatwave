@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { notifyModerationTeam } from "../lib/moderationNotifications";
 import { prisma } from "../lib/prisma";
-import { getActiveUserTimeout } from "../lib/userTimeout";
+import { ensureUserCanContribute } from "../lib/userAccess";
 
 // Shared user select — only expose what the frontend needs, never email or passwordHash
 const USER_SELECT = {
@@ -11,33 +11,6 @@ const USER_SELECT = {
 
 const MAX_COMMENT_LENGTH = 2000;
 const MAX_REPORT_REASON_LENGTH = 1000;
-const BLOCKED_USER_MESSAGE =
-  "Your account has been blocked from posting and commenting.";
-
-const ensureUserCanComment = async (userId: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, isBlocked: true },
-  });
-
-  if (!user) {
-    return { status: 404, error: "User not found" };
-  }
-
-  if (user.isBlocked) {
-    return { status: 403, error: BLOCKED_USER_MESSAGE };
-  }
-
-  const timeout = await getActiveUserTimeout(userId);
-  if (timeout) {
-    return {
-      status: 403,
-      error: `You are timed out from posting and commenting until ${timeout.until.toISOString()}. Reason: ${timeout.reason}`,
-    };
-  }
-
-  return null;
-};
 
 export const getCommentsByPostId = async (
   req: Request,
@@ -99,7 +72,7 @@ export const createComment = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const blockedState = await ensureUserCanComment(req.userId);
+    const blockedState = await ensureUserCanContribute(req.userId);
     if (blockedState) {
       return res
         .status(blockedState.status)
@@ -125,12 +98,32 @@ export const createComment = async (
       return res.status(404).json({ message: "Post not found" });
     }
 
+    let parentComment: { id: string; userId: string } | null = null;
+    if (previousCommentId) {
+      parentComment = await prisma.comment.findFirst({
+        where: {
+          id: previousCommentId,
+          postId,
+        },
+        select: {
+          id: true,
+          userId: true,
+        },
+      });
+
+      if (!parentComment) {
+        return res.status(400).json({
+          error: "Invalid parent comment for this post",
+        });
+      }
+    }
+
     const newComment = await prisma.comment.create({
       data: {
         text: text.trim(),
         postId,
         userId: req.userId,
-        previousCommentId: previousCommentId || null,
+        previousCommentId: parentComment?.id || null,
       },
       include: {
         user: { select: USER_SELECT },
@@ -148,11 +141,8 @@ export const createComment = async (
       select: { username: true },
     });
 
-    if (previousCommentId) {
-      const parentComment = await prisma.comment.findUnique({
-        where: { id: previousCommentId },
-      });
-      if (parentComment && parentComment.userId !== req.userId && triggerUser) {
+    if (parentComment) {
+      if (parentComment.userId !== req.userId && triggerUser) {
         await prisma.notification.create({
           data: {
             type: "comment_reply",
@@ -271,66 +261,61 @@ export const likeComment = async (
   next: NextFunction,
 ) => {
   try {
-    const { id } = req.params;
+    const commentId = req.params.id;
+    const userId = req.userId as string;
 
-    if (!req.userId) return res.status(401).json({ error: "Unauthorized" });
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const existingLike = await prisma.commentLike.findUnique({
       where: {
-        userId_commentId: {
-          userId: req.userId,
-          commentId: id,
-        },
+        userId_commentId: { userId, commentId },
       },
     });
 
-    let comment;
-    let isLiked = false;
-
     if (existingLike) {
-      // Unlike — wrap in a transaction to keep the like row and counter in sync
-      [, comment] = await prisma.$transaction([
+      const [, updatedComment] = await prisma.$transaction([
         prisma.commentLike.delete({ where: { id: existingLike.id } }),
         prisma.comment.update({
-          where: { id },
+          where: { id: commentId },
           data: { likeAmount: { decrement: 1 } },
-          include: { user: { select: USER_SELECT } },
         }),
       ]);
-      isLiked = false;
-    } else {
-      // Like — wrap in a transaction to keep the like row and counter in sync
-      [, comment] = await prisma.$transaction([
-        prisma.commentLike.create({
-          data: { userId: req.userId, commentId: id },
-        }),
-        prisma.comment.update({
-          where: { id },
-          data: { likeAmount: { increment: 1 } },
-          include: { user: { select: USER_SELECT } },
-        }),
-      ]);
-      isLiked = true;
+      
+      return res.status(200).json({ likeAmount: updatedComment.likeAmount, isLiked: false });
+    }
 
+    const [, updatedComment] = await prisma.$transaction([
+      prisma.commentLike.create({
+        data: { userId, commentId },
+      }),
+      prisma.comment.update({
+        where: { id: commentId },
+        data: { likeAmount: { increment: 1 } },
+        include: { user: { select: USER_SELECT } }, 
+      }),
+    ]);
+
+    if (updatedComment.userId !== userId) {
       const triggerUser = await prisma.user.findUnique({
-        where: { id: req.userId },
+        where: { id: userId },
         select: { username: true },
       });
 
-      if (comment.userId !== req.userId && triggerUser) {
+      if (triggerUser) {
         await prisma.notification.create({
           data: {
             type: "comment_like",
             message: `@${triggerUser.username} liked your comment.`,
-            userId: comment.userId,
-            triggeredById: req.userId,
-            link: `/discussion/view/${comment.postId}`,
+            userId: updatedComment.userId,
+            triggeredById: userId,
+            link: `/discussion/view/${updatedComment.postId}`,
           },
         });
       }
     }
 
-    res.status(200).json({ likeAmount: comment.likeAmount, isLiked });
+    return res.status(200).json({ likeAmount: updatedComment.likeAmount, isLiked: true });
+
   } catch (error) {
     next(error);
   }

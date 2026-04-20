@@ -61,11 +61,8 @@ export const getSpotifyRecommendations = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     const cacheKey = `${userId}-recommendations`;
     const cachedEntry = spotifyCache.get<SpotifyTrack[]>(cacheKey);

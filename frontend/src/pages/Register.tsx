@@ -8,6 +8,7 @@ import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
+import { setStoredUser } from "../utils/auth";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -15,9 +16,34 @@ const Register = () => {
   const { error, showError } = useErrorToast();
 
   useEffect(() => {
-    if (localStorage.getItem("token")) {
-      navigate("/home");
-    }
+    let mounted = true;
+
+    const checkSession = async () => {
+      try {
+        const response = await api.get("/user-profile?includeSpotify=false", {
+          headers: {
+            "X-Skip-Auth-Redirect": "1",
+          },
+        });
+        if (!mounted) return;
+
+        setStoredUser({
+          id: response.data.id,
+          username: response.data.username,
+          email: response.data.email,
+          role: response.data.role,
+        });
+        navigate("/home");
+      } catch {
+        // Expected for signed-out visitors.
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      mounted = false;
+    };
   }, [navigate]);
 
   const [formData, setFormData] = useState({
@@ -66,32 +92,34 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const registerResponse = await api.post("/register", {
+      await api.post("/register", {
         email: formData.email,
         username: formData.username,
         password: formData.password,
       });
-
-      if (registerResponse.data?.token) {
-        localStorage.setItem("token", registerResponse.data.token);
-        localStorage.setItem(
-          "user",
-          JSON.stringify(registerResponse.data.user || {}),
-        );
-        window.location.href = "/home";
-        return;
-      }
 
       const response = await api.post("/login", {
         email: formData.email,
         password: formData.password,
       });
 
-      if (response.data.token) {
-        localStorage.setItem("token", response.data.token);
-        window.location.href = "/home";
+      if (response.data.user) {
+        setStoredUser({
+          id: response.data.user.id,
+          username: response.data.user.username,
+          email: response.data.user.email,
+          role: response.data.user.role,
+        });
+        navigate("/home");
       } else {
-        showError("Registration succeeded, but login response was invalid.");
+        const profileResponse = await api.get("/user-profile?includeSpotify=false");
+        setStoredUser({
+          id: profileResponse.data.id,
+          username: profileResponse.data.username,
+          email: profileResponse.data.email,
+          role: profileResponse.data.role,
+        });
+        navigate("/home");
       }
     } catch (err: any) {
       showError(

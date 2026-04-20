@@ -4,9 +4,14 @@ import type { NotificationListProps } from "./types";
 const NotificationList = ({
   notifications,
   compact = false,
+  showDeleteReadAction = true,
   onSelectNotification,
   onDeleteRead,
 }: NotificationListProps) => {
+  const hasReadNotifications = notifications.some(
+    (notification) => notification.read,
+  );
+
   if (notifications.length === 0) {
     return (
       <div
@@ -36,17 +41,19 @@ const NotificationList = ({
           </p>
         </div>
       ))}
-      <div className={compact ? "p-3" : "flex justify-center"}>
-        <Button
-          labelTitle={compact ? "Delete Read" : "Delete Notif"}
-          onClick={onDeleteRead}
-          className={
-            compact
-              ? "w-full! text-base! py-3!"
-              : "mt-0! p-4! w-full rounded-lg!"
-          }
-        />
-      </div>
+      {showDeleteReadAction && hasReadNotifications && (
+        <div className={compact ? "p-3" : "flex justify-center"}>
+          <Button
+            labelTitle={compact ? "Delete Read" : "Delete Notif"}
+            onClick={onDeleteRead}
+            className={
+              compact
+                ? "w-full! text-base! py-3!"
+                : "mt-0! p-4! w-full rounded-lg!"
+            }
+          />
+        </div>
+      )}
     </>
   );
 };

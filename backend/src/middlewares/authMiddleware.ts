@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 import config from "../config/config";
+import { getTokenFromRequest, hashToken } from "../lib/authToken";
 import { prisma } from "../lib/prisma";
 
 interface TokenPayload {
@@ -10,33 +11,55 @@ interface TokenPayload {
   role: string;
 }
 
-export const verifyToken = (
+const REVOKED_TOKEN_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+let lastRevokedTokenCleanupAt = 0;
+
+const maybeCleanupExpiredRevokedTokens = async () => {
+  const now = Date.now();
+  if (now - lastRevokedTokenCleanupAt < REVOKED_TOKEN_CLEANUP_INTERVAL_MS) {
+    return;
+  }
+
+  lastRevokedTokenCleanupAt = now;
+  await prisma.revokedToken.deleteMany({
+    where: {
+      expiresAt: {
+        lt: new Date(),
+      },
+    },
+  });
+};
+
+export const verifyToken = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Nincs bejelentkezve" });
-  }
-
-  const token = authHeader.slice(7);
+  const token = getTokenFromRequest(req);
 
   if (!token) {
-    return res.status(401).json({ error: "Nincs bejelentkezve" });
+    return res.status(401).json({ error: "Not logged in" });
   }
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
+
+    await maybeCleanupExpiredRevokedTokens();
+
+    const revokedToken = await prisma.revokedToken.findUnique({
+      where: { tokenHash: hashToken(token) },
+      select: { id: true },
+    });
+
+    if (revokedToken) {
+      return res.status(403).json({ error: "Invalid token" });
+    }
+
     req.userId = decoded.id;
     req.role = decoded.role;
-    console.log(
-      `[Spotify MiddleWare] Extracted userId: ${req.userId} from token.`,
-    );
     next();
-  } catch (error) {
-    return res.status(403).json({ error: "Ervenytelen token" });
+  } catch {
+    return res.status(403).json({ error: "Invalid token" });
   }
 };
 
@@ -46,7 +69,7 @@ export const isAdmin = async (
   next: NextFunction,
 ) => {
   if (!req.userId) {
-    return res.status(401).json({ error: "Nincs bejelentkezve" });
+    return res.status(401).json({ error: "Not logged in" });
   }
 
   try {
@@ -56,13 +79,13 @@ export const isAdmin = async (
     });
 
     if (!user || user.role !== "ADMIN") {
-      return res.status(403).json({ error: "Nincs jogosultsagod" });
+      return res.status(403).json({ error: "Insufficient permissions" });
     }
 
     req.role = user.role;
     next();
   } catch {
-    return res.status(500).json({ error: "Belso szerverhiba" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -72,7 +95,7 @@ export const isAdminOrModerator = async (
   next: NextFunction,
 ) => {
   if (!req.userId) {
-    return res.status(401).json({ error: "Nincs bejelentkezve" });
+    return res.status(401).json({ error: "Not logged in" });
   }
 
   try {
@@ -82,12 +105,12 @@ export const isAdminOrModerator = async (
     });
 
     if (!user || (user.role !== "ADMIN" && user.role !== "MODERATOR")) {
-      return res.status(403).json({ error: "Nincs jogosultsagod" });
+      return res.status(403).json({ error: "Insufficient permissions" });
     }
 
     req.role = user.role;
     next();
   } catch {
-    return res.status(500).json({ error: "Belso szerverhiba" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 };

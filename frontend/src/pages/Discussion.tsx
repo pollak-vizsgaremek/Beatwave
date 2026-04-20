@@ -11,11 +11,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
-import { getNormalizedHashtags, normalizeHashtagInput } from "../utils/hashtags";
+import {
+  getNormalizedHashtags,
+  normalizeHashtagInput,
+} from "../utils/hashtags";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 import formatRelative from "../utils/DateFormatting";
-import { getLikedPosts, getStoredUser, saveLikedPosts } from "../utils/auth";
+import { getStoredUser } from "../utils/auth";
 import type { DiscussionType } from "../utils/Type";
 
 const MAX_REPORT_REASON_LENGTH = 1000;
@@ -197,12 +200,11 @@ const Discussion = () => {
     const fetchAllPosts = async () => {
       try {
         const response = await api.get("/posts");
-        const likedPosts = getLikedPosts();
 
         setPostsData(
           response.data.map((post: DiscussionType) => ({
             ...post,
-            isLiked: likedPosts.has(post.id),
+            isLiked: post.isLiked,
           })),
         );
       } catch (err: any) {
@@ -253,13 +255,6 @@ const Discussion = () => {
       const response = await api.post(`/post/${postId}/like`, {
         isLiked: currentPost.isLiked,
       });
-
-      const storedLikes = getLikedPosts();
-
-      if (response.data.isLiked) storedLikes.add(postId);
-      else storedLikes.delete(postId);
-
-      saveLikedPosts(storedLikes);
 
       setPostsData((prevPosts) =>
         prevPosts.map((post) =>
@@ -435,7 +430,7 @@ const Discussion = () => {
           Posts
         </h1>
 
-        <div className="w-full max-w-[1400px] mx-auto mt-4">
+        <div className="w-full max-w-[1500px] mx-auto mt-4">
           <div className="rounded-2xl border border-white/10 bg-card-black p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1">
@@ -447,7 +442,9 @@ const Discussion = () => {
                   type="text"
                   placeholder="Search in discussions..."
                   value={discussionSearchQuery}
-                  onChange={(event) => setDiscussionSearchQuery(event.target.value)}
+                  onChange={(event) =>
+                    setDiscussionSearchQuery(event.target.value)
+                  }
                   className="w-full rounded-xl border border-white/10 bg-card px-10 py-2 text-white outline-none transition-colors focus:border-spotify-green"
                 />
               </div>
@@ -493,7 +490,9 @@ const Discussion = () => {
                   Author
                   <select
                     value={selectedAuthorId}
-                    onChange={(event) => setSelectedAuthorId(event.target.value)}
+                    onChange={(event) =>
+                      setSelectedAuthorId(event.target.value)
+                    }
                     className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
                   >
                     <option value="all">All authors</option>
@@ -551,7 +550,9 @@ const Discussion = () => {
                   <input
                     type="checkbox"
                     checked={onlyLikedPosts}
-                    onChange={(event) => setOnlyLikedPosts(event.target.checked)}
+                    onChange={(event) =>
+                      setOnlyLikedPosts(event.target.checked)
+                    }
                     className="h-4 w-4 accent-spotify-green"
                   />
                   Only liked posts
@@ -565,7 +566,7 @@ const Discussion = () => {
           </div>
         </div>
 
-        <div className="grid flex-row items-center justify-center w-full max-w-[1400px] mx-auto gap-4 mt-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid flex-row items-center justify-center w-full max-w-[1600px] mx-auto gap-4 mt-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {loadingPosts ? (
             <p>Loading posts...</p>
           ) : postsData.length === 0 ? (
@@ -588,7 +589,9 @@ const Discussion = () => {
                     <div className="min-w-0 flex flex-wrap items-center">
                       <button
                         type="button"
-                        onClick={(event) => handleProfileClick(event, post.user.id)}
+                        onClick={(event) =>
+                          handleProfileClick(event, post.user.id)
+                        }
                         className="font-bold text-xl max-w-[100px] sm:max-w-[150px] truncate cursor-pointer hover:underline text-left"
                       >
                         {post.user.username}
@@ -597,14 +600,14 @@ const Discussion = () => {
                         {" "}
                         —{" "}
                       </p>
-                      <p className="text-lg font-extralight max-w-[80px] sm:max-w-[120px] truncate">
+                      <p className="text-lg font-extralight max-w-[80px] sm:max-w-[100px] truncate">
                         {post.title}
                       </p>
                       <p className="mx-2 font-bold text-lg hidden sm:block">
                         {" "}
                         -{" "}
                       </p>
-                      <p className="text-lg font-extralight italic max-w-[80px] sm:max-w-[120px] truncate">
+                      <p className="text-lg font-extralight italic max-w-[80px] sm:max-w-[100px] truncate">
                         {post.topic}
                       </p>
                     </div>

@@ -135,12 +135,11 @@ const Navigation = () => {
 
 const canAccessAdminPanel = useMemo(() => {
   try {
-    const token = localStorage.getItem("token");
-    if (!token) return false;
+    const rawUser = localStorage.getItem("user");
+    if (!rawUser) return false;
 
-    const payload = JSON.parse(atob(token.split(".")[1]));
-
-    return payload.role === "ADMIN" || payload.role === "MODERATOR";
+    const user = JSON.parse(rawUser) as { role?: string };
+    return user.role === "ADMIN" || user.role === "MODERATOR";
   } catch {
     return false;
   }
@@ -203,11 +202,9 @@ const canAccessAdminPanel = useMemo(() => {
       }
     };
 
-    if (localStorage.getItem("token")) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000);
-      return () => clearInterval(interval);
-    }
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -245,6 +242,18 @@ const canAccessAdminPanel = useMemo(() => {
     setIsFilterOpen(false);
     setIsNotificationsOpen(false);
     setIsMenuOpen(false);
+  };
+
+  const clearLocalSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("spotifyTimeRange");
+
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("likedPosts:")) {
+        localStorage.removeItem(key);
+      }
+    });
   };
 
   const markNotificationsAsRead = async () => {
@@ -288,11 +297,18 @@ const canAccessAdminPanel = useMemo(() => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    closeAllMenus();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await api.post("/logout");
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn("Logout API call failed, clearing local session anyway.", error);
+      }
+    } finally {
+      clearLocalSession();
+      closeAllMenus();
+      navigate("/login");
+    }
   };
 
   const handleNavigate = (path: string) => {

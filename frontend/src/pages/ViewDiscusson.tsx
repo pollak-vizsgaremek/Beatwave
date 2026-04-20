@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 
+import AdminActionModal from "../components/admin/AdminActionModal";
 import CommentComposer from "../components/discussion/CommentComposer";
 import CommentThread from "../components/discussion/CommentThread";
 import DiscussionPostCard from "../components/discussion/DiscussionPostCard";
@@ -11,10 +12,11 @@ import {
 } from "../components/discussion/DiscussionModals";
 import ErrorToast from "../components/ErrorToast";
 import api from "../utils/api";
-import { getLikedPosts, getStoredUser, saveLikedPosts } from "../utils/auth";
+import { getStoredUser } from "../utils/auth";
 import { normalizeHashtagInput } from "../utils/hashtags";
 import { useErrorToast } from "../utils/useErrorToast";
 import type { CommentType, DiscussionType } from "../utils/Type";
+import { discussionController } from "../controllers/discussionController";
 
 const MAX_COMMENT_LENGTH = 2000;
 const MAX_REPORT_REASON_LENGTH = 1000;
@@ -34,6 +36,7 @@ const ViewDiscussion = () => {
   const [isLikingPost, setIsLikingPost] = useState(false);
   const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [postForm, setPostForm] = useState(EMPTY_POST_FORM);
   const [reportReason, setReportReason] = useState("");
@@ -43,6 +46,7 @@ const ViewDiscussion = () => {
     label: "post" | "comment" | "reply";
   } | null>(null);
   const [isSavingPost, setIsSavingPost] = useState(false);
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
   const [isReportingContent, setIsReportingContent] = useState(false);
   const [toastVariant, setToastVariant] = useState<"error" | "success">(
     "error",
@@ -60,6 +64,9 @@ const ViewDiscussion = () => {
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
 
   const postMenuRef = useRef<HTMLDivElement | null>(null);
+  const deleteRedirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const currentUserId = getStoredUser()?.id ?? null;
   const { error, showError } = useErrorToast();
 
@@ -86,11 +93,10 @@ const ViewDiscussion = () => {
     const fetchPost = async () => {
       try {
         const response = await api.get(`/post/${id}`);
-        const likedPosts = getLikedPosts();
 
         setPostData({
           ...response.data,
-          isLiked: likedPosts.has(response.data.id),
+          isLiked: response.data.isLiked,
         });
       } catch (err: any) {
         console.error("Error fetching post:", err);
@@ -135,24 +141,20 @@ const ViewDiscussion = () => {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (deleteRedirectTimeoutRef.current) {
+        clearTimeout(deleteRedirectTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handlePostLike = async () => {
     if (!postData || isLikingPost) return;
 
     setIsLikingPost(true);
     try {
-      const response = await api.post(`/post/${postData.id}/like`, {
-        isLiked: postData.isLiked,
-      });
-
-      const storedLikes = getLikedPosts();
-
-      if (response.data.isLiked) {
-        storedLikes.add(postData.id);
-      } else {
-        storedLikes.delete(postData.id);
-      }
-
-      saveLikedPosts(storedLikes);
+      const response = await discussionController.likePost(postData.id);
 
       setPostData((prev) =>
         prev
@@ -301,6 +303,13 @@ const ViewDiscussion = () => {
     setIsPostModalOpen(true);
   };
 
+  const openDeleteModal = () => {
+    if (!postData || isDeletingPost) return;
+
+    setIsPostMenuOpen(false);
+    setIsDeleteModalOpen(true);
+  };
+
   const resetPostModal = () => {
     setPostForm(EMPTY_POST_FORM);
     setIsPostModalOpen(false);
@@ -341,11 +350,10 @@ const ViewDiscussion = () => {
     setIsSavingPost(true);
     try {
       const response = await api.put(`/post/${postData.id}`, postForm);
-      const likedPosts = getLikedPosts();
 
       setPostData({
         ...response.data,
-        isLiked: likedPosts.has(response.data.id),
+        isLiked: response.data.isLiked,
       });
       resetPostModal();
     } catch (err: any) {
@@ -357,22 +365,21 @@ const ViewDiscussion = () => {
   };
 
   const handleDeletePost = async () => {
-    if (!postData) return;
+    if (!postData || isDeletingPost) return;
 
-    setIsPostMenuOpen(false);
-
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this post?",
-    );
-
-    if (!confirmed) return;
-
+    setIsDeletingPost(true);
     try {
-      await api.delete(`/post/${postData.id}`);
-      navigate("/discussion");
+      await discussionController.deletePost(postData.id);
+      setIsDeleteModalOpen(false);
+      showToastSuccess("Post deleted successfully. Redirecting...");
+      deleteRedirectTimeoutRef.current = setTimeout(() => {
+        navigate("/discussion");
+      }, 900);
     } catch (err: any) {
       console.error("Error deleting post:", err);
       showToastError(err.response?.data?.error || "Failed to delete post.");
+    } finally {
+      setIsDeletingPost(false);
     }
   };
 
@@ -463,6 +470,7 @@ const ViewDiscussion = () => {
               currentUserId={currentUserId}
               showAllText={showAllText}
               isPostMenuOpen={isPostMenuOpen}
+              isDeletingPost={isDeletingPost}
               isLikingPost={isLikingPost}
               isReportingContent={isReportingContent}
               postMenuRef={postMenuRef}
@@ -471,7 +479,7 @@ const ViewDiscussion = () => {
               onToggleText={() => setShowAllText((prev) => !prev)}
               onLike={() => void handlePostLike()}
               onEdit={openPostEditModal}
-              onDelete={() => void handleDeletePost()}
+              onDelete={openDeleteModal}
               onReport={() => openReportModal("post", postData.id, "post")}
             />
 
@@ -545,6 +553,19 @@ const ViewDiscussion = () => {
         onClose={resetPostModal}
         onChange={handlePostFieldChange}
         onSubmit={handleSavePost}
+      />
+
+      <AdminActionModal
+        isOpen={isDeleteModalOpen}
+        title="Delete Post"
+        description="This post will be permanently removed."
+        confirmLabel="Delete post"
+        danger
+        isSubmitting={isDeletingPost}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={() => {
+          void handleDeletePost();
+        }}
       />
 
       <ReportModal
