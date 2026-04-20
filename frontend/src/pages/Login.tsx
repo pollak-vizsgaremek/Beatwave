@@ -40,7 +40,6 @@ const Login = () => {
 
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user || {}));
         navigate("/home");
       } else {
         showError("Invalid response from server");

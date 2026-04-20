@@ -6,7 +6,7 @@ export const isTokenExpired = (token: string): boolean => {
       atob(base64)
         .split("")
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(""),
+        .join("")
     );
 
     const { exp } = JSON.parse(jsonPayload);
@@ -28,8 +28,14 @@ type StoredUser = {
 
 export const getStoredUser = (): StoredUser | null => {
   try {
-    const rawUser = localStorage.getItem("user");
-    return rawUser ? JSON.parse(rawUser) : null;
+    const rawToken = localStorage.getItem("token");
+    if (!rawToken || isTokenExpired(rawToken)) {
+      localStorage.removeItem("token");
+      return null;
+    }
+
+    const payload = JSON.parse(atob(rawToken.split(".")[1]));
+    return payload as StoredUser;
   } catch {
     return null;
   }

@@ -209,7 +209,7 @@ const checkTrackInPlaylist = async (
   returnEarly: boolean = true,
 ) => {
   let nextUrl: string | null =
-    `https://api.spotify.com/v1/playlists/${playlistId}/items?limit=100&fields=${encodeURIComponent(
+    `https://api.spotify.com/v1/playlists/${playlistId}/items?limit=50&fields=${encodeURIComponent(
       "items(track(uri,id,linked_from(uri,id))),next",
     )}`;
 
