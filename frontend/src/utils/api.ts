@@ -27,7 +27,6 @@ api.interceptors.response.use(
       const url = error.config?.url;
       if (url && !url.includes("/login") && !url.includes("/register")) {
         localStorage.removeItem("token");
-        localStorage.removeItem("user");
         window.location.href = "/login";
       }
     }

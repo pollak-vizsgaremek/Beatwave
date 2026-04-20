@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router";
 import { User, Lock } from "lucide-react";
 
@@ -8,10 +9,11 @@ import MusicWave from "../components/MusicWave";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
-import { setStoredUser } from "../utils/auth";
+import { createSessionUser, useSession } from "../context/SessionContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { setCurrentUser } = useSession();
   const [formData, setFormData] = useState({
     identifier: "",
     password: "",
@@ -31,14 +33,12 @@ const Login = () => {
         });
         if (!mounted) return;
 
-        setStoredUser({
-          id: response.data.id,
-          username: response.data.username,
-          email: response.data.email,
-          role: response.data.role,
-        });
+        setCurrentUser(createSessionUser(response.data));
         navigate("/home");
       } catch {
+        if (mounted) {
+          setCurrentUser(null);
+        }
         // User is not logged in yet, stay on login page.
       }
     };
@@ -48,7 +48,7 @@ const Login = () => {
     return () => {
       mounted = false;
     };
-  }, [navigate]);
+  }, [navigate, setCurrentUser]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -65,21 +65,11 @@ const Login = () => {
       });
 
       if (response.data.user) {
-        setStoredUser({
-          id: response.data.user.id,
-          username: response.data.user.username,
-          email: response.data.user.email,
-          role: response.data.user.role,
-        });
+        setCurrentUser(createSessionUser(response.data.user));
         navigate("/home");
       } else {
         const profileResponse = await api.get("/user-profile?includeSpotify=false");
-        setStoredUser({
-          id: profileResponse.data.id,
-          username: profileResponse.data.username,
-          email: profileResponse.data.email,
-          role: profileResponse.data.role,
-        });
+        setCurrentUser(createSessionUser(profileResponse.data));
         navigate("/home");
       }
     } catch (err: any) {
@@ -95,7 +85,12 @@ const Login = () => {
         <MusicWave />
       </div>
       <div className="w-full sm:w-1/2 flex items-center justify-center z-10 order-2 sm:order-1">
-        <div className="min-w-[300px] w-full max-w-[500px] min-h-[70vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10 backdrop-blur-md">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className="min-w-[300px] w-full max-w-[500px] min-h-[70vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10 backdrop-blur-md"
+        >
           <div className="absolute top-4 left-6 flex items-center gap-2">
             <img
               src="/Beatwave_logo.png"
@@ -151,7 +146,7 @@ const Login = () => {
               </Link>
             </p>
           </form>
-        </div>
+        </motion.div>
       </div>
 
       <ErrorToast error={error} />

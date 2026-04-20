@@ -1,6 +1,7 @@
 import { EllipsisVertical } from "lucide-react";
 import type { RefObject } from "react";
 import { Link } from "react-router";
+import { AnimatePresence, motion } from "framer-motion";
 import formatRelative from "../../utils/DateFormatting";
 import type { DiscussionType } from "../../utils/Type";
 
@@ -42,10 +43,14 @@ const ProfileContent = ({
           <p className="text-gray-400">You have not created any posts yet.</p>
         ) : (
           <div className="flex flex-col gap-3">
-            {userPosts.map((post) => (
-              <div
+            {userPosts.map((post, i) => (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+                whileHover={{ y: -3, scale: 1.01 }}
                 key={post.id}
-                className="rounded-2xl border border-white/10 bg-card-black p-4"
+                className="rounded-2xl border border-white/10 bg-card-black p-4 shadow-md hover:shadow-lg transition-shadow"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div>
@@ -69,31 +74,39 @@ const ProfileContent = ({
                       <EllipsisVertical size={20} />
                     </button>
 
-                    {openPostMenuId === post.id && (
-                      <div className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-card shadow-lg z-10 overflow-hidden">
-                        <Link
-                          to={`/discussion/view/${post.id}`}
-                          onClick={() => onTogglePostMenu(post.id)}
-                          className="block px-4 py-2 text-sm text-white hover:bg-white/10"
+                    <AnimatePresence>
+                      {openPostMenuId === post.id && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute right-0 mt-2 w-36 rounded-xl border border-white/10 bg-card shadow-lg z-10 overflow-hidden origin-top-right"
                         >
-                          View
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => onOpenPostEdit(post)}
-                          className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeletePost(post.id)}
-                          className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 cursor-pointer"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
+                          <Link
+                            to={`/discussion/view/${post.id}`}
+                            onClick={() => onTogglePostMenu(post.id)}
+                            className="block px-4 py-2 text-sm text-white hover:bg-white/10"
+                          >
+                            View
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => onOpenPostEdit(post)}
+                            className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeletePost(post.id)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
@@ -106,7 +119,7 @@ const ProfileContent = ({
                     {post.hashtags}
                   </p>
                 )}
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
