@@ -133,19 +133,18 @@ const Navigation = () => {
     tagHipster: searchAlbums,
   };
 
-  const canAccessAdminPanel = useMemo(() => {
-    try {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
-        return false;
-      }
+const canAccessAdminPanel = useMemo(() => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) return false;
 
-      const parsedUser = JSON.parse(storedUser);
-      return parsedUser?.role === "ADMIN" || parsedUser?.role === "MODERATOR";
-    } catch {
-      return false;
-    }
-  }, []);
+    const payload = JSON.parse(atob(token.split(".")[1]));
+
+    return payload.role === "ADMIN" || payload.role === "MODERATOR";
+  } catch {
+    return false;
+  }
+}, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
