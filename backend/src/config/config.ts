@@ -2,9 +2,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// ────────────────────────────────────────────────────────────
-// Startup validation — fail fast if critical secrets are absent
-// ────────────────────────────────────────────────────────────
 const REQUIRED_ENV_VARS = [
   "JWT_SECRET",
   "PASSWORD_PEPPER",
@@ -17,10 +14,32 @@ const REQUIRED_ENV_VARS = [
 for (const key of REQUIRED_ENV_VARS) {
   if (!process.env[key]) {
     throw new Error(
-      `[Config] Missing required environment variable: ${key}. ` +
-        "Please check your .env file before starting the server.",
+      `[Config] Missing required environment variable: ${key}. Please check your .env file.`,
     );
   }
+}
+
+const databaseUrl = process.env.DATABASE_URL!;
+let parsedDatabaseUrl: URL;
+
+try {
+  parsedDatabaseUrl = new URL(databaseUrl);
+} catch {
+  throw new Error("[Config] DATABASE_URL is not a valid URL.");
+}
+
+const databaseHost = process.env.DATABASE_HOST || parsedDatabaseUrl.hostname;
+const databaseUser =
+  process.env.DATABASE_USER || decodeURIComponent(parsedDatabaseUrl.username);
+const databasePassword =
+  process.env.DATABASE_PASSWORD || decodeURIComponent(parsedDatabaseUrl.password);
+const databaseName =
+  process.env.DATABASE_NAME || parsedDatabaseUrl.pathname.replace(/^\//, "");
+
+if (!databaseHost || !databaseUser || !databaseName) {
+  throw new Error(
+    "[Config] Database connection details are incomplete. Set DATABASE_URL or DATABASE_HOST/DATABASE_USER/DATABASE_NAME.",
+  );
 }
 
 interface Config {
@@ -44,16 +63,15 @@ interface Config {
 const config: Config = {
   port: Number(process.env.PORT) || 3000,
   nodeEnv: process.env.NODE_ENV || "development",
-  // These are guaranteed to exist by the check above
   jwtSecret: process.env.JWT_SECRET!,
   passwordPepper: process.env.PASSWORD_PEPPER!,
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS) || 12,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
-  databaseUrl: process.env.DATABASE_URL!,
-  databaseHost: process.env.DATABASE_HOST || "",
-  databaseUser: process.env.DATABASE_USER || "",
-  databaseName: process.env.DATABASE_NAME || "",
-  databasePassword: process.env.DATABASE_PASSWORD || "",
+  databaseUrl,
+  databaseHost,
+  databaseUser,
+  databaseName,
+  databasePassword,
   spotifyClientId: process.env.SPOTIFY_CLIENT_ID!,
   spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
   spotifyRedirectUri: process.env.SPOTIFY_REDIRECT_URI!,

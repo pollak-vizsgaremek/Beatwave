@@ -11,6 +11,23 @@ import {
 const VALID_USER_ROLES = ["USER", "MODERATOR", "ADMIN"] as const;
 const MAX_TIMEOUT_MINUTES = 60 * 24 * 30;
 const MAX_TIMEOUT_REASON_LENGTH = 110;
+const MAX_DELETE_REASON_LENGTH = 300;
+
+const getValidatedDeleteReason = (reason: unknown) => {
+  if (!reason || typeof reason !== "string" || !reason.trim()) {
+    return { value: null, error: "Delete reason is required" } as const;
+  }
+
+  const trimmedReason = reason.trim();
+  if (trimmedReason.length > MAX_DELETE_REASON_LENGTH) {
+    return {
+      value: null,
+      error: `Delete reason must be at most ${MAX_DELETE_REASON_LENGTH} characters`,
+    } as const;
+  }
+
+  return { value: trimmedReason, error: null } as const;
+};
 
 const getPendingReport = async (reportId: string) => {
   const report = await prisma.moderationLog.findUnique({
@@ -100,6 +117,7 @@ export const setUserTimeout = async (
     if (!req.userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+    const moderatorId = req.userId;
 
     if (id === req.userId) {
       return res
@@ -739,32 +757,99 @@ export const deletePost = async (
 ) => {
   try {
     const { id } = req.params;
+    const { reason } = req.body;
 
-    const post = await prisma.post.findUnique({
-      where: { id },
-      select: { userId: true },
-    });
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const moderatorId = req.userId;
+
+    const validatedReason = getValidatedDeleteReason(reason);
+    if (validatedReason.error || !validatedReason.value) {
+      return res.status(400).json({ error: validatedReason.error });
+    }
+
+    const [post, moderator] = await Promise.all([
+      prisma.post.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          title: true,
+          userId: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { username: true },
+      }),
+    ]);
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Moderator not found" });
+    }
 
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
 
-    await prisma.comment.deleteMany({
+    const relatedComments = await prisma.comment.findMany({
       where: { postId: id },
+      select: { id: true },
     });
+    const relatedCommentIds = relatedComments.map((comment) => comment.id);
 
-    await prisma.post.delete({
-      where: { id },
-    });
+    await prisma.$transaction(async (tx) => {
+      if (relatedCommentIds.length > 0) {
+        await tx.moderationLog.updateMany({
+          where: {
+            commentId: { in: relatedCommentIds },
+          },
+          data: { commentId: null },
+        });
 
-    await prisma.moderationLog.create({
-      data: {
-        status: "DELETED",
-        action: "DELETE_POST",
-        moderatorId: req.userId!,
-        userId: post.userId,
-        details: `Deleted post ${id}`,
-      },
+        await tx.commentLike.deleteMany({
+          where: {
+            commentId: { in: relatedCommentIds },
+          },
+        });
+      }
+
+      await tx.moderationLog.updateMany({
+        where: { postId: id },
+        data: { postId: null },
+      });
+
+      await tx.comment.deleteMany({
+        where: { postId: id },
+      });
+
+      await tx.postLike.deleteMany({
+        where: { postId: id },
+      });
+
+      await tx.post.delete({
+        where: { id },
+      });
+
+      await tx.moderationLog.create({
+        data: {
+          status: "DELETED",
+          action: "DELETE_POST",
+          moderatorId,
+          userId: post.userId,
+          details: `Deleted post ${id}. Reason: ${validatedReason.value}`,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          type: "post_deleted_by_moderator",
+          message: `Your post "${post.title}" was removed by @${moderator.username}. Reason: ${validatedReason.value}`,
+          userId: post.userId,
+          triggeredById: moderatorId,
+          link: "/discussion",
+        },
+      });
     });
 
     res.status(200).json({ message: "Post deleted" });
@@ -780,36 +865,88 @@ export const deleteComment = async (
 ) => {
   try {
     const { id } = req.params;
+    const { reason } = req.body;
 
-    const comment = await prisma.comment.findUnique({
-      where: { id },
-      select: { userId: true },
-    });
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const moderatorId = req.userId;
+
+    const validatedReason = getValidatedDeleteReason(reason);
+    if (validatedReason.error || !validatedReason.value) {
+      return res.status(400).json({ error: validatedReason.error });
+    }
+
+    const [comment, moderator] = await Promise.all([
+      prisma.comment.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          userId: true,
+          postId: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { username: true },
+      }),
+    ]);
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Moderator not found" });
+    }
 
     if (!comment) {
       return res.status(404).json({ error: "Comment not found" });
     }
 
-    await prisma.commentLike.deleteMany({
-      where: { commentId: id },
-    });
-
-    await prisma.comment.deleteMany({
+    const replies = await prisma.comment.findMany({
       where: { previousCommentId: id },
+      select: { id: true },
     });
+    const deletedCommentIds = [id, ...replies.map((reply) => reply.id)];
 
-    await prisma.comment.delete({
-      where: { id },
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.moderationLog.updateMany({
+        where: {
+          commentId: { in: deletedCommentIds },
+        },
+        data: { commentId: null },
+      });
 
-    await prisma.moderationLog.create({
-      data: {
-        status: "DELETED",
-        action: "DELETE_COMMENT",
-        moderatorId: req.userId!,
-        userId: comment.userId,
-        details: `Deleted comment ${id}`,
-      },
+      await tx.commentLike.deleteMany({
+        where: {
+          commentId: { in: deletedCommentIds },
+        },
+      });
+
+      await tx.comment.deleteMany({
+        where: { previousCommentId: id },
+      });
+
+      await tx.comment.delete({
+        where: { id },
+      });
+
+      await tx.moderationLog.create({
+        data: {
+          status: "DELETED",
+          action: "DELETE_COMMENT",
+          moderatorId,
+          userId: comment.userId,
+          details: `Deleted comment ${id}. Reason: ${validatedReason.value}`,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          type: "comment_deleted_by_moderator",
+          message: `Your comment was removed by @${moderator.username}. Reason: ${validatedReason.value}`,
+          userId: comment.userId,
+          triggeredById: moderatorId,
+          link: `/discussion/view/${comment.postId}`,
+        },
+      });
     });
 
     res.status(200).json({ message: "Comment deleted" });

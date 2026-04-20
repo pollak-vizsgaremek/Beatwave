@@ -8,11 +8,8 @@ export const searchSpotify = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     const q = (req.query.q as string) || "";
     const type = (req.query.type as string) || "";

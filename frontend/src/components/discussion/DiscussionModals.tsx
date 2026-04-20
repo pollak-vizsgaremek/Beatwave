@@ -145,6 +145,18 @@ export const ReportModal = ({
             placeholder="Write the reason for your report"
             value={reason}
             onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing
+              ) {
+                e.preventDefault();
+                if (!isSubmitting) {
+                  onSubmit();
+                }
+              }
+            }}
             rows={6}
             maxLength={maxLength}
             className="w-4/5 p-4 rounded-xl bg-card-black border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none"

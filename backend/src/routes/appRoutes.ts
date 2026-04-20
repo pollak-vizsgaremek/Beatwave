@@ -1,10 +1,15 @@
 import { Router } from "express";
 
-import { createUser, authenticateUser } from "../controllers/authController";
+import {
+  createUser,
+  authenticateUser,
+  logoutUser,
+} from "../controllers/authController";
 import {
   getPublicUserProfile,
   getUserProfile,
   updateProfilePrivacy,
+  updateSpotifyTimeRange,
   updateUserProfile,
 } from "../controllers/userProfile";
 import {
@@ -71,14 +76,24 @@ import {
 
 const router = Router();
 
+//Auth
 router.post("/register", createUser);
 router.post("/login", authenticateUser);
+router.post("/logout", logoutUser);
+
+//User Profile
 router.get("/user-profile", verifyToken, getUserProfile);
 router.put("/user-profile", verifyToken, updateUserProfile);
 router.patch("/user-profile/privacy", verifyToken, updateProfilePrivacy);
 router.get("/user-profile/posts", verifyToken, getMyPosts);
 router.get("/user-profile/:id", verifyToken, getPublicUserProfile);
+router.patch(
+  "/user-profile/spotify-time-range",
+  verifyToken,
+  updateSpotifyTimeRange,
+);
 
+//Spotify
 router.get("/auth/spotify/url", verifyToken, getSpotifyAuthUrl);
 router.get("/auth/spotify/callback", spotifyCallback);
 router.get("/auth/spotify/token", verifyToken, getSpotifyToken);
@@ -121,6 +136,7 @@ router.put("/auth/spotify/player/pause", verifyToken, pauseSpotifyTrack);
 router.post("/auth/spotify/player/next", verifyToken, skipSpotifyNext);
 router.get("/auth/spotify/search", verifyToken, searchSpotify);
 
+//Discussion
 router.get("/posts", verifyToken, getPosts);
 router.get("/post/:id", verifyToken, getPostById);
 router.post("/posts", verifyToken, createPost);
@@ -129,11 +145,13 @@ router.delete("/post/:id", verifyToken, deleteOwnPost);
 router.post("/post/:id/like", verifyToken, likePost);
 router.post("/post/:id/report", verifyToken, reportPost);
 
+//Comments
 router.get("/post/:id/comments", verifyToken, getCommentsByPostId);
 router.post("/post/:id/comments", verifyToken, createComment);
 router.post("/comment/:id/like", verifyToken, likeComment);
 router.post("/comment/:id/report", verifyToken, reportComment);
 
+//Notifications
 router.get("/notifications", verifyToken, getNotifications);
 router.patch("/notifications/read", verifyToken, markNotificationsRead);
 router.delete("/notifications/read", verifyToken, deleteNotificationsRead);

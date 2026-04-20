@@ -89,6 +89,7 @@ export interface SearchBarProps {
 export interface NotificationListProps {
   notifications: NotificationType[];
   compact?: boolean;
+  showDeleteReadAction?: boolean;
   onSelectNotification: (link?: string | null) => void;
   onDeleteRead: () => Promise<void> | void;
 }

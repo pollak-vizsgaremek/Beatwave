@@ -1,9 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 
-import { prisma } from "../lib/prisma";
 import config from "../config/config";
+import {
+  AUTH_COOKIE_NAME,
+  getTokenFromRequest,
+  hashToken,
+} from "../lib/authToken";
+import { prisma } from "../lib/prisma";
+
+const AUTH_COOKIE_MAX_AGE_MS =
+  Number(process.env.JWT_COOKIE_MAX_AGE_MS) || 7 * 24 * 60 * 60 * 1000;
 
 export const createUser = async (
   req: Request,
@@ -22,7 +30,7 @@ export const createUser = async (
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: "Érvénytelen email formátum" });
+      return res.status(400).json({ error: "Invalid email format" });
     }
 
     if (
@@ -32,7 +40,7 @@ export const createUser = async (
       !/[A-Z]/.test(password)
     ) {
       return res.status(400).json({
-        error: "A jelszó nem felel meg a biztonsági követelményeknek",
+        error: "Password does not meet security requirements",
       });
     }
 
@@ -45,18 +53,17 @@ export const createUser = async (
     if (existingUser) {
       if (existingUser.email === email && existingUser.username === username) {
         return res.status(409).json({
-          error:
-            "A felhasználó ezzel az email címmel és felhasználónévvel már létezik",
-        });
-      } else if (existingUser.email === email) {
-        return res
-          .status(409)
-          .json({ error: "A felhasználó ezzel az email címmel már létezik" });
-      } else {
-        return res.status(409).json({
-          error: "A felhasználó ezzel a felhasználónévvel már létezik",
+          error: "A user with this email and username already exists",
         });
       }
+      if (existingUser.email === email) {
+        return res
+          .status(409)
+          .json({ error: "A user with this email already exists" });
+      }
+      return res
+        .status(409)
+        .json({ error: "A user with this username already exists" });
     }
 
     const passwordHash = await bcrypt.hash(password + pepper, rounds);
@@ -70,14 +77,15 @@ export const createUser = async (
     });
 
     const { passwordHash: _, ...safeUser } = newUser;
-    res.status(201).json(safeUser);
+    return res.status(201).json(safeUser);
   } catch (error: any) {
     if (error.code === "P2002") {
       const field = error.meta?.target?.[0] || "field";
       return res
         .status(409)
-        .json({ error: `A felhasználó ezzel a ${field} már létezik` });
+        .json({ error: `A user with this ${field} already exists` });
     }
+
     next(error);
   }
 };
@@ -101,10 +109,7 @@ export const authenticateUser = async (
       },
     });
 
-    // Use a single generic error for both "no user" and "wrong password"
-    // to prevent user enumeration attacks
-    const INVALID_CREDENTIALS_ERROR =
-      "Érvénytelen email/felhasználónév vagy jelszó";
+    const INVALID_CREDENTIALS_ERROR = "Invalid email/username or password";
 
     if (!user) {
       return res.status(401).json({ error: INVALID_CREDENTIALS_ERROR });
@@ -122,10 +127,18 @@ export const authenticateUser = async (
       config.jwtSecret,
       { expiresIn: config.jwtExpiresIn as any },
     );
+    const isProduction = config.nodeEnv === "production";
 
-    res.status(200).json({
-      message: "Sikeres bejelentkezés",
-      token,
+    res.cookie(AUTH_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+      maxAge: AUTH_COOKIE_MAX_AGE_MS,
+    });
+
+    return res.status(200).json({
+      message: "Login successful",
       user: {
         id: user.id,
         email: user.email,
@@ -133,6 +146,49 @@ export const authenticateUser = async (
         username: user.username,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logoutUser = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const token = getTokenFromRequest(req);
+    const isProduction = config.nodeEnv === "production";
+
+    if (token) {
+      const decoded = jwt.decode(token) as JwtPayload | null;
+      const expSeconds =
+        typeof decoded?.exp === "number"
+          ? decoded.exp
+          : Math.floor(Date.now() / 1000) + 60 * 60;
+      const tokenHash = hashToken(token);
+
+      await prisma.revokedToken.upsert({
+        where: { tokenHash },
+        update: {
+          expiresAt: new Date(expSeconds * 1000),
+          revokedAt: new Date(),
+        },
+        create: {
+          tokenHash,
+          expiresAt: new Date(expSeconds * 1000),
+        },
+      });
+    }
+
+    res.clearCookie(AUTH_COOKIE_NAME, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    return res.status(200).json({ message: "Logout successful" });
   } catch (error) {
     next(error);
   }

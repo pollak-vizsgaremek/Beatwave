@@ -2,6 +2,7 @@ import { X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Link } from "react-router";
 
+import Button from "../Button";
 import NotificationList from "./NotificationList";
 import type { MobileMenuProps } from "./types";
 
@@ -15,6 +16,10 @@ const MobileMenu = ({
   onLogout,
   onDeleteRead,
 }: MobileMenuProps) => {
+  const hasReadNotifications = notifications.some(
+    (notification) => notification.read,
+  );
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -47,10 +52,17 @@ const MobileMenu = ({
               <h3 className="text-white font-bold text-lg mb-4">
                 Notifications
               </h3>
+              <Button
+                labelTitle="Delete Read Notifications"
+                onClick={onDeleteRead}
+                disabled={!hasReadNotifications}
+                className="mt-0! mb-3! w-full! py-3! text-sm!"
+              />
               <div className="max-h-48 overflow-y-auto no-scrollbar">
                 <NotificationList
                   notifications={notifications}
                   compact
+                  showDeleteReadAction={false}
                   onSelectNotification={(onSelectNotification) => {
                     if (onSelectNotification) {
                       onNavigate(onSelectNotification);

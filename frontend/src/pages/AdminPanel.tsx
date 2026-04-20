@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import AdminActionModal from "../components/admin/AdminActionModal";
 import AdminTabs from "../components/admin/AdminTabs";
 import CommentsManagement from "../components/admin/CommentsManagement";
@@ -19,6 +20,7 @@ import api from "../utils/api";
 import { useErrorToast } from "../utils/useErrorToast";
 
 const ITEMS_PER_PAGE = 8;
+const MAX_DELETE_REASON_LENGTH = 300;
 
 type PendingAdminAction =
   | { type: "delete-post"; postId: string }
@@ -59,6 +61,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 const AdminPanel = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AdminTabId>(getInitialTab);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [posts, setPosts] = useState<AdminPost[]>([]);
@@ -76,6 +79,7 @@ const AdminPanel = () => {
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAdminAction>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const [deleteReasonInput, setDeleteReasonInput] = useState("");
   const [timeoutMinutesInput, setTimeoutMinutesInput] = useState("60");
   const [timeoutReasonInput, setTimeoutReasonInput] = useState("");
   const [pageByTab, setPageByTab] = useState<Record<AdminTabId, number>>({
@@ -163,6 +167,7 @@ const AdminPanel = () => {
           showError("Your session permissions changed. Please log in again.");
           setTimeout(() => {
             localStorage.removeItem("token");
+            localStorage.removeItem("user");
             window.location.href = "/login";
           }, 400);
           return;
@@ -176,15 +181,18 @@ const AdminPanel = () => {
 
   const closeActionModal = () => {
     setPendingAction(null);
+    setDeleteReasonInput("");
     setTimeoutMinutesInput("60");
     setTimeoutReasonInput("");
   };
 
   const requestDeletePost = async (postId: string) => {
+    setDeleteReasonInput("");
     setPendingAction({ type: "delete-post", postId });
   };
 
   const requestDeleteComment = async (commentId: string) => {
+    setDeleteReasonInput("");
     setPendingAction({ type: "delete-comment", commentId });
   };
 
@@ -238,6 +246,14 @@ const AdminPanel = () => {
     setPendingAction({ type: "clear-timeout", user });
   };
 
+  const visitPost = (postId: string) => {
+    navigate(`/discussion/view/${postId}`);
+  };
+
+  const visitComment = (postId: string) => {
+    navigate(`/discussion/view/${postId}`);
+  };
+
   const timeoutInputInvalid = useMemo(() => {
     if (!pendingAction || pendingAction.type !== "set-timeout") {
       return false;
@@ -246,6 +262,19 @@ const AdminPanel = () => {
     const minutes = Number(timeoutMinutesInput.trim());
     return !Number.isInteger(minutes) || minutes <= 0 || !timeoutReasonInput.trim();
   }, [pendingAction, timeoutMinutesInput, timeoutReasonInput]);
+
+  const deleteReasonInvalid = useMemo(() => {
+    if (
+      !pendingAction ||
+      (pendingAction.type !== "delete-post" &&
+        pendingAction.type !== "delete-comment")
+    ) {
+      return false;
+    }
+
+    const reasonLength = deleteReasonInput.trim().length;
+    return reasonLength === 0 || reasonLength > MAX_DELETE_REASON_LENGTH;
+  }, [deleteReasonInput, pendingAction]);
 
   const paginateByTab = <T,>(items: T[], tab: AdminTabId) => {
     const page = pageByTab[tab] ?? 1;
@@ -307,7 +336,15 @@ const AdminPanel = () => {
     try {
       switch (pendingAction.type) {
         case "delete-post": {
-          await api.delete(`/admin/posts/${pendingAction.postId}`);
+          const trimmedReason = deleteReasonInput.trim();
+          if (!trimmedReason) {
+            showError("Delete reason is required.");
+            return;
+          }
+
+          await api.delete(`/admin/posts/${pendingAction.postId}`, {
+            data: { reason: trimmedReason },
+          });
           setPosts((prev) =>
             prev.filter((post) => post.id !== pendingAction.postId),
           );
@@ -315,7 +352,15 @@ const AdminPanel = () => {
         }
 
         case "delete-comment": {
-          await api.delete(`/admin/comments/${pendingAction.commentId}`);
+          const trimmedReason = deleteReasonInput.trim();
+          if (!trimmedReason) {
+            showError("Delete reason is required.");
+            return;
+          }
+
+          await api.delete(`/admin/comments/${pendingAction.commentId}`, {
+            data: { reason: trimmedReason },
+          });
           setComments((prev) =>
             prev.filter((comment) => comment.id !== pendingAction.commentId),
           );
@@ -453,14 +498,16 @@ const AdminPanel = () => {
       case "delete-post":
         return {
           title: "Delete Post",
-          description: "This post will be permanently removed.",
+          description:
+            "This post will be permanently removed. A reason is required and the user will be notified.",
           confirmLabel: "Delete post",
           danger: true,
         };
       case "delete-comment":
         return {
           title: "Delete Comment",
-          description: "This comment will be permanently removed.",
+          description:
+            "This comment will be permanently removed. A reason is required and the user will be notified.",
           confirmLabel: "Delete comment",
           danger: true,
         };
@@ -534,6 +581,7 @@ const AdminPanel = () => {
           <PostsManagement
             posts={paginateByTab(posts, "posts")}
             onDeletePost={requestDeletePost}
+            onVisitPost={visitPost}
           />
         );
       case "comments":
@@ -541,6 +589,7 @@ const AdminPanel = () => {
           <CommentsManagement
             comments={paginateByTab(comments, "comments")}
             onDeleteComment={requestDeleteComment}
+            onVisitComment={visitComment}
           />
         );
       case "reports":
@@ -631,7 +680,7 @@ const AdminPanel = () => {
         confirmLabel={actionModalContent.confirmLabel}
         danger={actionModalContent.danger}
         isSubmitting={isSubmittingAction}
-        confirmDisabled={timeoutInputInvalid}
+        confirmDisabled={timeoutInputInvalid || deleteReasonInvalid}
         onClose={closeActionModal}
         onConfirm={() => {
           void executePendingAction();
@@ -674,6 +723,28 @@ const AdminPanel = () => {
                 {timeoutReasonInput.length}/110
               </p>
             </div>
+          </div>
+        ) : pendingAction?.type === "delete-post" ||
+          pendingAction?.type === "delete-comment" ? (
+          <div>
+            <label
+              htmlFor="delete-reason"
+              className="block text-sm text-gray-300 mb-1"
+            >
+              Reason for deletion
+            </label>
+            <textarea
+              id="delete-reason"
+              value={deleteReasonInput}
+              onChange={(event) => setDeleteReasonInput(event.target.value)}
+              maxLength={MAX_DELETE_REASON_LENGTH}
+              rows={4}
+              className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white resize-none"
+              placeholder="Explain why this content is being removed."
+            />
+            <p className="text-xs text-gray-400 mt-1 text-right">
+              {deleteReasonInput.length}/{MAX_DELETE_REASON_LENGTH}
+            </p>
           </div>
         ) : null}
       </AdminActionModal>

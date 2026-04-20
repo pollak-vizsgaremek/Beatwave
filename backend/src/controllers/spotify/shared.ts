@@ -1,4 +1,4 @@
-    import NodeCache from "node-cache";
+import NodeCache from "node-cache";
 
 // TTL of 60 minutes (3600s), cleanup check every 10 mins (600s)
 export const spotifyCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });

@@ -39,6 +39,25 @@ const CommentThread = ({
   onToggleReplies,
   onReportComment,
 }: CommentThreadProps) => {
+  const handleReplyKeyDown = (
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+    commentId: string,
+  ) => {
+    if (
+      event.nativeEvent.isComposing ||
+      event.key !== "Enter" ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!isSubmittingReply) {
+      onSubmitReply(commentId);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-5">
       {comments.map((comment) => (
@@ -108,6 +127,7 @@ const CommentThread = ({
                 placeholder={`Replying to @${comment.user?.username || "Unknown"}...`}
                 value={replyText}
                 onChange={(e) => onReplyTextChange(e.target.value)}
+                onKeyDown={(event) => handleReplyKeyDown(event, comment.id)}
                 autoFocus
               />
               <div className="flex justify-end gap-3">

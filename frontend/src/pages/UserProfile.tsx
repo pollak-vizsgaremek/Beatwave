@@ -7,12 +7,34 @@ import ProfileSummaryCard from "../components/profile/ProfileSummaryCard";
 import SettingsContent from "../components/profile/SettingsContent";
 import type {
   PostFormData,
+  SpotifyTimeRange,
   UserProfileData,
 } from "../components/profile/types";
 import api from "../utils/api";
 import { normalizeHashtagInput } from "../utils/hashtags";
 import type { DiscussionType } from "../utils/Type";
 import { useErrorToast } from "../utils/useErrorToast";
+import { discussionController } from "../controllers/discussionController";
+
+const normalizeSpotifyTimeRange = (value: unknown): SpotifyTimeRange => {
+  if (value === "SHORT" || value === "MEDIUM" || value === "LONG") {
+    return value;
+  }
+
+  if (value === "4week") {
+    return "SHORT";
+  }
+
+  if (value === "6month") {
+    return "MEDIUM";
+  }
+
+  if (value === "alltime") {
+    return "LONG";
+  }
+
+  return "MEDIUM";
+};
 
 const UserProfile = () => {
   const [isOnProfile, setIsOnProfile] = useState(true);
@@ -20,9 +42,7 @@ const UserProfile = () => {
   const [soundHover, setSoundHover] = useState(false);
   const [user, setUser] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState(
-    () => localStorage.getItem("spotifyTimeRange") ?? "4week",
-  );
+  const [timeRange, setTimeRange] = useState<SpotifyTimeRange>("MEDIUM");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newUsername, setNewUsername] = useState("");
@@ -212,15 +232,21 @@ const UserProfile = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       const [profileResult, postsResult] = await Promise.allSettled([
-        api.get("/user-profile?includeSpotify=false"),
-        api.get("/user-profile/posts"),
+        api.get("/user-profile?includeSpotify=true"),
+        discussionController.getMyPosts(),
       ]);
 
       if (profileResult.status === "fulfilled") {
-        setUser(profileResult.value.data);
+        const userData = profileResult.value.data;
+        setUser(userData);
+        const selectedTimeRange = userData.spotifyTimeRange;
+        const normalizedTimeRange = normalizeSpotifyTimeRange(selectedTimeRange);
+        setTimeRange(normalizedTimeRange);
       } else {
         const profileError = profileResult.reason as any;
-        showError(profileError?.response?.data?.error || "Failed to load profile.");
+        showError(
+          profileError?.response?.data?.error || "Failed to load profile.",
+        );
       }
       setLoading(false);
 
@@ -228,7 +254,9 @@ const UserProfile = () => {
         setUserPosts(postsResult.value.data);
       } else {
         const postsError = postsResult.reason as any;
-        showError(postsError?.response?.data?.error || "Failed to load your posts.");
+        showError(
+          postsError?.response?.data?.error || "Failed to load your posts.",
+        );
       }
       setLoadingPosts(false);
     };
@@ -236,12 +264,25 @@ const UserProfile = () => {
     void fetchUserProfile();
   }, []);
 
-  const handleTimeRangeChange = (
+  const handleTimeRangeChange = async (
     event: React.ChangeEvent<HTMLSelectElement>,
   ) => {
-    const value = event.target.value;
-    setTimeRange(value);
-    localStorage.setItem("spotifyTimeRange", value);
+    const previousValue = timeRange;
+    const newValue = normalizeSpotifyTimeRange(event.target.value);
+    setTimeRange(newValue);
+    setUser((prev) => (prev ? { ...prev, spotifyTimeRange: newValue } : prev));
+
+    try {
+      await api.patch("/user-profile/spotify-time-range", {
+        timeRange: newValue,
+      });
+    } catch (err: any) {
+      setTimeRange(previousValue);
+      setUser((prev) =>
+        prev ? { ...prev, spotifyTimeRange: previousValue } : prev,
+      );
+      showError(err.response?.data?.error || "Failed to update time range.");
+    }
   };
 
   useEffect(() => {
@@ -270,7 +311,10 @@ const UserProfile = () => {
 
     setIsSavingPost(true);
     try {
-      const response = await api.put(`/post/${editingPostId}`, postForm);
+      const response = await discussionController.updatePost(
+        editingPostId,
+        postForm,
+      );
       setUserPosts((prev) =>
         prev.map((post) =>
           post.id === editingPostId ? { ...post, ...response.data } : post,
@@ -296,7 +340,7 @@ const UserProfile = () => {
     }
 
     try {
-      await api.delete(`/post/${postId}`);
+      await discussionController.deletePost(postId);
       setUserPosts((prev) => prev.filter((post) => post.id !== postId));
     } catch (err: any) {
       showError(err.response?.data?.error || "Failed to delete post.");
