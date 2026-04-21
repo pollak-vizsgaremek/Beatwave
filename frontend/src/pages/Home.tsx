@@ -41,7 +41,7 @@ const formatDuration = (durationMs: number) => {
 };
 
 const Home = () => {
-  const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
+  const [artists, setArtists] = useState<{ name: string; image: string; id?: string }[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
 
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
@@ -156,6 +156,7 @@ const Home = () => {
 
         const formattedArtists = response.data.items.map((artist: any) => ({
           name: artist.name,
+          id: artist.id,
           image:
             artist.images?.length > 0
               ? artist.images[0].url

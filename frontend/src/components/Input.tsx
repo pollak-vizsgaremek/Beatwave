@@ -108,7 +108,7 @@ const Input = ({
       </div>
       {forgotPwd && (
         <p className="text-sm hover:underline self-end mt-2 mr-2 hover:cursor-pointer">
-          Elfelejtetted a Jelszavad?
+          Forgot password?
         </p>
       )}
     </div>
