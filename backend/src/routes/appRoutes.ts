@@ -6,6 +6,7 @@ import {
   logoutUser,
 } from "../controllers/authController";
 import {
+  deleteOwnAccount,
   getPublicUserProfile,
   getUserProfile,
   updateProfilePrivacy,
@@ -30,6 +31,7 @@ import {
   pauseSpotifyTrack,
   skipSpotifyNext,
   searchSpotify,
+  getSpotifyArtist,
 } from "../controllers/spotify";
 
 import {
@@ -84,6 +86,7 @@ router.post("/logout", logoutUser);
 //User Profile
 router.get("/user-profile", verifyToken, getUserProfile);
 router.put("/user-profile", verifyToken, updateUserProfile);
+router.delete("/user-profile", verifyToken, deleteOwnAccount);
 router.patch("/user-profile/privacy", verifyToken, updateProfilePrivacy);
 router.get("/user-profile/posts", verifyToken, getMyPosts);
 router.get("/user-profile/:id", verifyToken, getPublicUserProfile);
@@ -135,6 +138,7 @@ router.put("/auth/spotify/player/play", verifyToken, playSpotifyTrack);
 router.put("/auth/spotify/player/pause", verifyToken, pauseSpotifyTrack);
 router.post("/auth/spotify/player/next", verifyToken, skipSpotifyNext);
 router.get("/auth/spotify/search", verifyToken, searchSpotify);
+router.get("/auth/spotify/artist/:id", verifyToken, getSpotifyArtist);
 
 //Discussion
 router.get("/posts", verifyToken, getPosts);

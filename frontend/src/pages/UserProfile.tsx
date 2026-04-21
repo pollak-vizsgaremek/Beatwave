@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import ErrorToast from "../components/ErrorToast";
+import DeleteAccountModal from "../components/profile/DeleteAccountModal";
 import EditPostModal from "../components/profile/EditPostModal";
 import EditProfileModal from "../components/profile/EditProfileModal";
 import ProfileContent from "../components/profile/ProfileContent";
@@ -39,6 +41,7 @@ const normalizeSpotifyTimeRange = (value: unknown): SpotifyTimeRange => {
 };
 
 const UserProfile = () => {
+  const navigate = useNavigate();
   const { setCurrentUser } = useSession();
   const [isOnProfile, setIsOnProfile] = useState(true);
   const [spotiHover, setSpotiHover] = useState(false);
@@ -55,6 +58,9 @@ const UserProfile = () => {
   const [password, setPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [secondsUntilDeleteUnlock, setSecondsUntilDeleteUnlock] = useState(5);
 
   const [userPosts, setUserPosts] = useState<DiscussionType[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
@@ -71,6 +77,7 @@ const UserProfile = () => {
   const postMenuRef = useRef<HTMLDivElement | null>(null);
 
   const { error, showError } = useErrorToast();
+  const { error: successMessage, showError: showSuccess } = useErrorToast(1800);
 
   const resetModal = () => {
     setNewUsername("");
@@ -225,6 +232,55 @@ const UserProfile = () => {
     }
   };
 
+  const closeDeleteAccountModal = () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeleteModalOpen(false);
+    setSecondsUntilDeleteUnlock(5);
+  };
+
+  const openDeleteAccountModal = () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeleteModalOpen(true);
+    setSecondsUntilDeleteUnlock(5);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    if (secondsUntilDeleteUnlock > 0) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+
+    try {
+      await api.delete("/user-profile", {
+        headers: {
+          "X-Skip-Auth-Redirect": "1",
+        },
+      });
+
+      setCurrentUser(null);
+      localStorage.removeItem("token");
+      showSuccess("Account deleted.");
+
+      window.setTimeout(() => {
+        navigate("/login", { replace: true });
+      }, 900);
+    } catch (err: any) {
+      showError(err.response?.data?.error || "Failed to delete account.");
+      setIsDeletingAccount(false);
+    }
+  };
+
   const connectedToSpotify = user?.spotifyConnected ?? false;
   const connectedToSoundCloud = user?.soundCloudConnected ?? false;
 
@@ -239,7 +295,8 @@ const UserProfile = () => {
         const userData = profileResult.value.data;
         setUser(userData);
         const selectedTimeRange = userData.spotifyTimeRange;
-        const normalizedTimeRange = normalizeSpotifyTimeRange(selectedTimeRange);
+        const normalizedTimeRange =
+          normalizeSpotifyTimeRange(selectedTimeRange);
         setTimeRange(normalizedTimeRange);
       } else {
         const profileError = profileResult.reason as any;
@@ -300,6 +357,24 @@ const UserProfile = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    if (
+      !isDeleteModalOpen ||
+      isDeletingAccount ||
+      secondsUntilDeleteUnlock <= 0
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSecondsUntilDeleteUnlock((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isDeleteModalOpen, isDeletingAccount, secondsUntilDeleteUnlock]);
 
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -376,7 +451,7 @@ const UserProfile = () => {
           </button>
         </div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
@@ -420,8 +495,10 @@ const UserProfile = () => {
                     timeRange={timeRange}
                     isPrivate={user?.isPrivate ?? false}
                     isUpdatingPrivacy={isUpdatingPrivacy}
+                    isDeletingAccount={isDeletingAccount}
                     onOpenEditModal={openEditModal}
                     onTogglePrivacy={handlePrivacyToggle}
+                    onOpenDeleteAccountModal={openDeleteAccountModal}
                     onConnectSpotify={handleConnectSpotify}
                     onDisconnectSpotify={handleDisconnectSpotify}
                     onSpotifyHoverChange={setSpotiHover}
@@ -459,9 +536,18 @@ const UserProfile = () => {
           onSubmit={handleSavePost}
           onFieldChange={handlePostFieldChange}
         />
+
+        <DeleteAccountModal
+          isOpen={isDeleteModalOpen}
+          isDeletingAccount={isDeletingAccount}
+          secondsUntilUnlock={secondsUntilDeleteUnlock}
+          onClose={closeDeleteAccountModal}
+          onDeleteAccount={handleDeleteAccount}
+        />
       </div>
 
       <ErrorToast error={error} />
+      <ErrorToast error={successMessage} variant="success" />
     </div>
   );
 };

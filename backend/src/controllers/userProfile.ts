@@ -1,7 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
 import config from "../config/config";
+import {
+  AUTH_COOKIE_NAME,
+  getTokenFromRequest,
+  hashToken,
+} from "../lib/authToken";
 import {
   getValidSpotifyToken,
   safeJsonParse,
@@ -231,7 +237,9 @@ export const updateUserProfile = async (
 
     if (username !== undefined) {
       if (typeof username !== "string" || username.trim().length === 0) {
-        return res.status(400).json({ error: "Ă‰rvĂ©nytelen felhasznĂˇlĂłnĂ©v" });
+        return res
+          .status(400)
+          .json({ error: "Ă‰rvĂ©nytelen felhasznĂˇlĂłnĂ©v" });
       }
 
       if (username.trim().length > MAX_USERNAME_LENGTH) {
@@ -306,7 +314,9 @@ export const updateUserProfile = async (
         return res.status(409).json({ error: "Ez az email cĂ­m mĂˇr foglalt" });
       }
 
-      return res.status(409).json({ error: "Ez a felhasznĂˇlĂłnĂ©v mĂˇr foglalt" });
+      return res
+        .status(409)
+        .json({ error: "Ez a felhasznĂˇlĂłnĂ©v mĂˇr foglalt" });
     }
     next(error);
   }
@@ -320,7 +330,6 @@ export const updateSpotifyTimeRange = async (
   try {
     const userId = req.userId as string;
     const timeRange = req.body.timeRange;
-
 
     if (!timeRange || !VALID_TIME_RANGES.includes(timeRange)) {
       return res.status(400).json({ error: "Ă‰rvĂ©nytelen idĹ‘tartomĂˇny" });
@@ -340,6 +349,71 @@ export const updateSpotifyTimeRange = async (
     });
 
     res.json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteOwnAccount = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId as string | undefined;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const token = getTokenFromRequest(req);
+
+    await prisma.$transaction(async (tx) => {
+      if (token) {
+        const decoded = jwt.decode(token) as JwtPayload | null;
+        const expSeconds =
+          typeof decoded?.exp === "number"
+            ? decoded.exp
+            : Math.floor(Date.now() / 1000) + 60 * 60;
+        const tokenHash = hashToken(token);
+
+        await tx.revokedToken.upsert({
+          where: { tokenHash },
+          update: {
+            expiresAt: new Date(expSeconds * 1000),
+            revokedAt: new Date(),
+          },
+          create: {
+            tokenHash,
+            expiresAt: new Date(expSeconds * 1000),
+          },
+        });
+      }
+
+      await tx.user.delete({
+        where: { id: userId },
+      });
+    });
+
+    const isProduction = config.nodeEnv === "production";
+
+    res.clearCookie(AUTH_COOKIE_NAME, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    return res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
     next(error);
   }

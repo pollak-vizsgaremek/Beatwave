@@ -10,8 +10,10 @@ interface SettingsContentProps {
   timeRange: SpotifyTimeRange;
   isPrivate: boolean;
   isUpdatingPrivacy: boolean;
+  isDeletingAccount: boolean;
   onOpenEditModal: () => void;
   onTogglePrivacy: () => void;
+  onOpenDeleteAccountModal: () => void;
   onConnectSpotify: () => void;
   onDisconnectSpotify: () => void;
   onSpotifyHoverChange: (value: boolean) => void;
@@ -27,8 +29,10 @@ const SettingsContent = ({
   timeRange,
   isPrivate,
   isUpdatingPrivacy,
+  isDeletingAccount,
   onOpenEditModal,
   onTogglePrivacy,
+  onOpenDeleteAccountModal,
   onConnectSpotify,
   onDisconnectSpotify,
   onSpotifyHoverChange,
@@ -158,6 +162,25 @@ const SettingsContent = ({
           <option value="MEDIUM">Last 6 months</option>
           <option value="LONG">All time</option>
         </select>
+      </div>
+
+      <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-red-300">Danger zone</h3>
+            <p className="mt-1 text-sm text-red-100/75">
+              Permanently delete your account and all associated Beatwave data.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenDeleteAccountModal}
+            disabled={isDeletingAccount}
+            className="self-start rounded-2xl bg-red-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
+          >
+            {isDeletingAccount ? "Deleting account..." : "Delete account"}
+          </button>
+        </div>
       </div>
     </div>
   );

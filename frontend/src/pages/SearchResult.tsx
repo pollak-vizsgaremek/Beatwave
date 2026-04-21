@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import api from "../utils/api";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
@@ -84,6 +84,7 @@ const formatDuration = (ms: number) => {
 
 const SearchResult = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [results, setResults] = useState<SearchResults>({});
   const [loading, setLoading] = useState(true);
   const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
@@ -358,14 +359,12 @@ const SearchResult = () => {
             {results.artists.items
               .filter(Boolean)
               .slice(0, getVisible("artists"))
-              .map((artist, i) => (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3, delay: i * 0.05 }}
-                  whileHover={{ scale: 1.05 }}
+              .map((artist) => (
+                <button
                   key={artist.id}
-                  className="flex flex-col items-center gap-3 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer shadow-sm hover:shadow-md"
+                  type="button"
+                  onClick={() => navigate(`/artist/${artist.id}`)}
+                  className="flex w-full cursor-pointer flex-col items-center gap-3 rounded-xl bg-card p-4 text-left transition-colors hover:bg-accent-dark"
                 >
                   <img
                     src={
@@ -383,7 +382,7 @@ const SearchResult = () => {
                       {artist.genres.slice(0, 2).join(", ")}
                     </p>
                   )}
-                </motion.div>
+                </button>
               ))}
           </div>
           {hasMore["artists"] && (
