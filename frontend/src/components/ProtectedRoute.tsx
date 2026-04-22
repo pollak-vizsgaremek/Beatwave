@@ -1,28 +1,57 @@
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router";
 
 import Navigation from "./Navigation";
-import { isTokenExpired } from "../utils/auth";
+import api from "../utils/api";
+import { createSessionUser, useSession } from "../context/SessionContext";
 
 const ProtectedRoute = () => {
-  const token = localStorage.getItem("token");
+  const { setCurrentUser } = useSession();
+  const [authState, setAuthState] = useState<"checking" | "allowed" | "blocked">(
+    "checking",
+  );
 
-  // Check if token exists AND is valid (not expired)
-  if (!token || isTokenExpired(token)) {
-    // Clear any invalid/expired data
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  useEffect(() => {
+    let mounted = true;
 
-    // Redirect to login
+    const verifySession = async () => {
+      try {
+        const response = await api.get("/user-profile?includeSpotify=false");
+        if (!mounted) {
+          return;
+        }
+
+        setCurrentUser(createSessionUser(response.data));
+        setAuthState("allowed");
+      } catch {
+        if (!mounted) {
+          return;
+        }
+
+        setCurrentUser(null);
+        setAuthState("blocked");
+      }
+    };
+
+    void verifySession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [setCurrentUser]);
+
+  if (authState === "checking") {
+    return null;
+  }
+
+  if (authState === "blocked") {
     window.location.href = "/login";
     return null;
   }
 
   return (
     <div>
-      <div>
-        <Navigation />
-      </div>
-
+      <Navigation />
       <Outlet />
     </div>
   );

@@ -15,6 +15,22 @@ const CommentComposer = ({
   onChange,
   onSubmit,
 }: CommentComposerProps) => {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      event.nativeEvent.isComposing ||
+      event.key !== "Enter" ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!isSubmitting) {
+      onSubmit();
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 mb-10 bg-card-black p-5 rounded-2xl">
       <textarea
@@ -24,6 +40,7 @@ const CommentComposer = ({
         placeholder="What are your thoughts?"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={handleKeyDown}
       />
       <div className="flex items-center justify-between gap-4">
         <p className="text-sm text-gray-400">

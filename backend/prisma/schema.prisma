@@ -21,23 +21,31 @@ enum Role {
   ADMIN
 }
 
+enum SpotifyTimeRange {
+  SHORT
+  MEDIUM
+  LONG
+}
+
 model User {
-  id           String   @id @default(uuid()) // user_id
-  email        String   @unique
-  username     String   @unique
-  passwordHash String
-  description  String?  @db.Text
-  isPrivate    Boolean  @default(false)
-  isBlocked    Boolean  @default(false)
-  role         Role     @default(USER)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(uuid()) // user_id
+  email             String   @unique
+  username          String   @unique
+  passwordHash      String
+  description       String?  @db.Text
+  isPrivate         Boolean  @default(false)
+  isBlocked         Boolean  @default(false)
+  role              Role     @default(USER)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  spotifyTimeRange  SpotifyTimeRange @default(SHORT) 
 
   // Relációk
   connectedApps          ConnectedApp[]
   posts                  Post[]
   comments               Comment[]
   commentLikes           CommentLike[]
+  postLikes              PostLike[]
   notifications          Notification[] @relation("UserNotifications")
   triggeredNotifications Notification[] @relation("TriggeredNotifications")
   moderationLogs         ModerationLog[] @relation("UserLogs")
@@ -51,7 +59,7 @@ model ConnectedApp {
   refreshToken String?  @db.Text
   expiresAt    DateTime?
   connectedAt DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
 
   @@unique([userId, platform])
@@ -66,11 +74,12 @@ model Post {
   title      String   
   topic      String   
 
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   comments Comment[]
   moderationLogs ModerationLog[]
+  likes PostLike[]
 }
 
 model Comment {
@@ -79,17 +88,17 @@ model Comment {
   likeAmount  Int      @default(0)
   commentedAt DateTime @default(now())
 
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
-  post   Post @relation(fields: [postId], references: [id])
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId String
 
   // Likes tracking
   likes   CommentLike[]
 
   // önreferenciális kapcsolat (reply / previous comment)
-  previousComment   Comment?  @relation("PreviousComment", fields: [previousCommentId], references: [id])
+  previousComment   Comment?  @relation("PreviousComment", fields: [previousCommentId], references: [id] , onDelete: Cascade)
   previousCommentId String?
   replies           Comment[] @relation("PreviousComment")
   moderationLogs    ModerationLog[]
@@ -104,11 +113,11 @@ model Notification {
   createdAt DateTime @default(now())
 
   // Akihez tartozik a notification
-  user   User @relation("UserNotifications", fields: [userId], references: [id])
+  user   User @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   // Opcionális: melyik user váltotta ki (triggered_by)
-  triggeredBy   User? @relation("TriggeredNotifications", fields: [triggeredById], references: [id])
+  triggeredBy   User? @relation("TriggeredNotifications", fields: [triggeredById], references: [id], onDelete: SetNull)
   triggeredById String?
 }
 
@@ -129,27 +138,44 @@ model ModerationLog {
   createdAt DateTime          @default(now())
 
   // The admin/moderator who performed the action
-  moderator   User   @relation("ModeratorLogs", fields: [moderatorId], references: [id])
+  moderator   User   @relation("ModeratorLogs", fields: [moderatorId], references: [id], onDelete: Cascade)
   moderatorId String
 
   // The user who created the content
-  user   User   @relation("UserLogs", fields: [userId], references: [id])
+  user   User   @relation("UserLogs", fields: [userId], references: [id], onDelete: Cascade)
   userId String
 
   // The content that was moderated (optional relations)
-  post   Post?   @relation(fields: [postId], references: [id])
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: SetNull)
   postId String?
 
-  comment   Comment? @relation(fields: [commentId], references: [id])
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
   commentId String?
 }
 
 model CommentLike {
   id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  comment   Comment  @relation(fields: [commentId], references: [id])
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
   commentId String
 
   @@unique([userId, commentId])
+}
+
+model PostLike {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+
+  @@unique([userId, postId])
+}
+
+model RevokedToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime @default(now())
 }

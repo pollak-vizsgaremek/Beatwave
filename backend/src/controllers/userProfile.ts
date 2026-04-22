@@ -1,13 +1,20 @@
 import { Request, Response, NextFunction } from "express";
 import bcrypt from "bcrypt";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { prisma } from "../lib/prisma";
 import config from "../config/config";
+import {
+  AUTH_COOKIE_NAME,
+  getTokenFromRequest,
+  hashToken,
+} from "../lib/authToken";
 import {
   getValidSpotifyToken,
   safeJsonParse,
   spotifyFetch,
 } from "../lib/spotifyUtils";
 
+const VALID_TIME_RANGES = ["SHORT", "MEDIUM", "LONG"] as const;
 const MAX_USERNAME_LENGTH = 50;
 const MAX_DESCRIPTION_LENGTH = 300;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -81,6 +88,7 @@ export const getUserProfile = async (
         description: true,
         isPrivate: true,
         role: true,
+        spotifyTimeRange: true,
         connectedApps: {
           select: {
             platform: true,
@@ -90,15 +98,16 @@ export const getUserProfile = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "Felhasználó nem található" });
+      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
     }
 
     const spotifyConnected = user.connectedApps.some(
       (app) => app.platform === "Spotify",
     );
-    const spotifyProfileImage = includeSpotify && spotifyConnected
-      ? await getSpotifyProfileImage(user.id)
-      : null;
+    const spotifyProfileImage =
+      includeSpotify && spotifyConnected
+        ? await getSpotifyProfileImage(user.id)
+        : null;
 
     const userData = {
       id: user.id,
@@ -107,6 +116,7 @@ export const getUserProfile = async (
       description: user.description,
       isPrivate: user.isPrivate,
       role: user.role,
+      spotifyTimeRange: user.spotifyTimeRange,
       spotifyConnected,
       spotifyProfileImage,
       soundCloudConnected: user.connectedApps.some(
@@ -155,7 +165,7 @@ export const getPublicUserProfile = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "Felhasználó nem található" });
+      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
     }
 
     const spotifyProfileImage = includeSpotify
@@ -222,39 +232,41 @@ export const updateUserProfile = async (
     const { username, email, description, password } = req.body;
 
     if (!password) {
-      return res.status(400).json({ error: "Hiányzó adatok" });
+      return res.status(400).json({ error: "HiĂˇnyzĂł adatok" });
     }
 
     if (username !== undefined) {
       if (typeof username !== "string" || username.trim().length === 0) {
-        return res.status(400).json({ error: "Érvénytelen felhasználónév" });
+        return res
+          .status(400)
+          .json({ error: "Ă‰rvĂ©nytelen felhasznĂˇlĂłnĂ©v" });
       }
 
       if (username.trim().length > MAX_USERNAME_LENGTH) {
         return res.status(400).json({
-          error: `A felhasználónév legfeljebb ${MAX_USERNAME_LENGTH} karakter lehet`,
+          error: `A felhasznĂˇlĂłnĂ©v legfeljebb ${MAX_USERNAME_LENGTH} karakter lehet`,
         });
       }
     }
 
     if (email !== undefined) {
       if (typeof email !== "string" || email.trim().length === 0) {
-        return res.status(400).json({ error: "Érvénytelen email cím" });
+        return res.status(400).json({ error: "Ă‰rvĂ©nytelen email cĂ­m" });
       }
 
       if (!EMAIL_REGEX.test(email.trim())) {
-        return res.status(400).json({ error: "Érvénytelen email formátum" });
+        return res.status(400).json({ error: "Ă‰rvĂ©nytelen email formĂˇtum" });
       }
     }
 
     if (description !== undefined) {
       if (typeof description !== "string") {
-        return res.status(400).json({ error: "Érvénytelen leírás" });
+        return res.status(400).json({ error: "Ă‰rvĂ©nytelen leĂ­rĂˇs" });
       }
 
       if (description.trim().length > MAX_DESCRIPTION_LENGTH) {
         return res.status(400).json({
-          error: `A leírás legfeljebb ${MAX_DESCRIPTION_LENGTH} karakter lehet`,
+          error: `A leĂ­rĂˇs legfeljebb ${MAX_DESCRIPTION_LENGTH} karakter lehet`,
         });
       }
     }
@@ -264,14 +276,14 @@ export const updateUserProfile = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "Felhasználó nem található" });
+      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
     }
 
     const pepper = config.passwordPepper;
     const isValid = await bcrypt.compare(password + pepper, user.passwordHash);
 
     if (!isValid) {
-      return res.status(401).json({ error: "Hibás jelszó" });
+      return res.status(401).json({ error: "HibĂˇs jelszĂł" });
     }
 
     const updatedUser = await prisma.user.update({
@@ -283,7 +295,7 @@ export const updateUserProfile = async (
           ? { description: description.trim() || null }
           : {}),
       },
-      // Only return safe fields — never expose passwordHash, role, etc. in the response
+      // Only return safe fields â€” never expose passwordHash, role, etc. in the response
       select: {
         id: true,
         username: true,
@@ -299,11 +311,110 @@ export const updateUserProfile = async (
       const target = String(error.meta?.target?.[0] ?? "");
 
       if (target.includes("email")) {
-        return res.status(409).json({ error: "Ez az email cím már foglalt" });
+        return res.status(409).json({ error: "Ez az email cĂ­m mĂˇr foglalt" });
       }
 
-      return res.status(409).json({ error: "Ez a felhasználónév már foglalt" });
+      return res
+        .status(409)
+        .json({ error: "Ez a felhasznĂˇlĂłnĂ©v mĂˇr foglalt" });
     }
+    next(error);
+  }
+};
+
+export const updateSpotifyTimeRange = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId as string;
+    const timeRange = req.body.timeRange;
+
+    if (!timeRange || !VALID_TIME_RANGES.includes(timeRange)) {
+      return res.status(400).json({ error: "Ă‰rvĂ©nytelen idĹ‘tartomĂˇny" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { spotifyTimeRange: timeRange },
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteOwnAccount = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId as string | undefined;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const token = getTokenFromRequest(req);
+
+    await prisma.$transaction(async (tx) => {
+      if (token) {
+        const decoded = jwt.decode(token) as JwtPayload | null;
+        const expSeconds =
+          typeof decoded?.exp === "number"
+            ? decoded.exp
+            : Math.floor(Date.now() / 1000) + 60 * 60;
+        const tokenHash = hashToken(token);
+
+        await tx.revokedToken.upsert({
+          where: { tokenHash },
+          update: {
+            expiresAt: new Date(expSeconds * 1000),
+            revokedAt: new Date(),
+          },
+          create: {
+            tokenHash,
+            expiresAt: new Date(expSeconds * 1000),
+          },
+        });
+      }
+
+      await tx.user.delete({
+        where: { id: userId },
+      });
+    });
+
+    const isProduction = config.nodeEnv === "production";
+
+    res.clearCookie(AUTH_COOKIE_NAME, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+    });
+
+    return res.status(200).json({ message: "Account deleted successfully" });
+  } catch (error) {
     next(error);
   }
 };

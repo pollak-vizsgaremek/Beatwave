@@ -17,10 +17,6 @@ type PlaylistItem = {
   tracks?: { total?: number };
 };
 
-type DuplicatePlaylistInfo = {
-  playlistId: string;
-  trackOccurrences: number;
-};
 
 type TrackPlaylistPickerProps = {
   trackUri: string;
@@ -109,23 +105,19 @@ const TrackPlaylistPicker = ({
 
     try {
       setSaving(true);
-      let response;
-      try {
-        response = await spotifyPlaylistController.addTrackToPlaylists(
-          selectedPlaylistIds,
-          trackUri,
-        );
-      } catch (err: any) {
-        const duplicatePlaylists = Array.isArray(
-          err.response?.data?.duplicatePlaylists,
-        )
-          ? (err.response.data.duplicatePlaylists as DuplicatePlaylistInfo[])
-          : [];
+      
+      const checkResponse = await spotifyPlaylistController.checkTrackInPlaylists(
+        selectedPlaylistIds,
+        trackUri
+      );
 
-        if (err.response?.status !== 409 || duplicatePlaylists.length === 0) {
-          throw err;
-        }
+      const duplicateChecks = (checkResponse.data?.checks || []) as {
+        playlistId: string;
+        containsTrack: boolean;
+      }[];
 
+      const duplicatePlaylists = duplicateChecks.filter((c) => c.containsTrack);
+      if (duplicatePlaylists.length > 0) {
         const duplicateNameMap = new Map(
           playlists.map((playlist) => [playlist.id, playlist.name]),
         );
@@ -133,22 +125,21 @@ const TrackPlaylistPicker = ({
           .map((item) => duplicateNameMap.get(item.playlistId) || "a playlist")
           .filter(Boolean);
 
-        const shouldContinue = window.confirm(
+        onError(
           duplicateNames.length === 1
-            ? `"${trackName}" is already in ${duplicateNames[0]}. Add it again anyway?`
-            : `"${trackName}" is already in ${duplicateNames.length} selected playlists. Add it again anyway?`,
+            ? `"${trackName}" is already in ${duplicateNames[0]}.`
+            : `"${trackName}" is already in ${duplicateNames.length} selected playlists.`
         );
 
-        if (!shouldContinue) {
-          return;
-        }
-
-        response = await spotifyPlaylistController.addTrackToPlaylists(
-          selectedPlaylistIds,
-          trackUri,
-          duplicatePlaylists.map((item) => item.playlistId),
-        );
+        setSaving(false);
+        return;
       }
+
+      const response = await spotifyPlaylistController.addTrackToPlaylists(
+        selectedPlaylistIds,
+        trackUri,
+        undefined,
+      );
 
       setPlaylists((prev) =>
         prev.map((playlist) =>
@@ -264,8 +255,13 @@ const TrackPlaylistPicker = ({
                 >
                   <button
                     type="button"
-                    onClick={() => togglePlaylist(playlist.id)}
-                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+                    onClick={() => {
+                      if (!alreadyAdded) {
+                        togglePlaylist(playlist.id);
+                      }
+                    }}
+                    disabled={alreadyAdded}
+                    className={`flex min-w-0 flex-1 items-center gap-3 text-left ${alreadyAdded ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                   >
                     <img
                       src={playlistImage || "https://placehold.co/56x56"}

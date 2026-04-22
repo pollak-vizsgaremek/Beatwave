@@ -1,5 +1,6 @@
 import type { MouseEvent, RefObject } from "react";
 import { EllipsisVertical, Heart } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 import formatRelative from "../../utils/DateFormatting";
 import type { DiscussionType } from "../../utils/Type";
@@ -9,6 +10,7 @@ interface DiscussionPostCardProps {
   currentUserId: string | null;
   showAllText: boolean;
   isPostMenuOpen: boolean;
+  isDeletingPost: boolean;
   isLikingPost: boolean;
   isReportingContent: boolean;
   postMenuRef: RefObject<HTMLDivElement | null>;
@@ -26,6 +28,7 @@ const DiscussionPostCard = ({
   currentUserId,
   showAllText,
   isPostMenuOpen,
+  isDeletingPost,
   isLikingPost,
   isReportingContent,
   postMenuRef,
@@ -70,37 +73,46 @@ const DiscussionPostCard = ({
               <EllipsisVertical size={20} />
             </button>
 
-            {isPostMenuOpen && (
-              <div className="absolute right-0 mt-2 w-40 rounded-xl border border-white/10 bg-card shadow-lg z-20 overflow-hidden">
-                {isOwner ? (
-                  <>
+            <AnimatePresence>
+              {isPostMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-40 rounded-xl border border-white/10 bg-card shadow-lg z-20 overflow-hidden origin-top-right"
+                >
+                  {isOwner ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={onEdit}
+                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
+                      >
+                        Edit post
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onDelete}
+                        disabled={isDeletingPost}
+                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 cursor-pointer"
+                      >
+                        {isDeletingPost ? "Deleting..." : "Delete post"}
+                      </button>
+                    </>
+                  ) : (
                     <button
                       type="button"
-                      onClick={onEdit}
-                      className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
+                      onClick={onReport}
+                      disabled={isReportingContent}
+                      className="w-full text-left px-4 py-2 text-sm text-yellow-300 hover:bg-white/10 cursor-pointer disabled:opacity-50"
                     >
-                      Edit post
+                      {isReportingContent ? "Reporting..." : "Report post"}
                     </button>
-                    <button
-                      type="button"
-                      onClick={onDelete}
-                      className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 cursor-pointer"
-                    >
-                      Delete post
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onReport}
-                    disabled={isReportingContent}
-                    className="w-full text-left px-4 py-2 text-sm text-yellow-300 hover:bg-white/10 cursor-pointer disabled:opacity-50"
-                  >
-                    {isReportingContent ? "Reporting..." : "Report post"}
-                  </button>
-                )}
-              </div>
-            )}
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

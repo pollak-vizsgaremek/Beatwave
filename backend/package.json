@@ -4,8 +4,10 @@
   "description": "",
   "main": "src/server.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --exec tsx ./src/server.ts"
+    "dev": "nodemon --exec tsx ./src/server.ts",
+    "test": "vitest run --pool=threads",
+    "test:watch": "vitest --pool=threads",
+    "test:api": "vitest run --pool=threads tests/api.non-spotify.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -15,14 +17,17 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.10.1",
+    "@types/supertest": "^7.2.0",
     "nodemon": "^3.1.11",
-    "prisma": "^7.4.2",
+    "prisma": "^7.7.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4"
   },
   "dependencies": {
-    "@prisma/adapter-mariadb": "^7.3.0",
-    "@prisma/client": "^7.4.2",
+    "@prisma/adapter-mariadb": "^7.7.0",
+    "@prisma/client": "^7.7.0",
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node-cache": "^4.1.3",

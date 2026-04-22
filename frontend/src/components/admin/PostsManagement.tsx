@@ -1,12 +1,17 @@
-import { Trash2 } from "lucide-react";
+import { ArrowUpRight, Trash2 } from "lucide-react";
 import type { AdminPost } from "./types";
 
 interface PostsManagementProps {
   posts: AdminPost[];
   onDeletePost: (id: string) => void;
+  onVisitPost: (id: string) => void;
 }
 
-const PostsManagement = ({ posts, onDeletePost }: PostsManagementProps) => {
+const PostsManagement = ({
+  posts,
+  onDeletePost,
+  onVisitPost,
+}: PostsManagementProps) => {
   if (posts.length === 0) {
     return <div className="text-center py-8 text-gray-300">No posts found.</div>;
   }
@@ -25,13 +30,22 @@ const PostsManagement = ({ posts, onDeletePost }: PostsManagementProps) => {
               By {post.user.username} • {new Date(post.postedAt).toLocaleDateString()}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => onDeletePost(post.id)}
-            className="bg-red-600 hover:bg-red-700 p-2 rounded text-white self-start shrink-0"
-          >
-            <Trash2 size={16} />
-          </button>
+          <div className="flex flex-col gap-2 self-start shrink-0">
+            <button
+              type="button"
+              onClick={() => onVisitPost(post.id)}
+              className="inline-flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-white text-xs font-medium"
+            >
+              Visit <ArrowUpRight size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDeletePost(post.id)}
+              className="bg-red-600 hover:bg-red-700 p-2 rounded text-white"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
       ))}
     </div>

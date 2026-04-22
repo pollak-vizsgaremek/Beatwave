@@ -1,28 +1,54 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { motion, AnimatePresence } from "framer-motion";
 import ErrorToast from "../components/ErrorToast";
+import DeleteAccountModal from "../components/profile/DeleteAccountModal";
 import EditPostModal from "../components/profile/EditPostModal";
 import EditProfileModal from "../components/profile/EditProfileModal";
 import ProfileContent from "../components/profile/ProfileContent";
 import ProfileSummaryCard from "../components/profile/ProfileSummaryCard";
 import SettingsContent from "../components/profile/SettingsContent";
+import { useSession } from "../context/SessionContext";
 import type {
   PostFormData,
+  SpotifyTimeRange,
   UserProfileData,
 } from "../components/profile/types";
 import api from "../utils/api";
 import { normalizeHashtagInput } from "../utils/hashtags";
 import type { DiscussionType } from "../utils/Type";
 import { useErrorToast } from "../utils/useErrorToast";
+import { discussionController } from "../controllers/discussionController";
+
+const normalizeSpotifyTimeRange = (value: unknown): SpotifyTimeRange => {
+  if (value === "SHORT" || value === "MEDIUM" || value === "LONG") {
+    return value;
+  }
+
+  if (value === "4week") {
+    return "SHORT";
+  }
+
+  if (value === "6month") {
+    return "MEDIUM";
+  }
+
+  if (value === "alltime") {
+    return "LONG";
+  }
+
+  return "MEDIUM";
+};
 
 const UserProfile = () => {
+  const navigate = useNavigate();
+  const { setCurrentUser } = useSession();
   const [isOnProfile, setIsOnProfile] = useState(true);
   const [spotiHover, setSpotiHover] = useState(false);
   const [soundHover, setSoundHover] = useState(false);
   const [user, setUser] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState(
-    () => localStorage.getItem("spotifyTimeRange") ?? "4week",
-  );
+  const [timeRange, setTimeRange] = useState<SpotifyTimeRange>("MEDIUM");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newUsername, setNewUsername] = useState("");
@@ -32,6 +58,9 @@ const UserProfile = () => {
   const [password, setPassword] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [secondsUntilDeleteUnlock, setSecondsUntilDeleteUnlock] = useState(5);
 
   const [userPosts, setUserPosts] = useState<DiscussionType[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
@@ -48,6 +77,7 @@ const UserProfile = () => {
   const postMenuRef = useRef<HTMLDivElement | null>(null);
 
   const { error, showError } = useErrorToast();
+  const { error: successMessage, showError: showSuccess } = useErrorToast(1800);
 
   const resetModal = () => {
     setNewUsername("");
@@ -125,19 +155,15 @@ const UserProfile = () => {
             }
           : null,
       );
-
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...parsedUser,
-            username: response.data.username,
-            email: response.data.email,
-          }),
-        );
-      }
+      setCurrentUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              username: response.data.username,
+              email: response.data.email,
+            }
+          : prev,
+      );
 
       closeEditModal();
     } catch (err: any) {
@@ -206,21 +232,77 @@ const UserProfile = () => {
     }
   };
 
+  const closeDeleteAccountModal = () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeleteModalOpen(false);
+    setSecondsUntilDeleteUnlock(5);
+  };
+
+  const openDeleteAccountModal = () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    setIsDeleteModalOpen(true);
+    setSecondsUntilDeleteUnlock(5);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (isDeletingAccount) {
+      return;
+    }
+
+    if (secondsUntilDeleteUnlock > 0) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+
+    try {
+      await api.delete("/user-profile", {
+        headers: {
+          "X-Skip-Auth-Redirect": "1",
+        },
+      });
+
+      setCurrentUser(null);
+      localStorage.removeItem("token");
+      showSuccess("Account deleted.");
+
+      window.setTimeout(() => {
+        navigate("/login", { replace: true });
+      }, 900);
+    } catch (err: any) {
+      showError(err.response?.data?.error || "Failed to delete account.");
+      setIsDeletingAccount(false);
+    }
+  };
+
   const connectedToSpotify = user?.spotifyConnected ?? false;
   const connectedToSoundCloud = user?.soundCloudConnected ?? false;
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       const [profileResult, postsResult] = await Promise.allSettled([
-        api.get("/user-profile?includeSpotify=false"),
-        api.get("/user-profile/posts"),
+        api.get("/user-profile?includeSpotify=true"),
+        discussionController.getMyPosts(),
       ]);
 
       if (profileResult.status === "fulfilled") {
-        setUser(profileResult.value.data);
+        const userData = profileResult.value.data;
+        setUser(userData);
+        const selectedTimeRange = userData.spotifyTimeRange;
+        const normalizedTimeRange =
+          normalizeSpotifyTimeRange(selectedTimeRange);
+        setTimeRange(normalizedTimeRange);
       } else {
         const profileError = profileResult.reason as any;
-        showError(profileError?.response?.data?.error || "Failed to load profile.");
+        showError(
+          profileError?.response?.data?.error || "Failed to load profile.",
+        );
       }
       setLoading(false);
 
@@ -228,7 +310,9 @@ const UserProfile = () => {
         setUserPosts(postsResult.value.data);
       } else {
         const postsError = postsResult.reason as any;
-        showError(postsError?.response?.data?.error || "Failed to load your posts.");
+        showError(
+          postsError?.response?.data?.error || "Failed to load your posts.",
+        );
       }
       setLoadingPosts(false);
     };
@@ -236,12 +320,25 @@ const UserProfile = () => {
     void fetchUserProfile();
   }, []);
 
-  const handleTimeRangeChange = (
+  const handleTimeRangeChange = async (
     event: React.ChangeEvent<HTMLSelectElement>,
   ) => {
-    const value = event.target.value;
-    setTimeRange(value);
-    localStorage.setItem("spotifyTimeRange", value);
+    const previousValue = timeRange;
+    const newValue = normalizeSpotifyTimeRange(event.target.value);
+    setTimeRange(newValue);
+    setUser((prev) => (prev ? { ...prev, spotifyTimeRange: newValue } : prev));
+
+    try {
+      await api.patch("/user-profile/spotify-time-range", {
+        timeRange: newValue,
+      });
+    } catch (err: any) {
+      setTimeRange(previousValue);
+      setUser((prev) =>
+        prev ? { ...prev, spotifyTimeRange: previousValue } : prev,
+      );
+      showError(err.response?.data?.error || "Failed to update time range.");
+    }
   };
 
   useEffect(() => {
@@ -261,6 +358,24 @@ const UserProfile = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (
+      !isDeleteModalOpen ||
+      isDeletingAccount ||
+      secondsUntilDeleteUnlock <= 0
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSecondsUntilDeleteUnlock((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isDeleteModalOpen, isDeletingAccount, secondsUntilDeleteUnlock]);
+
   const handleSavePost = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -270,7 +385,10 @@ const UserProfile = () => {
 
     setIsSavingPost(true);
     try {
-      const response = await api.put(`/post/${editingPostId}`, postForm);
+      const response = await discussionController.updatePost(
+        editingPostId,
+        postForm,
+      );
       setUserPosts((prev) =>
         prev.map((post) =>
           post.id === editingPostId ? { ...post, ...response.data } : post,
@@ -296,7 +414,7 @@ const UserProfile = () => {
     }
 
     try {
-      await api.delete(`/post/${postId}`);
+      await discussionController.deletePost(postId);
       setUserPosts((prev) => prev.filter((post) => post.id !== postId));
     } catch (err: any) {
       showError(err.response?.data?.error || "Failed to delete post.");
@@ -333,40 +451,65 @@ const UserProfile = () => {
           </button>
         </div>
 
-        <div className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl shadow-lg border border-white/5"
+        >
           <ProfileSummaryCard user={user} />
 
-          <div className="flex-1 p-2">
-            {isOnProfile ? (
-              <ProfileContent
-                loadingPosts={loadingPosts}
-                userPosts={userPosts}
-                openPostMenuId={openPostMenuId}
-                postMenuRef={postMenuRef}
-                onTogglePostMenu={handleTogglePostMenu}
-                onOpenPostEdit={openPostEditModal}
-                onDeletePost={handleDeletePost}
-              />
-            ) : (
-              <SettingsContent
-                connectedToSpotify={connectedToSpotify}
-                connectedToSoundCloud={connectedToSoundCloud}
-                spotiHover={spotiHover}
-                soundHover={soundHover}
-                timeRange={timeRange}
-                isPrivate={user?.isPrivate ?? false}
-                isUpdatingPrivacy={isUpdatingPrivacy}
-                onOpenEditModal={openEditModal}
-                onTogglePrivacy={handlePrivacyToggle}
-                onConnectSpotify={handleConnectSpotify}
-                onDisconnectSpotify={handleDisconnectSpotify}
-                onSpotifyHoverChange={setSpotiHover}
-                onSoundHoverChange={setSoundHover}
-                onTimeRangeChange={handleTimeRangeChange}
-              />
-            )}
+          <div className="flex-1 p-2 overflow-hidden relative">
+            <AnimatePresence mode="wait">
+              {isOnProfile ? (
+                <motion.div
+                  key="profile"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ProfileContent
+                    loadingPosts={loadingPosts}
+                    userPosts={userPosts}
+                    openPostMenuId={openPostMenuId}
+                    postMenuRef={postMenuRef}
+                    onTogglePostMenu={handleTogglePostMenu}
+                    onOpenPostEdit={openPostEditModal}
+                    onDeletePost={handleDeletePost}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="settings"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <SettingsContent
+                    connectedToSpotify={connectedToSpotify}
+                    connectedToSoundCloud={connectedToSoundCloud}
+                    spotiHover={spotiHover}
+                    soundHover={soundHover}
+                    timeRange={timeRange}
+                    isPrivate={user?.isPrivate ?? false}
+                    isUpdatingPrivacy={isUpdatingPrivacy}
+                    isDeletingAccount={isDeletingAccount}
+                    onOpenEditModal={openEditModal}
+                    onTogglePrivacy={handlePrivacyToggle}
+                    onOpenDeleteAccountModal={openDeleteAccountModal}
+                    onConnectSpotify={handleConnectSpotify}
+                    onDisconnectSpotify={handleDisconnectSpotify}
+                    onSpotifyHoverChange={setSpotiHover}
+                    onSoundHoverChange={setSoundHover}
+                    onTimeRangeChange={handleTimeRangeChange}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
 
         <EditProfileModal
           isOpen={isModalOpen}
@@ -393,9 +536,18 @@ const UserProfile = () => {
           onSubmit={handleSavePost}
           onFieldChange={handlePostFieldChange}
         />
+
+        <DeleteAccountModal
+          isOpen={isDeleteModalOpen}
+          isDeletingAccount={isDeletingAccount}
+          secondsUntilUnlock={secondsUntilDeleteUnlock}
+          onClose={closeDeleteAccountModal}
+          onDeleteAccount={handleDeleteAccount}
+        />
       </div>
 
       <ErrorToast error={error} />
+      <ErrorToast error={successMessage} variant="success" />
     </div>
   );
 };

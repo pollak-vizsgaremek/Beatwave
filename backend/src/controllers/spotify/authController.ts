@@ -10,13 +10,8 @@ export const getSpotifyAuthUrl = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    // Generate a signed state containing the userId to prevent CSRF and identify the user
     const state = jwt.sign({ userId }, config.jwtSecret, { expiresIn: "10m" });
 
     const scope =
@@ -28,7 +23,7 @@ export const getSpotifyAuthUrl = async (
       scope: scope,
       redirect_uri: config.spotifyRedirectUri,
       state: state,
-      show_dialog: "true", // Forces Spotify to prompt for permissions
+      show_dialog: "true",
     });
 
     res.json({ url: `${SPOTIFY_AUTH_URL}?${params.toString()}` });
@@ -56,7 +51,6 @@ export const spotifyCallback = async (
   }
 
   try {
-    // Verify the state to get the userId
     const decoded = jwt.verify(state, config.jwtSecret) as { userId: string };
     const userId = decoded.userId;
 
@@ -94,13 +88,11 @@ export const spotifyCallback = async (
 
     const { access_token, refresh_token, expires_in } = data;
 
-    // Calculate absolute expiration time
     let expiresAt: Date | undefined;
     if (expires_in) {
       expiresAt = new Date(Date.now() + expires_in * 1000);
     }
 
-    // Save tokens to database securely using atomic upsert to prevent race conditions
     await prisma.connectedApp.upsert({
       where: {
         userId_platform: {
@@ -110,7 +102,6 @@ export const spotifyCallback = async (
       },
       update: {
         accessToken: access_token,
-        // Prisma ignores undefined, so we only update if provided
         refreshToken: refresh_token || undefined,
         expiresAt: expiresAt,
         connectedAt: new Date(),

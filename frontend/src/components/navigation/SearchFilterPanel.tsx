@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 import Input from "../Input";
 import type {
@@ -82,12 +83,16 @@ const SearchFilterPanel = ({
   onToggleSpotify,
   onToggleSoundCloud,
 }: SearchFilterPanelProps) => {
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="absolute top-12 mt-2 -right-4 sm:right-0 bg-accent p-4 md:p-6 rounded-3xl shadow-2xl border border-accent-dark z-50 flex flex-col gap-6 w-[280px] sm:w-[450px] md:w-[500px] max-w-[95vw] max-h-[75vh] overflow-y-auto no-scrollbar cursor-default">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+          transition={{ duration: 0.2 }}
+          className="absolute top-12 mt-2 -right-4 sm:right-0 bg-accent p-4 md:p-6 rounded-3xl shadow-2xl border border-accent-dark z-50 flex flex-col gap-6 w-[280px] sm:w-[450px] md:w-[500px] max-w-[95vw] max-h-[75vh] overflow-y-auto no-scrollbar cursor-default origin-top-right"
+        >
       <div className="flex flex-row justify-between gap-4">
         <button
           type="button"
@@ -238,7 +243,9 @@ const SearchFilterPanel = ({
           </div>
         </div>
       )}
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
