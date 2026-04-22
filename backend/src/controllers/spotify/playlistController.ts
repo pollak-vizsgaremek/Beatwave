@@ -797,7 +797,7 @@ export const removeTrackFromSpotifyPlaylist = async (
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          tracks: [{ uri: trackUri }],
+          items: [{ uri: trackUri }],
         }),
       },
       userId,

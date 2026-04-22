@@ -84,7 +84,7 @@ const Home = () => {
 
     const fetchSpotifyConnection = async () => {
       try {
-        const response = await api.get("/user-profile?includeSpotify=false");
+        const response = await api.get("/user-profile?includeSpotify=true");
         if (!isMounted) return;
         setSpotifyConnected(response.data.spotifyConnected ?? false);
       } catch {

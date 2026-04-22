@@ -17,5 +17,13 @@ services:
       - mysql-data:/var/lib/mysql
     restart: unless-stopped
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: beatwave-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+
 volumes:
   mysql-data:

@@ -14,6 +14,7 @@ interface TokenPayload {
   id: string;
   username: string;
   role: string;
+  tokenVersion?: number;
 }
 
 const REVOKED_TOKEN_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
@@ -49,6 +50,8 @@ export const verifyToken = async (
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
     const clientIp = getClientIp(req);
+    const tokenVersion =
+      typeof decoded.tokenVersion === "number" ? decoded.tokenVersion : 0;
 
     await maybeCleanupExpiredRevokedTokens();
 
@@ -70,10 +73,18 @@ export const verifyToken = async (
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, role: true },
+      select: {
+        id: true,
+        role: true,
+        authTokenVersion: true,
+      },
     });
 
     if (!user) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+
+    if (tokenVersion !== user.authTokenVersion) {
       return res.status(403).json({ error: "Invalid token" });
     }
 
