@@ -3,6 +3,10 @@ import { Router } from "express";
 import {
   createUser,
   authenticateUser,
+  requestPasswordReset,
+  validatePasswordResetToken,
+  confirmPasswordReset,
+  getSessionStatus,
   logoutUser,
 } from "../controllers/authController";
 import {
@@ -86,6 +90,10 @@ const router = Router();
 //Auth
 router.post("/register", createUser);
 router.post("/login", authenticateUser);
+router.post("/auth/password-reset/request", requestPasswordReset);
+router.get("/auth/password-reset/validate", validatePasswordResetToken);
+router.post("/auth/password-reset/confirm", confirmPasswordReset);
+router.get("/auth/session", getSessionStatus);
 router.post("/logout", logoutUser);
 
 //User Profile

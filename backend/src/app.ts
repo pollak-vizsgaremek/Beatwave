@@ -39,6 +39,7 @@ app.use(express.json({ limit: "50kb" }));
 app.use(apiRateLimiter);
 app.use("/login", authRateLimiter);
 app.use("/register", authRateLimiter);
+app.use("/auth/password-reset/request", authRateLimiter);
 
 app.use("/", appRoutes);
 app.use(errorHandler);

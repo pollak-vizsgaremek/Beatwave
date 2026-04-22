@@ -14,6 +14,7 @@ const setTestEnv = () => {
     SPOTIFY_REDIRECT_URI: "http://localhost:6969/auth/spotify/callback",
     DATABASE_URL: "mysql://root:@localhost:3306/beatwave_test",
     FRONTEND_URL: "http://localhost:5173",
+    RESET_PASSWORD_TTL_MINUTES: "30",
   };
 
   Object.entries(defaults).forEach(([key, value]) => {
@@ -25,7 +26,9 @@ const setTestEnv = () => {
 
 setTestEnv();
 
-const prismaMock = {
+const sendTemplatedEmailMock = vi.fn();
+
+const prismaMock: any = {
   user: {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
@@ -55,14 +58,22 @@ const prismaMock = {
     findUnique: vi.fn(),
     upsert: vi.fn(),
   },
+  passwordResetToken: {
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    deleteMany: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  $transaction: vi.fn(),
 };
 
 const makeAuthCookie = (
   userId: string,
   role: "USER" | "MODERATOR" | "ADMIN" = "USER",
+  tokenVersion = 0,
 ) => {
   const token = jwt.sign(
-    { id: userId, username: "test-user", role },
+    { id: userId, username: "test-user", role, tokenVersion },
     process.env.JWT_SECRET as string,
     { expiresIn: "1h" },
   );
@@ -79,18 +90,20 @@ const getSetCookieHeader = (headers: Record<string, unknown>) => {
   return Array.isArray(raw) ? raw : [String(raw)];
 };
 
-const mockVerifiedUser = (
+const allowAuthenticatedUser = (
   userId: string,
   role: "USER" | "MODERATOR" | "ADMIN" = "USER",
+  tokenVersion = 0,
 ) => {
   prismaMock.user.findUnique.mockResolvedValueOnce({
     id: userId,
     role,
+    authTokenVersion: tokenVersion,
   });
 };
 
 const allowUserToContribute = (userId: string) => {
-  mockVerifiedUser(userId);
+  allowAuthenticatedUser(userId);
   prismaMock.user.findUnique.mockResolvedValueOnce({
     id: userId,
     isBlocked: false,
@@ -110,6 +123,15 @@ const seedCommonDefaults = () => {
   prismaMock.ipBan.findFirst.mockResolvedValue(null);
   prismaMock.user.update.mockResolvedValue({ id: "user-1" });
   prismaMock.notification.create.mockResolvedValue({ id: "notification-1" });
+  prismaMock.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.passwordResetToken.create.mockResolvedValue({ id: "reset-token-1" });
+  prismaMock.passwordResetToken.findUnique.mockResolvedValue(null);
+  prismaMock.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+  prismaMock.user.update.mockResolvedValue({ id: "user-1" });
+  prismaMock.$transaction.mockImplementation(async (callback: any) =>
+    callback(prismaMock),
+  );
+  sendTemplatedEmailMock.mockResolvedValue(undefined);
 };
 
 describe("Non-Spotify backend endpoints", () => {
@@ -118,6 +140,9 @@ describe("Non-Spotify backend endpoints", () => {
   beforeAll(async () => {
     vi.doMock("../src/lib/prisma", () => ({
       prisma: prismaMock,
+    }));
+    vi.doMock("../src/email/service", () => ({
+      sendTemplatedEmail: sendTemplatedEmailMock,
     }));
 
     app = (await import("../src/app")).default;
@@ -136,6 +161,7 @@ describe("Non-Spotify backend endpoints", () => {
       email: "alice@example.com",
       passwordHash: "hashed-password",
       role: "USER",
+      authTokenVersion: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -164,6 +190,7 @@ describe("Non-Spotify backend endpoints", () => {
       username: "alice",
       email: "alice@example.com",
       role: "USER",
+      authTokenVersion: 0,
       passwordHash,
     });
 
@@ -201,7 +228,7 @@ describe("Non-Spotify backend endpoints", () => {
   });
 
   it("GET /user-profile returns profile data for authenticated user", async () => {
-    mockVerifiedUser("user-1");
+    allowAuthenticatedUser("user-1");
     prismaMock.user.findUnique.mockResolvedValueOnce({
       id: "user-1",
       username: "alice",
@@ -229,7 +256,7 @@ describe("Non-Spotify backend endpoints", () => {
   });
 
   it("GET /posts returns regular discussion posts", async () => {
-    mockVerifiedUser("user-1");
+    allowAuthenticatedUser("user-1");
     prismaMock.post.findMany.mockResolvedValueOnce([
       {
         id: "post-1",
@@ -265,7 +292,7 @@ describe("Non-Spotify backend endpoints", () => {
   });
 
   it("GET /announcements returns announcement posts", async () => {
-    mockVerifiedUser("user-1");
+    allowAuthenticatedUser("user-1");
     prismaMock.post.findMany.mockResolvedValueOnce([
       {
         id: "announcement-1",
@@ -376,5 +403,126 @@ describe("Non-Spotify backend endpoints", () => {
         }),
       }),
     );
+  });
+
+  it("POST /auth/password-reset/request returns generic response for unknown email", async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce(null);
+
+    const res = await request(app).post("/auth/password-reset/request").send({
+      email: "unknown@example.com",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain("If an account exists");
+    expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("POST /auth/password-reset/request creates token and sends email for known email", async () => {
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: "user-1",
+      email: "alice@example.com",
+      username: "alice",
+    });
+
+    const res = await request(app).post("/auth/password-reset/request").send({
+      email: "alice@example.com",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain("If an account exists");
+    expect(prismaMock.passwordResetToken.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "user-1",
+          tokenHash: expect.any(String),
+        }),
+      }),
+    );
+    expect(sendTemplatedEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template: "passwordReset",
+        to: "alice@example.com",
+        context: expect.objectContaining({
+          resetUrl: expect.stringContaining("/reset-password?token="),
+        }),
+      }),
+    );
+  });
+
+  it("GET /auth/password-reset/validate returns false for invalid token", async () => {
+    prismaMock.passwordResetToken.findUnique.mockResolvedValueOnce(null);
+
+    const res = await request(app).get("/auth/password-reset/validate").query({
+      token: "bad-token",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.valid).toBe(false);
+  });
+
+  it("POST /auth/password-reset/confirm rejects weak password", async () => {
+    const res = await request(app).post("/auth/password-reset/confirm").send({
+      token: "token-1",
+      password: "weak",
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Password");
+    expect(prismaMock.passwordResetToken.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("POST /auth/password-reset/confirm rejects invalid token", async () => {
+    prismaMock.passwordResetToken.findUnique.mockResolvedValueOnce(null);
+
+    const res = await request(app).post("/auth/password-reset/confirm").send({
+      token: "invalid-token",
+      password: "Password1!",
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Invalid or expired");
+  });
+
+  it("POST /auth/password-reset/confirm updates password and invalidates old token version", async () => {
+    prismaMock.passwordResetToken.findUnique.mockResolvedValueOnce({
+      id: "reset-token-1",
+      userId: "user-1",
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      usedAt: null,
+    });
+    prismaMock.passwordResetToken.updateMany.mockResolvedValueOnce({ count: 1 });
+    prismaMock.user.update.mockResolvedValueOnce({ id: "user-1" });
+    prismaMock.passwordResetToken.deleteMany.mockResolvedValueOnce({ count: 0 });
+
+    const confirmRes = await request(app).post("/auth/password-reset/confirm").send({
+      token: "valid-token",
+      password: "Password1!",
+    });
+
+    expect(confirmRes.status).toBe(200);
+    expect(confirmRes.body.message).toBe("Password reset successful");
+    expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          passwordHash: expect.any(String),
+          authTokenVersion: {
+            increment: 1,
+          },
+        }),
+      }),
+    );
+
+    prismaMock.user.findUnique.mockResolvedValueOnce({
+      id: "user-1",
+      role: "USER",
+      authTokenVersion: 1,
+    });
+
+    const oldSessionRes = await request(app)
+      .get("/user-profile")
+      .set("Cookie", makeAuthCookie("user-1", "USER", 0));
+
+    expect(oldSessionRes.status).toBe(403);
+    expect(oldSessionRes.body.error).toBe("Invalid token");
   });
 });

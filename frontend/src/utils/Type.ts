@@ -16,6 +16,7 @@ interface InputProps {
   disabled?: boolean;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onForgotPasswordClick?: () => void;
 }
 
 interface ButtonProps {

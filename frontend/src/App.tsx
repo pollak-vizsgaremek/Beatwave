@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Discussion from "./pages/Discussion";
 import UserProfile from "./pages/UserProfile";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import SearchResult from "./pages/SearchResult";
 import CreateDiscusson from "./pages/CreatePost";
 import Error404 from "./pages/Error404";
@@ -28,6 +29,7 @@ function App() {
         <Routes location={location} key={location.pathname}>
           <Route element={<Login />} path="login" />
           <Route element={<Register />} path="register" />
+          <Route element={<ResetPassword />} path="reset-password" />
           <Route element={<ProtectedRoute />}>
             <Route index element={<Home />} path="home" />
             <Route element={<UserProfile />} path="profile" />

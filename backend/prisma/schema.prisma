@@ -32,6 +32,7 @@ model User {
   email             String   @unique
   username          String   @unique
   passwordHash      String
+  authTokenVersion  Int      @default(0)
   description       String?  @db.Text
   isPrivate         Boolean  @default(false)
   isBlocked         Boolean  @default(false)
@@ -52,6 +53,7 @@ model User {
   moderationLogs         ModerationLog[] @relation("UserLogs")
   performedModerations   ModerationLog[] @relation("ModeratorLogs")
   ipBansCreated          IpBan[]         @relation("IpBanCreatedBy")
+  passwordResetTokens    PasswordResetToken[]
 }
 
 model ConnectedApp {
@@ -195,4 +197,15 @@ model RevokedToken {
   tokenHash String   @unique
   expiresAt DateTime
   revokedAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
 }

@@ -58,6 +58,27 @@ interface Config {
   spotifyClientSecret: string;
   spotifyRedirectUri: string;
   frontendUrl: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  smtpPass: string;
+  mailFrom: string;
+  resetPasswordTtlMinutes: number;
+}
+
+const smtpPort = Number(process.env.SMTP_PORT || 1025);
+if (!Number.isFinite(smtpPort) || smtpPort <= 0) {
+  throw new Error("[Config] SMTP_PORT must be a positive number.");
+}
+
+const resetPasswordTtlMinutes = Number(
+  process.env.RESET_PASSWORD_TTL_MINUTES || 30,
+);
+if (!Number.isFinite(resetPasswordTtlMinutes) || resetPasswordTtlMinutes <= 0) {
+  throw new Error(
+    "[Config] RESET_PASSWORD_TTL_MINUTES must be a positive number.",
+  );
 }
 
 const config: Config = {
@@ -76,6 +97,13 @@ const config: Config = {
   spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
   spotifyRedirectUri: process.env.SPOTIFY_REDIRECT_URI!,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
+  smtpHost: process.env.SMTP_HOST || "127.0.0.1",
+  smtpPort,
+  smtpSecure: process.env.SMTP_SECURE === "true",
+  smtpUser: process.env.SMTP_USER || "",
+  smtpPass: process.env.SMTP_PASS || "",
+  mailFrom: process.env.MAIL_FROM || "Beatwave <no-reply@beatwave.local>",
+  resetPasswordTtlMinutes,
 };
 
 export default config;
