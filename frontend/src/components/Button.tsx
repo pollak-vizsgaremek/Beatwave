@@ -1,19 +1,23 @@
+import { motion } from "framer-motion";
 import { type ButtonProps } from "../utils/Type";
 
 const Button = ({ labelTitle, type, disabled, className, onClick }: ButtonProps) => {
   return (
-    <button
+    <motion.button
+      whileHover={disabled ? {} : { scale: 1.02 }}
+      whileTap={disabled ? {} : { scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 400, damping: 10 }}
       className={`px-12 py-4 bg-[#C5E1ED] rounded-3xl text-black font-medium border border-border transition-all duration-200
         ${disabled
           ? "opacity-40 cursor-not-allowed grayscale-30"
-          : "cursor-pointer hover:bg-[#C5E1ED]/80 hover:outline-1 focus:outline-2"
+          : "cursor-pointer hover:bg-[#C5E1ED]/80 hover:outline-1 focus:outline-2 shadow-md hover:shadow-lg"
         } ${className}`}
       type={type}
       disabled={disabled}
       onClick={onClick}
     >
       {labelTitle}
-    </button>
+    </motion.button>
   );
 };
 

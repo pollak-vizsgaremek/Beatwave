@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { Mail, Lock, User, CheckCircle2, Circle } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
@@ -8,17 +9,42 @@ import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
+import { createSessionUser, useSession } from "../context/SessionContext";
 
 const Register = () => {
   const navigate = useNavigate();
+  const { setCurrentUser } = useSession();
   const [isLoading, setIsLoading] = useState(false);
   const { error, showError } = useErrorToast();
 
   useEffect(() => {
-    if (localStorage.getItem("token")) {
-      navigate("/home");
-    }
-  }, [navigate]);
+    let mounted = true;
+
+    const checkSession = async () => {
+      try {
+        const response = await api.get("/user-profile?includeSpotify=false", {
+          headers: {
+            "X-Skip-Auth-Redirect": "1",
+          },
+        });
+        if (!mounted) return;
+
+        setCurrentUser(createSessionUser(response.data));
+        navigate("/home");
+      } catch {
+        if (mounted) {
+          setCurrentUser(null);
+        }
+        // Expected for signed-out visitors.
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [navigate, setCurrentUser]);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -66,33 +92,24 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const registerResponse = await api.post("/register", {
+      await api.post("/register", {
         email: formData.email,
         username: formData.username,
         password: formData.password,
       });
-
-      if (registerResponse.data?.token) {
-        localStorage.setItem("token", registerResponse.data.token);
-        localStorage.setItem(
-          "user",
-          JSON.stringify(registerResponse.data.user || {}),
-        );
-        window.location.href = "/home";
-        return;
-      }
 
       const response = await api.post("/login", {
         email: formData.email,
         password: formData.password,
       });
 
-      if (response.data.token) {
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user || {}));
-        window.location.href = "/home";
+      if (response.data.user) {
+        setCurrentUser(createSessionUser(response.data.user));
+        navigate("/home");
       } else {
-        showError("Registration succeeded, but login response was invalid.");
+        const profileResponse = await api.get("/user-profile?includeSpotify=false");
+        setCurrentUser(createSessionUser(profileResponse.data));
+        navigate("/home");
       }
     } catch (err: any) {
       showError(
@@ -106,7 +123,12 @@ const Register = () => {
   return (
     <div className="flex flex-col sm:flex-row h-screen w-screen bg-linear-to-r from-black to-border">
       <div className="w-full sm:w-1/2 flex items-center justify-center order-2 sm:order-1">
-        <div className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className="min-w-[300px] w-full max-w-[500px] min-h-[60vh] sm:min-h-[80vh] h-auto bg-card border rounded-2xl flex flex-col items-center shadow-md shadow-blue-100/30 relative py-6 sm:py-10"
+        >
           <div className="absolute top-4 left-6 flex items-center gap-2">
             <img
               src="/Beatwave_logo.png"
@@ -261,7 +283,7 @@ const Register = () => {
               Login!
             </Link>
           </p>
-        </div>
+        </motion.div>
       </div>
       <div className="w-full sm:w-1/2 relative order-1 sm:order-2 mb-4 sm:mb-0 max-h-[40vh] sm:max-h-none overflow-hidden">
         <MusicWave />

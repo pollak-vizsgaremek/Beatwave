@@ -8,19 +8,24 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
-import { getNormalizedHashtags, normalizeHashtagInput } from "../utils/hashtags";
+import {
+  getNormalizedHashtags,
+  normalizeHashtagInput,
+} from "../utils/hashtags";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 import formatRelative from "../utils/DateFormatting";
-import { getLikedPosts, getStoredUser, saveLikedPosts } from "../utils/auth";
+import { useSession } from "../context/SessionContext";
 import type { DiscussionType } from "../utils/Type";
 
 const MAX_REPORT_REASON_LENGTH = 1000;
 
 const Discussion = () => {
+  const { currentUser } = useSession();
   // Fixed typo: was `lodingPosts` (missing 'a')
   const [postsData, setPostsData] = useState<DiscussionType[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
@@ -58,7 +63,7 @@ const Discussion = () => {
   const [onlyLikedPosts, setOnlyLikedPosts] = useState(false);
   const postMenuRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-  const currentUserId = getStoredUser()?.id ?? null;
+  const currentUserId = currentUser?.id ?? null;
   const { error, showError } = useErrorToast();
 
   const topicOptions = useMemo(() => {
@@ -197,12 +202,11 @@ const Discussion = () => {
     const fetchAllPosts = async () => {
       try {
         const response = await api.get("/posts");
-        const likedPosts = getLikedPosts();
 
         setPostsData(
           response.data.map((post: DiscussionType) => ({
             ...post,
-            isLiked: likedPosts.has(post.id),
+            isLiked: post.isLiked,
           })),
         );
       } catch (err: any) {
@@ -253,13 +257,6 @@ const Discussion = () => {
       const response = await api.post(`/post/${postId}/like`, {
         isLiked: currentPost.isLiked,
       });
-
-      const storedLikes = getLikedPosts();
-
-      if (response.data.isLiked) storedLikes.add(postId);
-      else storedLikes.delete(postId);
-
-      saveLikedPosts(storedLikes);
 
       setPostsData((prevPosts) =>
         prevPosts.map((post) =>
@@ -435,7 +432,7 @@ const Discussion = () => {
           Posts
         </h1>
 
-        <div className="w-full max-w-[1400px] mx-auto mt-4">
+        <div className="w-full max-w-[1500px] mx-auto mt-4">
           <div className="rounded-2xl border border-white/10 bg-card-black p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1">
@@ -447,7 +444,9 @@ const Discussion = () => {
                   type="text"
                   placeholder="Search in discussions..."
                   value={discussionSearchQuery}
-                  onChange={(event) => setDiscussionSearchQuery(event.target.value)}
+                  onChange={(event) =>
+                    setDiscussionSearchQuery(event.target.value)
+                  }
                   className="w-full rounded-xl border border-white/10 bg-card px-10 py-2 text-white outline-none transition-colors focus:border-spotify-green"
                 />
               </div>
@@ -471,93 +470,105 @@ const Discussion = () => {
               </div>
             </div>
 
-            {isDiscussionFilterOpen && (
-              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <label className="flex flex-col gap-1 text-sm text-gray-300">
-                  Topic
-                  <select
-                    value={selectedTopic}
-                    onChange={(event) => setSelectedTopic(event.target.value)}
-                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
-                  >
-                    <option value="all">All topics</option>
-                    {topicOptions.map((topic) => (
-                      <option key={topic.value} value={topic.value}>
-                        {topic.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <AnimatePresence>
+              {isDiscussionFilterOpen && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, overflow: "hidden" }}
+                  animate={{ opacity: 1, height: "auto", overflow: "visible" }}
+                  exit={{ opacity: 0, height: 0, overflow: "hidden" }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5"
+                >
+                  <label className="flex flex-col gap-1 text-sm text-gray-300">
+                    Topic
+                    <select
+                      value={selectedTopic}
+                      onChange={(event) => setSelectedTopic(event.target.value)}
+                      className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                    >
+                      <option value="all">All topics</option>
+                      {topicOptions.map((topic) => (
+                        <option key={topic.value} value={topic.value}>
+                          {topic.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="flex flex-col gap-1 text-sm text-gray-300">
-                  Author
-                  <select
-                    value={selectedAuthorId}
-                    onChange={(event) => setSelectedAuthorId(event.target.value)}
-                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
-                  >
-                    <option value="all">All authors</option>
-                    {authorOptions.map((author) => (
-                      <option key={author.value} value={author.value}>
-                        {author.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="flex flex-col gap-1 text-sm text-gray-300">
+                    Author
+                    <select
+                      value={selectedAuthorId}
+                      onChange={(event) =>
+                        setSelectedAuthorId(event.target.value)
+                      }
+                      className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                    >
+                      <option value="all">All authors</option>
+                      {authorOptions.map((author) => (
+                        <option key={author.value} value={author.value}>
+                          {author.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="flex flex-col gap-1 text-sm text-gray-300">
-                  Sort
-                  <select
-                    value={selectedSort}
-                    onChange={(event) =>
-                      setSelectedSort(
-                        event.target.value as "newest" | "oldest" | "mostLiked",
-                      )
-                    }
-                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
-                  >
-                    <option value="newest">Newest first</option>
-                    <option value="oldest">Oldest first</option>
-                    <option value="mostLiked">Most liked</option>
-                  </select>
-                </label>
+                  <label className="flex flex-col gap-1 text-sm text-gray-300">
+                    Sort
+                    <select
+                      value={selectedSort}
+                      onChange={(event) =>
+                        setSelectedSort(
+                          event.target.value as "newest" | "oldest" | "mostLiked",
+                        )
+                      }
+                      className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                    >
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                      <option value="mostLiked">Most liked</option>
+                    </select>
+                  </label>
 
-                <label className="flex flex-col gap-1 text-sm text-gray-300">
-                  Hashtags
-                  <input
-                    type="text"
-                    value={discussionHashtagFilter}
-                    onChange={(event) =>
-                      setDiscussionHashtagFilter(
-                        normalizeHashtagInput(event.target.value),
-                      )
-                    }
-                    placeholder="#music #rock"
-                    className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
-                  />
-                </label>
+                  <label className="flex flex-col gap-1 text-sm text-gray-300">
+                    Hashtags
+                    <input
+                      type="text"
+                      value={discussionHashtagFilter}
+                      onChange={(event) =>
+                        setDiscussionHashtagFilter(
+                          normalizeHashtagInput(event.target.value),
+                        )
+                      }
+                      placeholder="#music #rock"
+                      className="rounded-lg border border-white/10 bg-card px-3 py-2 text-white outline-none focus:border-spotify-green"
+                    />
+                  </label>
 
-                <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-card px-3 py-2 text-sm text-gray-200">
-                  <input
-                    type="checkbox"
-                    checked={onlyMyPosts}
-                    onChange={(event) => setOnlyMyPosts(event.target.checked)}
-                    className="h-4 w-4 accent-spotify-green"
-                  />
-                  Only my posts
-                </label>
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-card px-3 py-2 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={onlyMyPosts}
+                      onChange={(event) => setOnlyMyPosts(event.target.checked)}
+                      className="h-4 w-4 accent-spotify-green"
+                    />
+                    Only my posts
+                  </label>
 
-                <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-card px-3 py-2 text-sm text-gray-200">
-                  <input
-                    type="checkbox"
-                    checked={onlyLikedPosts}
-                    onChange={(event) => setOnlyLikedPosts(event.target.checked)}
-                    className="h-4 w-4 accent-spotify-green"
-                  />
-                  Only liked posts
-                </label>
-              </div>
-            )}
+                  <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-card px-3 py-2 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={onlyLikedPosts}
+                      onChange={(event) =>
+                        setOnlyLikedPosts(event.target.checked)
+                      }
+                      className="h-4 w-4 accent-spotify-green"
+                    />
+                    Only liked posts
+                  </label>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <p className="mt-3 text-sm text-gray-400">
               Showing {filteredPosts.length} of {postsData.length} posts
@@ -565,7 +576,7 @@ const Discussion = () => {
           </div>
         </div>
 
-        <div className="grid flex-row items-center justify-center w-full max-w-[1400px] mx-auto gap-4 mt-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid flex-row items-center justify-center w-full max-w-[1600px] mx-auto gap-4 mt-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {loadingPosts ? (
             <p>Loading posts...</p>
           ) : postsData.length === 0 ? (
@@ -580,15 +591,19 @@ const Discussion = () => {
                 className="z-10"
                 to={`/discussion/view/${post.id}`}
               >
-                <div
+                <motion.div
                   key={post.id}
-                  className="flex flex-col relative bg-gray-500/60 w-full min-h-[220px] sm:min-h-[260px] p-2 sm:p-4 mt-2 rounded-lg outline-1 outline-black"
+                  whileHover={{ y: -5, scale: 1.01 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="flex flex-col relative bg-gray-500/60 w-full min-h-[220px] sm:min-h-[260px] p-2 sm:p-4 mt-2 rounded-lg outline-1 outline-black shadow-md hover:shadow-xl"
                 >
                   <div className="flex flex-row self-start items-start sm:items-center relative top-1 w-full gap-2">
                     <div className="min-w-0 flex flex-wrap items-center">
                       <button
                         type="button"
-                        onClick={(event) => handleProfileClick(event, post.user.id)}
+                        onClick={(event) =>
+                          handleProfileClick(event, post.user.id)
+                        }
                         className="font-bold text-xl max-w-[100px] sm:max-w-[150px] truncate cursor-pointer hover:underline text-left"
                       >
                         {post.user.username}
@@ -597,14 +612,14 @@ const Discussion = () => {
                         {" "}
                         —{" "}
                       </p>
-                      <p className="text-lg font-extralight max-w-[80px] sm:max-w-[120px] truncate">
+                      <p className="text-lg font-extralight max-w-[80px] sm:max-w-[100px] truncate">
                         {post.title}
                       </p>
                       <p className="mx-2 font-bold text-lg hidden sm:block">
                         {" "}
                         -{" "}
                       </p>
-                      <p className="text-lg font-extralight italic max-w-[80px] sm:max-w-[120px] truncate">
+                      <p className="text-lg font-extralight italic max-w-[80px] sm:max-w-[100px] truncate">
                         {post.topic}
                       </p>
                     </div>
@@ -632,64 +647,72 @@ const Discussion = () => {
                           <EllipsisVertical size={18} />
                         </button>
 
-                        {openPostMenuId === post.id && (
-                          <div className="absolute right-0 mt-2 w-40 rounded-xl border border-white/10 bg-card shadow-lg z-20 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setOpenPostMenuId(null);
-                                navigate(`/discussion/view/${post.id}`);
-                              }}
-                              className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
+                        <AnimatePresence>
+                          {openPostMenuId === post.id && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -5, scale: 0.95 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute right-0 mt-2 w-40 rounded-xl border border-white/10 bg-card shadow-lg z-20 overflow-hidden origin-top-right"
                             >
-                              View post
-                            </button>
-
-                            {post.userId === currentUserId ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    openPostEditModal(post);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
-                                >
-                                  Edit post
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    void handleDeletePost(post.id);
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 cursor-pointer"
-                                >
-                                  Delete post
-                                </button>
-                              </>
-                            ) : (
                               <button
                                 type="button"
                                 onClick={(event) => {
                                   event.preventDefault();
                                   event.stopPropagation();
-                                  openReportModal(post.id);
+                                  setOpenPostMenuId(null);
+                                  navigate(`/discussion/view/${post.id}`);
                                 }}
-                                disabled={reportingPostIds.has(post.id)}
-                                className="w-full text-left px-4 py-2 text-sm text-yellow-300 hover:bg-white/10 cursor-pointer disabled:opacity-50"
+                                className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
                               >
-                                {reportingPostIds.has(post.id)
-                                  ? "Reporting..."
-                                  : "Report post"}
+                                View post
                               </button>
-                            )}
-                          </div>
-                        )}
+
+                              {post.userId === currentUserId ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      openPostEditModal(post);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 cursor-pointer"
+                                  >
+                                    Edit post
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      void handleDeletePost(post.id);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 cursor-pointer"
+                                  >
+                                    Delete post
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    openReportModal(post.id);
+                                  }}
+                                  disabled={reportingPostIds.has(post.id)}
+                                  className="w-full text-left px-4 py-2 text-sm text-yellow-300 hover:bg-white/10 cursor-pointer disabled:opacity-50"
+                                >
+                                  {reportingPostIds.has(post.id)
+                                    ? "Reporting..."
+                                    : "Report post"}
+                                </button>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </div>
                   </div>
@@ -719,7 +742,7 @@ const Discussion = () => {
                       <MessageCircle className="mr-2 z-99" />
                     </p>
                   </div>
-                </div>
+                </motion.div>
               </Link>
             ))
           )}

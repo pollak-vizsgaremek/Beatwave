@@ -1,14 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { notifyModerationTeam } from "../lib/moderationNotifications";
 import { prisma } from "../lib/prisma";
-import { getActiveUserTimeout } from "../lib/userTimeout";
+import { ensureUserCanContribute } from "../lib/userAccess";
 
 const MAX_TITLE_LENGTH = 200;
 const MAX_TEXT_LENGTH = 10000;
 const MAX_TOPIC_LENGTH = 100;
 const MAX_REPORT_REASON_LENGTH = 1000;
-const BLOCKED_USER_MESSAGE =
-  "Your account has been blocked from posting and commenting.";
 
 const USER_SELECT = {
   id: true,
@@ -40,31 +38,6 @@ const validatePostInput = (title: unknown, text: unknown, topic: unknown) => {
   return null;
 };
 
-const ensureUserCanPostOrComment = async (userId: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, isBlocked: true },
-  });
-
-  if (!user) {
-    return { status: 404, error: "User not found" };
-  }
-
-  if (user.isBlocked) {
-    return { status: 403, error: BLOCKED_USER_MESSAGE };
-  }
-
-  const timeout = await getActiveUserTimeout(userId);
-  if (timeout) {
-    return {
-      status: 403,
-      error: `You are timed out from posting and commenting until ${timeout.until.toISOString()}. Reason: ${timeout.reason}`,
-    };
-  }
-
-  return null;
-};
-
 export const getPosts = async (
   req: Request,
   res: Response,
@@ -74,6 +47,9 @@ export const getPosts = async (
     const getAllPosts = await prisma.post.findMany({
       include: {
         user: { select: USER_SELECT },
+        likes: {
+          where: { userId: req.userId },
+        },
       },
       orderBy: {
         postedAt: "desc",
@@ -81,7 +57,14 @@ export const getPosts = async (
       take: 10,
     });
 
-    res.status(200).json(getAllPosts);
+    const mapped = getAllPosts.map((post) => ({
+      ...post,
+      isLiked: req.userId
+        ? post.likes.some((like) => like.userId === req.userId)
+        : false,
+    }));
+
+    res.status(200).json(mapped);
   } catch (error) {
     next(error);
   }
@@ -95,10 +78,13 @@ export const getPostById = async (
   try {
     const { id } = req.params;
 
-    const getPost = await prisma.post.findUnique({
+    const post = await prisma.post.findUnique({
       where: { id },
       include: {
         user: { select: USER_SELECT },
+        likes: {
+          where: { userId: req.userId },
+        },
         comments: {
           include: {
             user: { select: USER_SELECT },
@@ -112,11 +98,15 @@ export const getPostById = async (
       },
     });
 
-    if (!getPost) {
+    if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    res.status(200).json(getPost);
+    const isLiked = req.userId
+      ? post.likes.some((like) => like.userId === req.userId)
+      : false;
+
+    res.status(200).json({ ...post, isLiked });
   } catch (error) {
     next(error);
   }
@@ -136,13 +126,21 @@ export const getMyPosts = async (
       where: { userId: req.userId },
       include: {
         user: { select: USER_SELECT },
+        likes: {
+          where: { userId: req.userId },
+        },
       },
       orderBy: {
         postedAt: "desc",
       },
     });
 
-    res.status(200).json(posts);
+    const mapped = posts.map((post) => ({
+      ...post,
+      isLiked: post.likes.some((like) => like.userId === req.userId),
+    }));
+
+    res.status(200).json(mapped);
   } catch (error) {
     next(error);
   }
@@ -160,7 +158,7 @@ export const createPost = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const blockedState = await ensureUserCanPostOrComment(req.userId);
+    const blockedState = await ensureUserCanContribute(req.userId);
     if (blockedState) {
       return res
         .status(blockedState.status)
@@ -204,7 +202,7 @@ export const updateOwnPost = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const blockedState = await ensureUserCanPostOrComment(req.userId);
+    const blockedState = await ensureUserCanContribute(req.userId);
     if (blockedState) {
       return res
         .status(blockedState.status)
@@ -277,12 +275,34 @@ export const deleteOwnPost = async (
         .json({ error: "You can only delete your own posts" });
     }
 
-    await prisma.comment.deleteMany({
+    const relatedComments = await prisma.comment.findMany({
       where: { postId: id },
+      select: { id: true },
     });
+    const relatedCommentIds = relatedComments.map((comment) => comment.id);
 
-    await prisma.post.delete({
-      where: { id },
+    await prisma.$transaction(async (tx) => {
+      if (relatedCommentIds.length > 0) {
+        await tx.moderationLog.updateMany({
+          where: {
+            commentId: { in: relatedCommentIds },
+          },
+          data: { commentId: null },
+        });
+      }
+
+      await tx.moderationLog.updateMany({
+        where: { postId: id },
+        data: { postId: null },
+      });
+
+      await tx.comment.deleteMany({
+        where: { postId: id },
+      });
+
+      await tx.post.delete({
+        where: { id },
+      });
     });
 
     res.status(200).json({ message: "Post deleted" });
@@ -362,64 +382,67 @@ export const reportPost = async (
     next(error);
   }
 };
-
 export const likePost = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   try {
-    const { id } = req.params;
+    const postId = req.params.id;
+    const userId = req.userId as string;
 
-    if (!req.userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { isLiked } = req.body;
-
-    const existingPost = await prisma.post.findUnique({
-      where: { id },
-      include: { user: { select: USER_SELECT } },
-    });
-
-    if (!existingPost) {
-      return res.status(404).json({ error: "Post not found" });
-    }
-
-    const shouldUnlike = Boolean(isLiked) && existingPost.likeAmount > 0;
-
-    const post = await prisma.post.update({
-      where: { id },
-      data: {
-        likeAmount: {
-          [shouldUnlike ? "decrement" : "increment"]: 1,
-        },
+    const existingLike = await prisma.postLike.findUnique({
+      where: {
+        userId_postId: { userId, postId },
       },
-      include: { user: { select: USER_SELECT } },
     });
 
-    if (!shouldUnlike) {
+    if (existingLike) {
+      const [, updatedPost] = await prisma.$transaction([
+        prisma.postLike.delete({ where: { id: existingLike.id } }),
+        prisma.post.update({
+          where: { id: postId },
+          data: { likeAmount: { decrement: 1 } },
+        }),
+      ]);
+      
+      return res.status(200).json({ likeAmount: updatedPost.likeAmount, isLiked: false });
+    }
+
+    const [, updatedPost] = await prisma.$transaction([
+      prisma.postLike.create({
+        data: { userId, postId },
+      }),
+      prisma.post.update({
+        where: { id: postId },
+        data: { likeAmount: { increment: 1 } },
+        include: { user: { select: USER_SELECT } }, 
+      }),
+    ]);
+
+    if (updatedPost.userId !== userId) {
       const triggerUser = await prisma.user.findUnique({
-        where: { id: req.userId },
+        where: { id: userId },
         select: { username: true },
       });
 
-      if (post.userId !== req.userId && triggerUser) {
+      if (triggerUser) {
         await prisma.notification.create({
           data: {
             type: "post_like",
-            message: `@${triggerUser.username} liked your post: "${post.title}".`,
-            userId: post.userId,
-            triggeredById: req.userId,
-            link: `/discussion/view/${post.id}`,
+            message: `@${triggerUser.username} liked your post.`,
+            userId: updatedPost.userId,
+            triggeredById: userId,
+            link: `/discussion/view/${updatedPost.id}`,
           },
         });
       }
     }
 
-    res
-      .status(200)
-      .json({ likeAmount: post.likeAmount, isLiked: !Boolean(isLiked) });
+    return res.status(200).json({ likeAmount: updatedPost.likeAmount, isLiked: true });
+
   } catch (error) {
     next(error);
   }

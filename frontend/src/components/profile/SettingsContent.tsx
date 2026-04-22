@@ -1,16 +1,19 @@
 import { X } from "lucide-react";
 import Button from "../Button";
+import type { SpotifyTimeRange } from "./types";
 
 interface SettingsContentProps {
   connectedToSpotify: boolean;
   connectedToSoundCloud: boolean;
   spotiHover: boolean;
   soundHover: boolean;
-  timeRange: string;
+  timeRange: SpotifyTimeRange;
   isPrivate: boolean;
   isUpdatingPrivacy: boolean;
+  isDeletingAccount: boolean;
   onOpenEditModal: () => void;
   onTogglePrivacy: () => void;
+  onOpenDeleteAccountModal: () => void;
   onConnectSpotify: () => void;
   onDisconnectSpotify: () => void;
   onSpotifyHoverChange: (value: boolean) => void;
@@ -26,8 +29,10 @@ const SettingsContent = ({
   timeRange,
   isPrivate,
   isUpdatingPrivacy,
+  isDeletingAccount,
   onOpenEditModal,
   onTogglePrivacy,
+  onOpenDeleteAccountModal,
   onConnectSpotify,
   onDisconnectSpotify,
   onSpotifyHoverChange,
@@ -55,9 +60,12 @@ const SettingsContent = ({
       <div className="bg-card rounded-2xl p-5 border border-white/10">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">Profile privacy</h3>
+            <h3 className="text-lg font-semibold text-white">
+              Profile privacy
+            </h3>
             <p className="text-gray-400 mt-1">
-              When private, other users will see “this profile is private” instead of your posts.
+              When private, other users will see “this profile is private”
+              instead of your posts.
             </p>
           </div>
           <button
@@ -150,10 +158,29 @@ const SettingsContent = ({
           onChange={onTimeRangeChange}
           className="w-full md:w-2/3 p-3 rounded-2xl bg-card-black border border-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
         >
-          <option value="4week">Last 4 weeks</option>
-          <option value="6month">Last 6 months</option>
-          <option value="alltime">All time</option>
+          <option value="SHORT">Last 4 weeks</option>
+          <option value="MEDIUM">Last 6 months</option>
+          <option value="LONG">All time</option>
         </select>
+      </div>
+
+      <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-red-300">Danger zone</h3>
+            <p className="mt-1 text-sm text-red-100/75">
+              Permanently delete your account and all associated Beatwave data.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenDeleteAccountModal}
+            disabled={isDeletingAccount}
+            className="self-start rounded-2xl bg-red-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
+          >
+            {isDeletingAccount ? "Deleting account..." : "Delete account"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -9,11 +9,8 @@ export const getSpotifyToken = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     const token = await getValidSpotifyToken(userId);
 
@@ -35,11 +32,8 @@ export const disconnectSpotify = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     await prisma.connectedApp.deleteMany({
       where: {
@@ -48,9 +42,17 @@ export const disconnectSpotify = async (
       },
     });
 
+    await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        spotifyTimeRange: "SHORT",
+      },
+    });
+
     console.log(`Spotify disconnected for user ${userId}`);
 
-    // Clear all cached entries belonging to this user
     const keys = spotifyCache.keys();
     keys.forEach((key) => {
       if (key.startsWith(`${userId}-`)) {

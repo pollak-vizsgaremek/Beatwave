@@ -8,11 +8,8 @@ export const getSpotifyCurrentlyPlaying = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     // Check cache first (15s TTL for currently playing)
     const cacheKey = `${userId}-currently-playing`;
@@ -91,12 +88,9 @@ export const getSpotifyRecentlyPlayed = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
 
     // Auth check before parsing params
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     const amount = parseInt(req.params.amount as string);
 

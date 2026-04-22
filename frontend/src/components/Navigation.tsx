@@ -1,5 +1,5 @@
 import { Menu } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import ErrorToast from "./ErrorToast";
@@ -16,6 +16,7 @@ import type {
   SearchTypeState,
 } from "./navigation/types";
 import api from "../utils/api";
+import { useSession } from "../context/SessionContext";
 import type { NotificationType } from "../utils/Type";
 import { useErrorToast } from "../utils/useErrorToast";
 
@@ -35,6 +36,7 @@ const searchTypeParamMap: Record<keyof SearchTypeState, string> = {
 const Navigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentUser, setCurrentUser } = useSession();
   const isDiscussionRoute = location.pathname.startsWith("/discussion");
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -133,19 +135,8 @@ const Navigation = () => {
     tagHipster: searchAlbums,
   };
 
-  const canAccessAdminPanel = useMemo(() => {
-    try {
-      const storedUser = localStorage.getItem("user");
-      if (!storedUser) {
-        return false;
-      }
-
-      const parsedUser = JSON.parse(storedUser);
-      return parsedUser?.role === "ADMIN" || parsedUser?.role === "MODERATOR";
-    } catch {
-      return false;
-    }
-  }, []);
+  const canAccessAdminPanel =
+    currentUser?.role === "ADMIN" || currentUser?.role === "MODERATOR";
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -204,11 +195,9 @@ const Navigation = () => {
       }
     };
 
-    if (localStorage.getItem("token")) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000);
-      return () => clearInterval(interval);
-    }
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -246,6 +235,17 @@ const Navigation = () => {
     setIsFilterOpen(false);
     setIsNotificationsOpen(false);
     setIsMenuOpen(false);
+  };
+
+  const clearLocalSession = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("spotifyTimeRange");
+
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("likedPosts:")) {
+        localStorage.removeItem(key);
+      }
+    });
   };
 
   const markNotificationsAsRead = async () => {
@@ -289,11 +289,19 @@ const Navigation = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    closeAllMenus();
-    navigate("/login");
+  const handleLogout = async () => {
+    try {
+      await api.post("/logout");
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn("Logout API call failed, clearing local session anyway.", error);
+      }
+    } finally {
+      clearLocalSession();
+      setCurrentUser(null);
+      closeAllMenus();
+      navigate("/login");
+    }
   };
 
   const handleNavigate = (path: string) => {

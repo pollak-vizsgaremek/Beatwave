@@ -19,3 +19,4 @@ export {
   skipSpotifyNext,
 } from "./playerControlsController";
 export { searchSpotify } from "./searchController";
+export { getSpotifyArtist } from "./artistController";

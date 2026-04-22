@@ -4,6 +4,29 @@ import {
   safeJsonParse,
   spotifyFetch,
 } from "../../lib/spotifyUtils";
+import { spotifyCache } from "./shared";
+
+// Cache TTLs (seconds)
+const TTL_PLAYLISTS_BASE = 300;    // 5 min â€” base playlist list
+const TTL_TRACK_IN_PLAYLIST = 120; // 2 min â€” per-track duplicate check
+const TTL_OWNERSHIP = 600;         // 10 min â€” playlist ownership
+
+const playlistCacheKey = (userId: string) => `${userId}-playlists-base`;
+const trackInPlaylistCacheKey = (userId: string, playlistId: string, trackUri: string) =>
+  `${userId}-track-in-playlist-${playlistId}-${encodeURIComponent(trackUri)}`;
+const ownershipCacheKey = (userId: string, playlistId: string) =>
+  `${userId}-ownership-${playlistId}`;
+
+/** Bust all playlist-related caches for a user after a mutation (add/remove). */
+const invalidatePlaylistCaches = (userId: string, affectedPlaylistIds: string[], trackUri?: string) => {
+  spotifyCache.del(playlistCacheKey(userId));
+  for (const playlistId of affectedPlaylistIds) {
+    spotifyCache.del(ownershipCacheKey(userId, playlistId));
+    if (trackUri) {
+      spotifyCache.del(trackInPlaylistCacheKey(userId, playlistId, trackUri));
+    }
+  }
+};
 
 type SpotifyPlaylistSummary = {
   id: string;
@@ -129,6 +152,12 @@ const getPlaylistOwnership = async (
   token: string,
   playlistId: string,
 ) => {
+  const cKey = ownershipCacheKey(userId, playlistId);
+  const cachedPlaylist = spotifyCache.get<RawSpotifyPlaylist>(cKey);
+  if (cachedPlaylist) {
+    return { ok: true as const, playlist: cachedPlaylist };
+  }
+
   const fields = "id,name,owner(id,display_name)";
   const response = await spotifyFetch(
     `https://api.spotify.com/v1/playlists/${playlistId}?fields=${encodeURIComponent(fields)}`,
@@ -151,17 +180,19 @@ const getPlaylistOwnership = async (
 
     return {
       ok: false as const,
-      response,
       playlist: null,
     };
   }
 
+  const playlist = ((await safeJsonParse(response)) || {}) as RawSpotifyPlaylist;
+  spotifyCache.set(cKey, playlist, TTL_OWNERSHIP);
+
   return {
     ok: true as const,
-    response,
-    playlist: ((await safeJsonParse(response)) || {}) as RawSpotifyPlaylist,
+    playlist,
   };
 };
+
 
 const getPlaylistSummary = async (
   userId: string,
@@ -208,10 +239,15 @@ const checkTrackInPlaylist = async (
   trackUri: string,
   returnEarly: boolean = true,
 ) => {
-  let nextUrl: string | null =
-    `https://api.spotify.com/v1/playlists/${playlistId}/items?limit=100&fields=${encodeURIComponent(
-      "items(track(uri,id,linked_from(uri,id))),next",
-    )}`;
+  // Cache the result to avoid redundant full-playlist scans.
+  const cKey = trackInPlaylistCacheKey(userId, playlistId, trackUri);
+  const cached = spotifyCache.get<{ ok: boolean; occurrences: number; isInPlaylist: boolean }>(cKey);
+  if (cached) return cached;
+
+  // Do NOT use a 'fields' filter â€” Spotify silently omits items for local files / episodes.
+  // Note: Spotify's API returns the track object under the key 'item' (not 'track') in
+  // newer responses. We fall back to 'track' for compatibility.
+  let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/items?limit=50`;
 
   let occurrences = 0;
 
@@ -230,7 +266,7 @@ const checkTrackInPlaylist = async (
     if (!response.ok) {
       const errorData = await safeJsonParse(response);
       console.error(
-        `Hiba a Spotify playlist (${playlistId}) lekérésekor:`,
+        `Error checking Spotify playlist (${playlistId}):`,
         response.status,
         errorData,
       );
@@ -245,16 +281,17 @@ const checkTrackInPlaylist = async (
     const data = (await safeJsonParse(response)) || {};
     const items = Array.isArray(data.items) ? data.items : [];
 
-    for (const item of items) {
-      if (trackMatchesRequestedTrack(item?.track, trackUri)) {
+    for (const playlistItem of items) {
+      // Spotify returns the track object under 'item' in newer API responses,
+      // falling back to 'track' for older response formats.
+      const t = playlistItem?.item ?? playlistItem?.track;
+      if (trackMatchesRequestedTrack(t, trackUri)) {
         occurrences += 1;
 
         if (returnEarly) {
-          return {
-            ok: true as const,
-            occurrences,
-            isInPlaylist: true,
-          };
+          const result = { ok: true as const, occurrences, isInPlaylist: true };
+          spotifyCache.set(cKey, result, TTL_TRACK_IN_PLAYLIST);
+          return result;
         }
       }
     }
@@ -262,11 +299,9 @@ const checkTrackInPlaylist = async (
     nextUrl = typeof data.next === "string" ? data.next : null;
   }
 
-  return {
-    ok: true as const,
-    occurrences,
-    isInPlaylist: occurrences > 0,
-  };
+  const result = { ok: true as const, occurrences, isInPlaylist: occurrences > 0 };
+  spotifyCache.set(cKey, result, TTL_TRACK_IN_PLAYLIST);
+  return result;
 };
 
 const getSpotifyAuthError = (status: number, message: string) => {
@@ -306,13 +341,10 @@ export const getSpotifyPlaylists = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
     const trackUri =
       typeof req.query.trackUri === "string" ? req.query.trackUri : null;
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     const token = await getValidSpotifyToken(userId);
 
@@ -320,76 +352,85 @@ export const getSpotifyPlaylists = async (
       return res.json({ playlists: [], connected: false, cached: false });
     }
 
-    const [profileResult, playlistsResponse] = await Promise.all([
-      getCurrentSpotifyUser(userId, token),
-      spotifyFetch(
-        "https://api.spotify.com/v1/me/playlists?limit=50",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
+    // Try to serve the base playlist list from cache (avoids the heavy
+    // multi-request fan-out to Spotify on every TrackPlaylistPicker open).
+    const baseCacheKey = playlistCacheKey(userId);
+    let basePlaylists = spotifyCache.get<SpotifyPlaylistSummary[]>(baseCacheKey);
+
+    if (!basePlaylists) {
+      const [profileResult, playlistsResponse] = await Promise.all([
+        getCurrentSpotifyUser(userId, token),
+        spotifyFetch(
+          "https://api.spotify.com/v1/me/playlists?limit=50",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           },
-        },
-        userId,
-      ),
-    ]);
+          userId,
+        ),
+      ]);
 
-    if (!profileResult.ok) {
-      const errorResponse = getSpotifyAuthError(
-        profileResult.response.status,
-        "Spotify denied access to your playlists. Reconnect Spotify to grant playlist permissions.",
+      if (!profileResult.ok) {
+        const errorResponse = getSpotifyAuthError(
+          profileResult.response.status,
+          "Spotify denied access to your playlists. Reconnect Spotify to grant playlist permissions.",
+        );
+
+        return res.status(errorResponse.status).json(errorResponse.body);
+      }
+
+      if (!playlistsResponse.ok) {
+        const errorData = await safeJsonParse(playlistsResponse);
+        console.error(
+          "Error fetching Spotify playlists:",
+          playlistsResponse.status,
+          errorData,
+        );
+
+        const errorResponse = getSpotifyAuthError(
+          playlistsResponse.status,
+          "Spotify denied access to your playlists. Reconnect Spotify to grant playlist permissions.",
+        );
+
+        return res.status(errorResponse.status).json(errorResponse.body);
+      }
+
+      const data = (await safeJsonParse(playlistsResponse)) || { items: [] };
+      const rawPlaylists = (data.items || []) as RawSpotifyPlaylist[];
+      const currentSpotifyUserId = profileResult.userId;
+      const ownedPlaylists = rawPlaylists.filter((playlist) =>
+        Boolean(
+          currentSpotifyUserId && playlist.owner?.id === currentSpotifyUserId,
+        ),
       );
+      const playlistSummaries = await Promise.all(
+        ownedPlaylists.map((playlist) =>
+          getPlaylistSummary(userId, token, playlist.id),
+        ),
+      );
+      basePlaylists = playlistSummaries
+        .filter((result) => result.ok && result.playlist)
+        .map((playlist) => {
+          const resolvedPlaylist = (playlist as { playlist: RawSpotifyPlaylist })
+            .playlist;
 
-      return res.status(errorResponse.status).json(errorResponse.body);
+          return {
+            id: resolvedPlaylist.id,
+            name: resolvedPlaylist.name || "Untitled playlist",
+            ownerName: resolvedPlaylist.owner?.display_name || "Unknown owner",
+            image: resolvedPlaylist.images?.[0]?.url || null,
+            tracksTotal:
+              resolvedPlaylist.tracks?.total ??
+              resolvedPlaylist.items?.total ??
+              0,
+            canModify: true,
+          } satisfies SpotifyPlaylistSummary;
+        });
+
+      spotifyCache.set(baseCacheKey, basePlaylists, TTL_PLAYLISTS_BASE);
     }
-
-    if (!playlistsResponse.ok) {
-      const errorData = await safeJsonParse(playlistsResponse);
-      console.error(
-        "Error fetching Spotify playlists:",
-        playlistsResponse.status,
-        errorData,
-      );
-
-      const errorResponse = getSpotifyAuthError(
-        playlistsResponse.status,
-        "Spotify denied access to your playlists. Reconnect Spotify to grant playlist permissions.",
-      );
-
-      return res.status(errorResponse.status).json(errorResponse.body);
-    }
-
-    const data = (await safeJsonParse(playlistsResponse)) || { items: [] };
-    const rawPlaylists = (data.items || []) as RawSpotifyPlaylist[];
-    const currentSpotifyUserId = profileResult.userId;
-    const ownedPlaylists = rawPlaylists.filter((playlist) =>
-      Boolean(
-        currentSpotifyUserId && playlist.owner?.id === currentSpotifyUserId,
-      ),
-    );
-    const playlistSummaries = await Promise.all(
-      ownedPlaylists.map((playlist) =>
-        getPlaylistSummary(userId, token, playlist.id),
-      ),
-    );
-    const basePlaylists = playlistSummaries
-      .filter((result) => result.ok && result.playlist)
-      .map((playlist) => {
-        const resolvedPlaylist = (playlist as { playlist: RawSpotifyPlaylist })
-          .playlist;
-
-        return {
-          id: resolvedPlaylist.id,
-          name: resolvedPlaylist.name || "Untitled playlist",
-          ownerName: resolvedPlaylist.owner?.display_name || "Unknown owner",
-          image: resolvedPlaylist.images?.[0]?.url || null,
-          tracksTotal:
-            resolvedPlaylist.tracks?.total ??
-            resolvedPlaylist.items?.total ??
-            0,
-          canModify: true,
-        } satisfies SpotifyPlaylistSummary;
-      });
 
     const playlists = trackUri
       ? await Promise.all(
@@ -424,16 +465,13 @@ export const addTrackToSpotifyPlaylists = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
     const { playlistIds, trackUri, forceAddToPlaylistIds } = req.body as {
       playlistIds?: string[];
       trackUri?: string;
       forceAddToPlaylistIds?: string[];
     };
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     if (!trackUri || !Array.isArray(playlistIds) || playlistIds.length === 0) {
       return res.status(400).json({
@@ -569,6 +607,8 @@ export const addTrackToSpotifyPlaylists = async (
     const failed = results.filter((result) => !result.ok);
 
     if (failed.length === 0) {
+      // Invalidate caches for all modified playlists so the next load reflects truth.
+      invalidatePlaylistCaches(userId, playlistIdsToAdd, trackUri);
       return res.json({
         success: true,
         addedTo: playlistIdsToAdd.length,
@@ -610,15 +650,12 @@ export const checkTrackInSpotifyPlaylists = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
     const { playlistIds, trackUri } = req.body as {
       playlistIds?: string[];
       trackUri?: string;
     };
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     if (!trackUri || !Array.isArray(playlistIds) || playlistIds.length === 0) {
       return res.status(400).json({
@@ -701,15 +738,12 @@ export const removeTrackFromSpotifyPlaylist = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
     const { playlistId, trackUri } = req.body as {
       playlistId?: string;
       trackUri?: string;
     };
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     if (!playlistId || !trackUri) {
       return res.status(400).json({
@@ -781,6 +815,8 @@ export const removeTrackFromSpotifyPlaylist = async (
         error: "Failed to remove the track from the playlist.",
       });
     }
+
+    invalidatePlaylistCaches(userId, [playlistId], trackUri);
 
     return res.json({
       success: true,

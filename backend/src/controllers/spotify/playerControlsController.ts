@@ -94,11 +94,8 @@ const handleSpotifyPlayerAction =
   (endpoint: string, method: "POST" | "PUT") =>
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userId = req.userId;
+      const userId = req.userId as string;
 
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
 
       const token = await getValidSpotifyToken(userId);
 

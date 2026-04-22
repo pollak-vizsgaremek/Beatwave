@@ -15,13 +15,14 @@ import Error404 from "./pages/Error404";
 import ViewDiscussion from "./pages/ViewDiscusson";
 import ViewProfile from "./pages/ViewProfile";
 import AdminPanel from "./pages/AdminPanel";
-
+import { SessionProvider } from "./context/SessionContext";
+import ArtistView from "./pages/ArtistView";
 
 function App() {
   const location = useLocation();
 
   return (
-    <>
+    <SessionProvider>
       <Background />
       <AnimatePresence mode="popLayout">
         <Routes location={location} key={location.pathname}>
@@ -36,11 +37,12 @@ function App() {
             <Route element={<CreateDiscusson />} path="discussion/create" />
             <Route element={<ViewDiscussion />} path="discussion/view/:id" />
             <Route element={<AdminPanel />} path="admin" />
+            <Route element={<ArtistView />} path="artist/:id" />
           </Route>
           <Route element={<Error404 />} path="*" />
         </Routes>
       </AnimatePresence>
-    </>
+    </SessionProvider>
   );
 }
 

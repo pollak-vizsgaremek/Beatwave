@@ -1,6 +1,7 @@
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
+import { motion } from "framer-motion";
 
 import ErrorToast from "../components/ErrorToast";
 import api from "../utils/api";
@@ -70,7 +71,12 @@ const ViewProfile = () => {
             </p>
           </div>
         ) : (
-          <div className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl mt-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="bg-card-black w-full min-h-[460px] p-4 sm:p-6 flex flex-col lg:flex-row gap-6 rounded-3xl mt-4 shadow-lg border border-white/5"
+          >
             <div className="lg:w-1/3 p-2 flex flex-col items-center border-b lg:border-b-0 lg:border-r border-white/10">
               <div className="bg-accent mt-2 w-32 h-32 rounded-full flex justify-center items-center text-black text-3xl font-bold uppercase overflow-hidden">
                 {profile.spotifyProfileImage ? (
@@ -110,9 +116,16 @@ const ViewProfile = () => {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {profile.posts.map((post) => (
-                    <Link
+                  {profile.posts.map((post, i) => (
+                    <motion.div
                       key={post.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: i * 0.05 }}
+                      whileHover={{ y: -3, scale: 1.01 }}
+                    >
+                    <Link
+ 
                       to={`/discussion/view/${post.id}`}
                       className="block rounded-2xl border border-white/10 bg-black/20 p-4 hover:border-spotify-green/60 hover:bg-black/30 transition-colors"
                     >
@@ -140,11 +153,12 @@ const ViewProfile = () => {
                         </p>
                       ) : null}
                     </Link>
+                  </motion.div>
                   ))}
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
 

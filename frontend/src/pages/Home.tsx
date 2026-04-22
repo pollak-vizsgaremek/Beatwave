@@ -41,10 +41,7 @@ const formatDuration = (durationMs: number) => {
 };
 
 const Home = () => {
-  const [artists, setArtists] = useState<{ name: string; image: string }[]>([]);
-  const [timeRange] = useState(
-    () => localStorage.getItem("spotifyTimeRange") ?? "4week",
-  );
+  const [artists, setArtists] = useState<{ name: string; image: string; id?: string }[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
 
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
@@ -148,9 +145,7 @@ const Home = () => {
     let isMounted = true;
     const fetchTopArtists = async () => {
       try {
-        const response = await api.get("/auth/spotify/top/artists", {
-          params: { timeRange },
-        });
+        const response = await api.get("/auth/spotify/top/artists");
         if (!isMounted) return;
 
         if (response.data.connected === false) {
@@ -161,6 +156,7 @@ const Home = () => {
 
         const formattedArtists = response.data.items.map((artist: any) => ({
           name: artist.name,
+          id: artist.id,
           image:
             artist.images?.length > 0
               ? artist.images[0].url
@@ -185,15 +181,13 @@ const Home = () => {
     return () => {
       isMounted = false;
     };
-  }, [timeRange]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
     const fetchTopTracks = async () => {
       try {
-        const response = await api.get("/auth/spotify/top/tracks", {
-          params: { timeRange },
-        });
+        const response = await api.get("/auth/spotify/top/tracks");
         if (!isMounted) return;
 
         if (response.data.connected === false) {
@@ -227,7 +221,7 @@ const Home = () => {
     return () => {
       isMounted = false;
     };
-  }, [timeRange]);
+  }, []);
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
@@ -547,6 +541,10 @@ const Home = () => {
         ) : recommendedTracks.length > 0 ? (
           <motion.div
             layout
+            // A szülő elem megkapja az induló és érkező animációs értékeket
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5"
           >
             {recommendedTracks.map((track, index) => (

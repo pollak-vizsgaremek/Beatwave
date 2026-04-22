@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router";
+import { motion } from "framer-motion";
+import { useNavigate, useSearchParams } from "react-router";
 import api from "../utils/api";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
@@ -83,6 +84,7 @@ const formatDuration = (ms: number) => {
 
 const SearchResult = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [results, setResults] = useState<SearchResults>({});
   const [loading, setLoading] = useState(true);
   const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
@@ -281,8 +283,11 @@ const SearchResult = () => {
             {results.tracks.items
               .filter(Boolean)
               .slice(0, getVisible("tracks"))
-              .map((track) => (
-                <div
+              .map((track, i) => (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
                   key={track.id}
                   className={`rounded-xl border p-3 transition-all ${
                     expandedTrackId === track.id
@@ -329,7 +334,7 @@ const SearchResult = () => {
                       onError={showError}
                     />
                   )}
-                </div>
+                </motion.div>
               ))}
           </div>
           {hasMore["tracks"] && (
@@ -355,9 +360,11 @@ const SearchResult = () => {
               .filter(Boolean)
               .slice(0, getVisible("artists"))
               .map((artist) => (
-                <div
+                <button
                   key={artist.id}
-                  className="flex flex-col items-center gap-3 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                  type="button"
+                  onClick={() => navigate(`/artist/${artist.id}`)}
+                  className="flex w-full cursor-pointer flex-col items-center gap-3 rounded-xl bg-card p-4 text-left transition-colors hover:bg-accent-dark"
                 >
                   <img
                     src={
@@ -375,7 +382,7 @@ const SearchResult = () => {
                       {artist.genres.slice(0, 2).join(", ")}
                     </p>
                   )}
-                </div>
+                </button>
               ))}
           </div>
           {hasMore["artists"] && (
@@ -400,10 +407,14 @@ const SearchResult = () => {
             {results.albums.items
               .filter(Boolean)
               .slice(0, getVisible("albums"))
-              .map((album) => (
-                <div
+              .map((album, i) => (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
                   key={album.id}
-                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer shadow-sm hover:shadow-md"
                 >
                   <img
                     src={
@@ -419,7 +430,7 @@ const SearchResult = () => {
                     {album.artists.map((a) => a.name).join(", ")} ·{" "}
                     {album.release_date?.substring(0, 4)}
                   </p>
-                </div>
+                </motion.div>
               ))}
           </div>
           {hasMore["albums"] && (
@@ -444,10 +455,14 @@ const SearchResult = () => {
             {results.playlists.items
               .filter(Boolean)
               .slice(0, getVisible("playlists"))
-              .map((playlist) => (
-                <div
+              .map((playlist, i) => (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
                   key={playlist.id}
-                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer shadow-sm hover:shadow-md"
                 >
                   <img
                     src={
@@ -464,7 +479,7 @@ const SearchResult = () => {
                     by {playlist.owner?.display_name ?? "Unknown"} ·{" "}
                     {playlist.tracks?.total ?? 0} tracks
                   </p>
-                </div>
+                </motion.div>
               ))}
           </div>
           {hasMore["playlists"] && (
@@ -491,10 +506,14 @@ const SearchResult = () => {
             {results.shows.items
               .filter(Boolean)
               .slice(0, getVisible("shows"))
-              .map((show) => (
-                <div
+              .map((show, i) => (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
                   key={show.id}
-                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer shadow-sm hover:shadow-md"
                 >
                   <img
                     src={
@@ -509,7 +528,7 @@ const SearchResult = () => {
                   <p className="text-gray-400 text-xs truncate">
                     {show.publisher}
                   </p>
-                </div>
+                </motion.div>
               ))}
           </div>
           {hasMore["shows"] && (
@@ -534,10 +553,14 @@ const SearchResult = () => {
             {results.episodes.items
               .filter(Boolean)
               .slice(0, getVisible("episodes"))
-              .map((episode) => (
-                <div
+              .map((episode, i) => (
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  whileHover={{ scale: 1.01 }}
                   key={episode.id}
-                  className="flex items-center gap-4 bg-card hover:bg-accent-dark transition-colors rounded-xl p-3 cursor-pointer"
+                  className="flex items-center gap-4 bg-card hover:bg-accent-dark transition-colors rounded-xl p-3 cursor-pointer shadow-sm hover:shadow-md"
                 >
                   <img
                     src={
@@ -557,7 +580,7 @@ const SearchResult = () => {
                   <span className="text-gray-500 text-sm shrink-0">
                     {formatDuration(episode.duration_ms)}
                   </span>
-                </div>
+                </motion.div>
               ))}
           </div>
           {hasMore["episodes"] && (
@@ -582,10 +605,14 @@ const SearchResult = () => {
             {results.audiobooks.items
               .filter(Boolean)
               .slice(0, getVisible("audiobooks"))
-              .map((book) => (
-                <div
+              .map((book, i) => (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: i * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
                   key={book.id}
-                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer"
+                  className="flex flex-col gap-2 bg-card hover:bg-accent-dark transition-colors rounded-xl p-4 cursor-pointer shadow-sm hover:shadow-md"
                 >
                   <img
                     src={
@@ -600,7 +627,7 @@ const SearchResult = () => {
                   <p className="text-gray-400 text-xs truncate">
                     {book.authors.map((a) => a.name).join(", ")}
                   </p>
-                </div>
+                </motion.div>
               ))}
           </div>
           {hasMore["audiobooks"] && (

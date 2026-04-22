@@ -3,11 +3,12 @@ import Card from "./TopCard";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 
-type TopListProps = { list: { name: string; image: string }[]; title: string };
+type TopListProps = { list: { name: string; image: string; id?: string }[]; title: string };
 
 const TopList = ({ list, title }: TopListProps) => {
   const topListScroll = useRef<HTMLDivElement | null>(null);
-  const isDragging = useRef(false);
+  const isGrabbing = useRef(false);
+  const hasDragged = useRef(false);
   const startX = useRef(0);
   const startScrollLeft = useRef(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -36,29 +37,37 @@ const TopList = ({ list, title }: TopListProps) => {
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!topListScroll.current) return;
-    isDragging.current = true;
+    isGrabbing.current = true;
+    hasDragged.current = false;
     startX.current = e.clientX;
     startScrollLeft.current = topListScroll.current.scrollLeft;
     topListScroll.current.style.cursor = "grabbing";
     topListScroll.current.style.scrollBehavior = "auto";
-    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging.current || !topListScroll.current) return;
+    if (!isGrabbing.current || !topListScroll.current) return;
     e.preventDefault();
     const walk = (e.clientX - startX.current) * 1.15;
+    if (Math.abs(e.clientX - startX.current) > 5) {
+      hasDragged.current = true;
+    }
     topListScroll.current.scrollLeft = startScrollLeft.current - walk;
   };
 
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    isDragging.current = false;
+  const handlePointerUp = (_e: React.PointerEvent<HTMLDivElement>) => {
+    isGrabbing.current = false;
     if (topListScroll.current) {
       topListScroll.current.style.cursor = "grab";
       topListScroll.current.style.scrollBehavior = "smooth";
     }
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  // Intercept clicks during capture phase: suppress if user was dragging
+  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (hasDragged.current) {
+      e.stopPropagation();
+      hasDragged.current = false;
     }
   };
 
@@ -107,10 +116,11 @@ const TopList = ({ list, title }: TopListProps) => {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onClickCapture={handleClickCapture}
         style={{ touchAction: "pan-y" }}
       >
-        {list.map((list, i) => (
-          <Card key={i} name={list.name} image={list.image} placing={i + 1} />
+        {list.map((item, i) => (
+          <Card key={i} name={item.name} image={item.image} placing={i + 1} artistId={item.id} />
         ))}
       </div>
     </div>

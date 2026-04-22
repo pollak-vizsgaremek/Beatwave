@@ -5,6 +5,7 @@ import {
   spotifyFetch,
 } from "../../lib/spotifyUtils";
 import { spotifyCache } from "./shared";
+import { prisma } from "../../lib/prisma";
 
 export const getSpotifyTopItems = async (
   req: Request,
@@ -12,45 +13,55 @@ export const getSpotifyTopItems = async (
   next: NextFunction,
 ) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId as string;
     const type = req.params.type;
-    const requestedTimeRange = String(req.query.timeRange ?? "alltime");
 
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    // 1. JogosultsĂˇg Ă©s bemeneti paramĂ©terek ellenĹ‘rzĂ©se
 
     if (type !== "artists" && type !== "tracks") {
       return res.status(400).json({
-        error: "Invalid type parameter. Must be 'artists' or 'tracks'.",
+        error: "Ă‰rvĂ©nytelen paramĂ©ter. Csak 'artists' vagy 'tracks' lehet.",
       });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        spotifyTimeRange: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
+    }
+
     const spotifyTimeRangeMap: Record<string, string> = {
-      "4week": "short_term",
-      "6month": "medium_term",
-      alltime: "long_term",
+      SHORT: "short_term",
+      MEDIUM: "medium_term",
+      LONG: "long_term",
     };
 
-    const spotifyTimeRange =
-      spotifyTimeRangeMap[requestedTimeRange] ?? "long_term";
+    const requestedTimeRange = user.spotifyTimeRange || "MEDIUM"; 
+    const spotifyTimeRange = spotifyTimeRangeMap[requestedTimeRange] ?? "long_term";
 
     const cacheKey = `${userId}-${type}-${spotifyTimeRange}`;
     const cachedEntry = spotifyCache.get<any>(cacheKey);
 
     if (cachedEntry) {
       console.log(`Returning cached Spotify top ${type} for user: ${userId}`);
-      return res.json({ items: cachedEntry, cached: true });
+      return res.status(200).json({ items: cachedEntry, cached: true });
     }
 
     const token = await getValidSpotifyToken(userId);
 
     if (!token) {
-      return res.json({ items: [], connected: false, cached: false });
+      return res.status(200).json({ items: [], connected: false, cached: false });
     }
 
+    const spotifyApiUrl = `https://api.spotify.com/v1/me/top/${type}?time_range=${spotifyTimeRange}&limit=10`;
+    
     const response = await spotifyFetch(
-      `https://api.spotify.com/v1/me/top/${type}?time_range=${spotifyTimeRange}&limit=10`,
+      spotifyApiUrl,
       {
         method: "GET",
         headers: {
@@ -65,7 +76,7 @@ export const getSpotifyTopItems = async (
       console.error(`Error fetching Spotify top ${type}:`, errorData);
 
       if (response.status === 401) {
-        return res.json({
+        return res.status(401).json({
           items: [],
           connected: false,
           cached: false,
@@ -74,13 +85,14 @@ export const getSpotifyTopItems = async (
       }
 
       if (response.status === 403) {
-        return res.json({
+        return res.status(403).json({
           items: [],
           connected: false,
           cached: false,
           error: "Insufficient permissions to read top items from Spotify.",
         });
       }
+      
       return res
         .status(response.status)
         .json({ error: `Spotify API error: ${response.statusText}` });
@@ -90,7 +102,8 @@ export const getSpotifyTopItems = async (
 
     spotifyCache.set(cacheKey, data.items);
 
-    res.json({ items: data.items, cached: false });
+    return res.status(200).json({ items: data.items, cached: false });
+    
   } catch (error) {
     console.error("Error in getSpotifyTopItems:", error);
     next(error);
