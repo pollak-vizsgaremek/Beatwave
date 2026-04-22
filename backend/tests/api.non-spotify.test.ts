@@ -30,8 +30,10 @@ const prismaMock = {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
   },
   post: {
+    findMany: vi.fn(),
     findUnique: vi.fn(),
     create: vi.fn(),
   },
@@ -41,6 +43,9 @@ const prismaMock = {
   },
   notification: {
     create: vi.fn(),
+  },
+  ipBan: {
+    findFirst: vi.fn(),
   },
   moderationLog: {
     findFirst: vi.fn(),
@@ -74,7 +79,18 @@ const getSetCookieHeader = (headers: Record<string, unknown>) => {
   return Array.isArray(raw) ? raw : [String(raw)];
 };
 
+const mockVerifiedUser = (
+  userId: string,
+  role: "USER" | "MODERATOR" | "ADMIN" = "USER",
+) => {
+  prismaMock.user.findUnique.mockResolvedValueOnce({
+    id: userId,
+    role,
+  });
+};
+
 const allowUserToContribute = (userId: string) => {
+  mockVerifiedUser(userId);
   prismaMock.user.findUnique.mockResolvedValueOnce({
     id: userId,
     isBlocked: false,
@@ -91,6 +107,8 @@ const seedCommonDefaults = () => {
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     revokedAt: new Date(),
   });
+  prismaMock.ipBan.findFirst.mockResolvedValue(null);
+  prismaMock.user.update.mockResolvedValue({ id: "user-1" });
   prismaMock.notification.create.mockResolvedValue({ id: "notification-1" });
 };
 
@@ -160,7 +178,9 @@ describe("Non-Spotify backend endpoints", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe("Login successful");
-    expect(setCookie?.some((cookie) => cookie.startsWith("beatwave_token="))).toBe(true);
+    expect(
+      setCookie?.some((cookie) => cookie.startsWith("beatwave_token=")),
+    ).toBe(true);
   });
 
   it("POST /logout revokes token and clears cookie", async () => {
@@ -175,10 +195,13 @@ describe("Non-Spotify backend endpoints", () => {
     expect(res.status).toBe(200);
     expect(res.body.message).toBe("Logout successful");
     expect(prismaMock.revokedToken.upsert).toHaveBeenCalledTimes(1);
-    expect(setCookie?.some((cookie) => cookie.includes("beatwave_token=;"))).toBe(true);
+    expect(
+      setCookie?.some((cookie) => cookie.includes("beatwave_token=;")),
+    ).toBe(true);
   });
 
   it("GET /user-profile returns profile data for authenticated user", async () => {
+    mockVerifiedUser("user-1");
     prismaMock.user.findUnique.mockResolvedValueOnce({
       id: "user-1",
       username: "alice",
@@ -201,6 +224,76 @@ describe("Non-Spotify backend endpoints", () => {
         username: "alice",
         spotifyConnected: false,
         soundCloudConnected: false,
+      }),
+    );
+  });
+
+  it("GET /posts returns regular discussion posts", async () => {
+    mockVerifiedUser("user-1");
+    prismaMock.post.findMany.mockResolvedValueOnce([
+      {
+        id: "post-1",
+        title: "Regular post",
+        topic: "General",
+        text: "Hello",
+        hashtags: "#hello",
+        postedAt: new Date(),
+        userId: "user-1",
+        user: {
+          id: "user-1",
+          username: "alice",
+        },
+        likes: [],
+      },
+    ]);
+
+    const res = await request(app)
+      .get("/posts")
+      .set("Cookie", makeAuthCookie("user-1"));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(prismaMock.post.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          NOT: {
+            OR: [{ topic: "Announcement" }, { topic: "announcement" }],
+          },
+        },
+      }),
+    );
+  });
+
+  it("GET /announcements returns announcement posts", async () => {
+    mockVerifiedUser("user-1");
+    prismaMock.post.findMany.mockResolvedValueOnce([
+      {
+        id: "announcement-1",
+        title: "Maintenance",
+        topic: "Announcement",
+        text: "Scheduled maintenance tonight.",
+        hashtags: null,
+        postedAt: new Date(),
+        userId: "admin-1",
+        user: {
+          id: "admin-1",
+          username: "admin",
+        },
+        likes: [],
+      },
+    ]);
+
+    const res = await request(app)
+      .get("/announcements")
+      .set("Cookie", makeAuthCookie("user-1"));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(prismaMock.post.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          OR: [{ topic: "Announcement" }, { topic: "announcement" }],
+        },
       }),
     );
   });

@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import AdminActionModal from "../components/admin/AdminActionModal";
+import AdminActionFields from "../components/admin/AdminActionFields";
+import AdminPagination from "../components/admin/AdminPagination";
+import AdminPanelHeader from "../components/admin/AdminPanelHeader";
 import AdminTabs from "../components/admin/AdminTabs";
 import CommentsManagement from "../components/admin/CommentsManagement";
 import LogsManagement from "../components/admin/LogsManagement";
 import PostsManagement from "../components/admin/PostsManagement";
 import ReportsManagement from "../components/admin/ReportsManagement";
 import UsersManagement from "../components/admin/UsersManagement";
+import {
+  getActionModalContent,
+  type PendingAdminAction,
+} from "../components/admin/adminPanelActions";
+import { AdminPanelSkeleton } from "../components/LoadingSkeletons";
 import {
   VALID_ADMIN_TABS,
   type AdminComment,
@@ -22,27 +30,10 @@ import { useErrorToast } from "../utils/useErrorToast";
 
 const ITEMS_PER_PAGE = 8;
 const MAX_DELETE_REASON_LENGTH = 300;
-
-type PendingAdminAction =
-  | { type: "delete-post"; postId: string }
-  | { type: "delete-comment"; commentId: string }
-  | {
-      type: "report-action";
-      reportId: string;
-      action: "dismiss" | "block-user";
-      username: string;
-    }
-  | {
-      type: "change-role";
-      userId: string;
-      username: string;
-      currentRole: string;
-      nextRole: string;
-    }
-  | { type: "toggle-block"; userId: string; username: string; nextBlocked: boolean }
-  | { type: "set-timeout"; user: AdminUser }
-  | { type: "clear-timeout"; user: AdminUser }
-  | null;
+const MAX_IP_BAN_REASON_LENGTH = 200;
+const MAX_ANNOUNCEMENT_TITLE_LENGTH = 200;
+const MAX_ANNOUNCEMENT_TEXT_LENGTH = 10000;
+const MIN_ADMIN_SKELETON_MS = import.meta.env.DEV ? 1200 : 0;
 
 const getInitialTab = (): AdminTabId => {
   const requestedTab = new URLSearchParams(window.location.search).get("tab");
@@ -84,6 +75,10 @@ const AdminPanel = () => {
   const [deleteReasonInput, setDeleteReasonInput] = useState("");
   const [timeoutMinutesInput, setTimeoutMinutesInput] = useState("60");
   const [timeoutReasonInput, setTimeoutReasonInput] = useState("");
+  const [ipBanMinutesInput, setIpBanMinutesInput] = useState("");
+  const [ipBanReasonInput, setIpBanReasonInput] = useState("");
+  const [announcementTitleInput, setAnnouncementTitleInput] = useState("");
+  const [announcementTextInput, setAnnouncementTextInput] = useState("");
   const [pageByTab, setPageByTab] = useState<Record<AdminTabId, number>>({
     users: 1,
     posts: 1,
@@ -132,6 +127,7 @@ const AdminPanel = () => {
   };
 
   const fetchData = async (tab: AdminTabId = activeTab) => {
+    const startedAt = performance.now();
     setLoading(true);
 
     try {
@@ -177,6 +173,15 @@ const AdminPanel = () => {
       }
       showError("Failed to load admin data. Please try again.");
     } finally {
+      const elapsed = performance.now() - startedAt;
+      const remainingDelay = MIN_ADMIN_SKELETON_MS - elapsed;
+
+      if (remainingDelay > 0) {
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, remainingDelay),
+        );
+      }
+
       setLoading(false);
     }
   };
@@ -186,6 +191,10 @@ const AdminPanel = () => {
     setDeleteReasonInput("");
     setTimeoutMinutesInput("60");
     setTimeoutReasonInput("");
+    setIpBanMinutesInput("");
+    setIpBanReasonInput("");
+    setAnnouncementTitleInput("");
+    setAnnouncementTextInput("");
   };
 
   const requestDeletePost = async (postId: string) => {
@@ -248,6 +257,26 @@ const AdminPanel = () => {
     setPendingAction({ type: "clear-timeout", user });
   };
 
+  const requestSetIpBan = async (user: AdminUser) => {
+    setIpBanMinutesInput("");
+    setIpBanReasonInput(user.activeIpBanReason ?? "");
+    setPendingAction({ type: "set-ip-ban", user });
+  };
+
+  const requestClearIpBan = async (user: AdminUser) => {
+    setPendingAction({ type: "clear-ip-ban", user });
+  };
+
+  const requestDeleteUser = async (user: AdminUser) => {
+    setPendingAction({ type: "delete-user", user });
+  };
+
+  const requestCreateAnnouncement = async () => {
+    setAnnouncementTitleInput("");
+    setAnnouncementTextInput("");
+    setPendingAction({ type: "create-announcement" });
+  };
+
   const visitPost = (postId: string) => {
     navigate(`/discussion/view/${postId}`);
   };
@@ -262,7 +291,9 @@ const AdminPanel = () => {
     }
 
     const minutes = Number(timeoutMinutesInput.trim());
-    return !Number.isInteger(minutes) || minutes <= 0 || !timeoutReasonInput.trim();
+    return (
+      !Number.isInteger(minutes) || minutes <= 0 || !timeoutReasonInput.trim()
+    );
   }, [pendingAction, timeoutMinutesInput, timeoutReasonInput]);
 
   const deleteReasonInvalid = useMemo(() => {
@@ -277,6 +308,41 @@ const AdminPanel = () => {
     const reasonLength = deleteReasonInput.trim().length;
     return reasonLength === 0 || reasonLength > MAX_DELETE_REASON_LENGTH;
   }, [deleteReasonInput, pendingAction]);
+
+  const ipBanInputInvalid = useMemo(() => {
+    if (!pendingAction || pendingAction.type !== "set-ip-ban") {
+      return false;
+    }
+
+    const trimmedReason = ipBanReasonInput.trim();
+    if (!trimmedReason || trimmedReason.length > MAX_IP_BAN_REASON_LENGTH) {
+      return true;
+    }
+
+    const trimmedMinutes = ipBanMinutesInput.trim();
+    if (!trimmedMinutes) {
+      return false;
+    }
+
+    const parsedMinutes = Number(trimmedMinutes);
+    return !Number.isInteger(parsedMinutes) || parsedMinutes <= 0;
+  }, [ipBanMinutesInput, ipBanReasonInput, pendingAction]);
+
+  const announcementInputInvalid = useMemo(() => {
+    if (!pendingAction || pendingAction.type !== "create-announcement") {
+      return false;
+    }
+
+    const trimmedTitle = announcementTitleInput.trim();
+    const trimmedText = announcementTextInput.trim();
+
+    return (
+      !trimmedTitle ||
+      !trimmedText ||
+      trimmedTitle.length > MAX_ANNOUNCEMENT_TITLE_LENGTH ||
+      trimmedText.length > MAX_ANNOUNCEMENT_TEXT_LENGTH
+    );
+  }, [announcementTextInput, announcementTitleInput, pendingAction]);
 
   const paginateByTab = <T,>(items: T[], tab: AdminTabId) => {
     const page = pageByTab[tab] ?? 1;
@@ -297,10 +363,20 @@ const AdminPanel = () => {
       case "logs":
         return logs.length;
     }
-  }, [activeTab, users.length, posts.length, comments.length, reports.length, logs.length]);
+  }, [
+    activeTab,
+    users.length,
+    posts.length,
+    comments.length,
+    reports.length,
+    logs.length,
+  ]);
 
   const activePage = pageByTab[activeTab] ?? 1;
-  const totalPages = Math.max(1, Math.ceil(activeTabItemCount / ITEMS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(activeTabItemCount / ITEMS_PER_PAGE),
+  );
   const visiblePageNumbers = useMemo(() => {
     if (totalPages <= 7) {
       return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -381,9 +457,12 @@ const AdminPanel = () => {
 
         case "change-role": {
           setProcessingUserId(pendingAction.userId);
-          const res = await api.patch(`/admin/users/${pendingAction.userId}/role`, {
-            role: pendingAction.nextRole,
-          });
+          const res = await api.patch(
+            `/admin/users/${pendingAction.userId}/role`,
+            {
+              role: pendingAction.nextRole,
+            },
+          );
           setUsers((prev) =>
             prev.map((user) =>
               user.id === pendingAction.userId
@@ -397,9 +476,12 @@ const AdminPanel = () => {
 
         case "toggle-block": {
           setProcessingUserId(pendingAction.userId);
-          const res = await api.patch(`/admin/users/${pendingAction.userId}/block`, {
-            isBlocked: pendingAction.nextBlocked,
-          });
+          const res = await api.patch(
+            `/admin/users/${pendingAction.userId}/block`,
+            {
+              isBlocked: pendingAction.nextBlocked,
+            },
+          );
           setUsers((prev) =>
             prev.map((user) =>
               user.id === pendingAction.userId
@@ -452,6 +534,50 @@ const AdminPanel = () => {
           setProcessingUserId(null);
           break;
         }
+
+        case "set-ip-ban": {
+          setProcessingUserId(pendingAction.user.id);
+          const trimmedMinutes = ipBanMinutesInput.trim();
+          if (!ipBanReasonInput.trim()) {
+            showError("IP ban reason is required.");
+            return;
+          }
+
+          await api.patch(`/admin/users/${pendingAction.user.id}/ip-ban`, {
+            durationMinutes: trimmedMinutes ? Number(trimmedMinutes) : null,
+            reason: ipBanReasonInput.trim(),
+          });
+          await fetchData("users");
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "clear-ip-ban": {
+          setProcessingUserId(pendingAction.user.id);
+          await api.delete(`/admin/users/${pendingAction.user.id}/ip-ban`);
+          await fetchData("users");
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "delete-user": {
+          setProcessingUserId(pendingAction.user.id);
+          await api.delete(`/admin/users/${pendingAction.user.id}`);
+          setUsers((prev) =>
+            prev.filter((entry) => entry.id !== pendingAction.user.id),
+          );
+          setProcessingUserId(null);
+          break;
+        }
+
+        case "create-announcement": {
+          const res = await api.post("/admin/announcements", {
+            title: announcementTitleInput.trim(),
+            text: announcementTextInput.trim(),
+          });
+          setPosts((prev) => [res.data.post, ...prev]);
+          break;
+        }
       }
 
       closeActionModal();
@@ -463,7 +589,10 @@ const AdminPanel = () => {
         pendingAction.type === "change-role" ||
         pendingAction.type === "toggle-block" ||
         pendingAction.type === "set-timeout" ||
-        pendingAction.type === "clear-timeout"
+        pendingAction.type === "clear-timeout" ||
+        pendingAction.type === "set-ip-ban" ||
+        pendingAction.type === "clear-ip-ban" ||
+        pendingAction.type === "delete-user"
       ) {
         setProcessingUserId(null);
       }
@@ -474,7 +603,10 @@ const AdminPanel = () => {
         pendingAction.type === "change-role" ||
         pendingAction.type === "toggle-block" ||
         pendingAction.type === "set-timeout" ||
-        pendingAction.type === "clear-timeout"
+        pendingAction.type === "clear-timeout" ||
+        pendingAction.type === "set-ip-ban" ||
+        pendingAction.type === "clear-ip-ban" ||
+        pendingAction.type === "delete-user"
       ) {
         await fetchData("users");
       }
@@ -486,80 +618,10 @@ const AdminPanel = () => {
     }
   };
 
-  const actionModalContent = useMemo(() => {
-    if (!pendingAction) {
-      return {
-        title: "",
-        description: "",
-        confirmLabel: "Confirm",
-        danger: false,
-      };
-    }
-
-    switch (pendingAction.type) {
-      case "delete-post":
-        return {
-          title: "Delete Post",
-          description:
-            "This post will be permanently removed. A reason is required and the user will be notified.",
-          confirmLabel: "Delete post",
-          danger: true,
-        };
-      case "delete-comment":
-        return {
-          title: "Delete Comment",
-          description:
-            "This comment will be permanently removed. A reason is required and the user will be notified.",
-          confirmLabel: "Delete comment",
-          danger: true,
-        };
-      case "report-action":
-        if (pendingAction.action === "dismiss") {
-          return {
-            title: "Dismiss Report",
-            description: "This report will be marked as handled and dismissed.",
-            confirmLabel: "Dismiss report",
-            danger: false,
-          };
-        }
-        return {
-          title: "Block Reported User",
-          description: `Block @${pendingAction.username} from posting and commenting?`,
-          confirmLabel: "Block user",
-          danger: true,
-        };
-      case "change-role":
-        return {
-          title: "Change User Role",
-          description: `Change @${pendingAction.username} from ${pendingAction.currentRole} to ${pendingAction.nextRole}?`,
-          confirmLabel: "Change role",
-          danger: false,
-        };
-      case "toggle-block":
-        return {
-          title: pendingAction.nextBlocked ? "Block User" : "Unblock User",
-          description: pendingAction.nextBlocked
-            ? `Block @${pendingAction.username} from posting and commenting?`
-            : `Restore posting and commenting access for @${pendingAction.username}?`,
-          confirmLabel: pendingAction.nextBlocked ? "Block user" : "Unblock user",
-          danger: pendingAction.nextBlocked,
-        };
-      case "set-timeout":
-        return {
-          title: "Set Timeout",
-          description: `Set a temporary posting/commenting timeout for @${pendingAction.user.username}.`,
-          confirmLabel: "Set timeout",
-          danger: true,
-        };
-      case "clear-timeout":
-        return {
-          title: "Clear Timeout",
-          description: `Remove the active timeout for @${pendingAction.user.username}?`,
-          confirmLabel: "Clear timeout",
-          danger: false,
-        };
-    }
-  }, [pendingAction]);
+  const actionModalContent = useMemo(
+    () => getActionModalContent(pendingAction),
+    [pendingAction],
+  );
 
   const canManageUsers = currentUserRole === "ADMIN";
 
@@ -576,6 +638,9 @@ const AdminPanel = () => {
             onToggleBlock={requestToggleBlock}
             onSetTimeout={requestSetTimeout}
             onClearTimeout={requestClearTimeout}
+            onSetIpBan={requestSetIpBan}
+            onClearIpBan={requestClearIpBan}
+            onDeleteUser={requestDeleteUser}
           />
         );
       case "posts":
@@ -621,57 +686,26 @@ const AdminPanel = () => {
   return (
     <div className="min-h-screen text-white p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">
-          Moderation Panel
-        </h1>
+        <AdminPanelHeader
+          canManageUsers={canManageUsers}
+          onCreateAnnouncement={() => {
+            void requestCreateAnnouncement();
+          }}
+        />
 
         <AdminTabs activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="bg-gray-800 rounded-lg p-2 sm:p-4">
-          {loading ? (
-            <div className="text-center py-8">Loading...</div>
-          ) : (
-            renderActiveTab()
-          )}
+          {loading ? <AdminPanelSkeleton /> : renderActiveTab()}
         </div>
 
         {!loading && activeTabItemCount > 0 && (
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPageForActiveTab(Math.max(1, activePage - 1))}
-              disabled={activePage === 1}
-              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
-            >
-              Prev
-            </button>
-
-            {visiblePageNumbers.map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setPageForActiveTab(page)}
-                className={`px-3 py-1 rounded ${
-                  page === activePage
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={() =>
-                setPageForActiveTab(Math.min(totalPages, activePage + 1))
-              }
-              disabled={activePage === totalPages}
-              className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
+          <AdminPagination
+            activePage={activePage}
+            totalPages={totalPages}
+            visiblePageNumbers={visiblePageNumbers}
+            onPageChange={setPageForActiveTab}
+          />
         )}
       </div>
 
@@ -682,73 +716,38 @@ const AdminPanel = () => {
         confirmLabel={actionModalContent.confirmLabel}
         danger={actionModalContent.danger}
         isSubmitting={isSubmittingAction}
-        confirmDisabled={timeoutInputInvalid || deleteReasonInvalid}
+        confirmDisabled={
+          timeoutInputInvalid ||
+          deleteReasonInvalid ||
+          ipBanInputInvalid ||
+          announcementInputInvalid
+        }
         onClose={closeActionModal}
         onConfirm={() => {
           void executePendingAction();
         }}
       >
-        {pendingAction?.type === "set-timeout" ? (
-          <div className="space-y-3">
-            <div>
-              <label
-                htmlFor="timeout-minutes"
-                className="block text-sm text-gray-300 mb-1"
-              >
-                Duration (minutes)
-              </label>
-              <input
-                id="timeout-minutes"
-                type="number"
-                min={1}
-                value={timeoutMinutesInput}
-                onChange={(event) => setTimeoutMinutesInput(event.target.value)}
-                className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="timeout-reason"
-                className="block text-sm text-gray-300 mb-1"
-              >
-                Reason
-              </label>
-              <textarea
-                id="timeout-reason"
-                value={timeoutReasonInput}
-                onChange={(event) => setTimeoutReasonInput(event.target.value)}
-                maxLength={110}
-                rows={3}
-                className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white resize-none"
-              />
-              <p className="text-xs text-gray-400 mt-1 text-right">
-                {timeoutReasonInput.length}/110
-              </p>
-            </div>
-          </div>
-        ) : pendingAction?.type === "delete-post" ||
-          pendingAction?.type === "delete-comment" ? (
-          <div>
-            <label
-              htmlFor="delete-reason"
-              className="block text-sm text-gray-300 mb-1"
-            >
-              Reason for deletion
-            </label>
-            <textarea
-              id="delete-reason"
-              value={deleteReasonInput}
-              onChange={(event) => setDeleteReasonInput(event.target.value)}
-              maxLength={MAX_DELETE_REASON_LENGTH}
-              rows={4}
-              className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white resize-none"
-              placeholder="Explain why this content is being removed."
-            />
-            <p className="text-xs text-gray-400 mt-1 text-right">
-              {deleteReasonInput.length}/{MAX_DELETE_REASON_LENGTH}
-            </p>
-          </div>
-        ) : null}
+        <AdminActionFields
+          pendingAction={pendingAction}
+          timeoutMinutesInput={timeoutMinutesInput}
+          timeoutReasonInput={timeoutReasonInput}
+          deleteReasonInput={deleteReasonInput}
+          ipBanMinutesInput={ipBanMinutesInput}
+          ipBanReasonInput={ipBanReasonInput}
+          announcementTitleInput={announcementTitleInput}
+          announcementTextInput={announcementTextInput}
+          maxDeleteReasonLength={MAX_DELETE_REASON_LENGTH}
+          maxIpBanReasonLength={MAX_IP_BAN_REASON_LENGTH}
+          maxAnnouncementTitleLength={MAX_ANNOUNCEMENT_TITLE_LENGTH}
+          maxAnnouncementTextLength={MAX_ANNOUNCEMENT_TEXT_LENGTH}
+          onTimeoutMinutesInputChange={setTimeoutMinutesInput}
+          onTimeoutReasonInputChange={setTimeoutReasonInput}
+          onDeleteReasonInputChange={setDeleteReasonInput}
+          onIpBanMinutesInputChange={setIpBanMinutesInput}
+          onIpBanReasonInputChange={setIpBanReasonInput}
+          onAnnouncementTitleInputChange={setAnnouncementTitleInput}
+          onAnnouncementTextInputChange={setAnnouncementTextInput}
+        />
       </AdminActionModal>
 
       <ErrorToast error={error} />

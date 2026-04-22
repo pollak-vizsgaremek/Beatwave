@@ -7,6 +7,10 @@ import CommentComposer from "../components/discussion/CommentComposer";
 import CommentThread from "../components/discussion/CommentThread";
 import DiscussionPostCard from "../components/discussion/DiscussionPostCard";
 import {
+  CommentThreadSkeleton,
+  DiscussionDetailSkeleton,
+} from "../components/LoadingSkeletons";
+import {
   EditPostModal,
   ReportModal,
 } from "../components/discussion/DiscussionModals";
@@ -457,9 +461,7 @@ const ViewDiscussion = () => {
 
       <div>
         {loadingPost ? (
-          <p className="text-center mt-10 text-xl font-semibold">
-            Loading post...
-          </p>
+          <DiscussionDetailSkeleton />
         ) : !postData ? (
           <p className="text-center mt-10 text-xl font-semibold">
             No post found
@@ -499,9 +501,7 @@ const ViewDiscussion = () => {
               />
 
               {loadingComments ? (
-                <p className="text-center text-gray-400 py-10">
-                  Loading comments...
-                </p>
+                <CommentThreadSkeleton />
               ) : comments.length === 0 ? (
                 <div className="text-center py-10 bg-card-black rounded-2xl">
                   <p className="text-gray-400">

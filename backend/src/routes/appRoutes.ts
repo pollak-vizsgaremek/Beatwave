@@ -40,6 +40,7 @@ import {
   isAdminOrModerator,
 } from "../middlewares/authMiddleware";
 import {
+  getAnnouncements,
   getPostById,
   getPosts,
   getMyPosts,
@@ -74,6 +75,10 @@ import {
   blockReportedUser,
   updateUserRole,
   setUserBlockedStatus,
+  setUserIpBan,
+  clearUserIpBan,
+  deleteUserByAdmin,
+  createAnnouncement,
 } from "../controllers/adminController";
 
 const router = Router();
@@ -141,6 +146,7 @@ router.get("/auth/spotify/search", verifyToken, searchSpotify);
 router.get("/auth/spotify/artist/:id", verifyToken, getSpotifyArtist);
 
 //Discussion
+router.get("/announcements", verifyToken, getAnnouncements);
 router.get("/posts", verifyToken, getPosts);
 router.get("/post/:id", verifyToken, getPostById);
 router.post("/posts", verifyToken, createPost);
@@ -181,6 +187,10 @@ router.delete(
   isAdminOrModerator,
   clearUserTimeout,
 );
+router.patch("/admin/users/:id/ip-ban", verifyToken, isAdmin, setUserIpBan);
+router.delete("/admin/users/:id/ip-ban", verifyToken, isAdmin, clearUserIpBan);
+router.delete("/admin/users/:id", verifyToken, isAdmin, deleteUserByAdmin);
+router.post("/admin/announcements", verifyToken, isAdmin, createAnnouncement);
 router.get("/admin/posts", verifyToken, isAdminOrModerator, getAllPosts);
 router.get("/admin/comments", verifyToken, isAdminOrModerator, getAllComments);
 router.get(

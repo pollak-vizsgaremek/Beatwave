@@ -4,6 +4,7 @@ import { ChevronLeft, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "../utils/api";
 import ErrorToast from "../components/ErrorToast";
+import { ArtistViewSkeleton } from "../components/LoadingSkeletons";
 import { useErrorToast } from "../utils/useErrorToast";
 import TrackPlaylistPicker from "../components/TrackPlaylistPicker";
 
@@ -108,9 +109,7 @@ const ArtistView = () => {
         </button>
 
         {loading ? (
-          <p className="text-gray-400 text-center animate-pulse mt-20 text-lg">
-            Loading artist...
-          </p>
+          <ArtistViewSkeleton />
         ) : !artist ? (
           <p className="text-gray-400 text-center mt-20 text-lg">
             Artist not found.
