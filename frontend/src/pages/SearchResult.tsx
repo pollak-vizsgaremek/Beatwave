@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router";
 import api from "../utils/api";
 import ErrorToast from "../components/ErrorToast";
+import { SearchResultsSkeleton } from "../components/LoadingSkeletons";
 import { useErrorToast } from "../utils/useErrorToast";
 import TrackPlaylistPicker from "../components/TrackPlaylistPicker";
 
@@ -87,7 +88,12 @@ const SearchResult = () => {
   const navigate = useNavigate();
   const [results, setResults] = useState<SearchResults>({});
   const [loading, setLoading] = useState(true);
-  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
+  const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(
+    null,
+  );
+  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>(
+    {},
+  );
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
   const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({});
   const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
@@ -187,6 +193,7 @@ const SearchResult = () => {
       setHasMore({});
       setLoadingMore({});
       setExpandedTrackId(null);
+      setSpotifyConnected(null);
 
       try {
         const response = await api.get("/auth/spotify/search", {
@@ -195,9 +202,12 @@ const SearchResult = () => {
 
         if (!isMounted) return;
 
-        if (response.data.error) {
+        if (response.data.connected === false) {
+          setSpotifyConnected(false);
+        } else if (response.data.error) {
           showError(response.data.error);
         } else {
+          setSpotifyConnected(true);
           const data = response.data.results || {};
           setResults(data);
 
@@ -235,11 +245,7 @@ const SearchResult = () => {
   }, [searchParams.toString()]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-white text-xl animate-pulse">Searching...</div>
-      </div>
-    );
+    return <SearchResultsSkeleton />;
   }
 
   if (!query) {
@@ -267,10 +273,17 @@ const SearchResult = () => {
         Search results for "<span className="text-spotify-green">{query}</span>"
       </h1>
 
-      {!hasResults && (
+      {spotifyConnected === false ? (
         <p className="text-gray-400 text-lg text-center mt-20">
-          No results found. Try a different search or adjust your filters.
+          Spotify is not connected. Connect your Spotify account to search for
+          music.
         </p>
+      ) : (
+        !hasResults && (
+          <p className="text-gray-400 text-lg text-center mt-20">
+            No results found. Try a different search or adjust your filters.
+          </p>
+        )
       )}
 
       {/* Tracks */}
@@ -368,8 +381,7 @@ const SearchResult = () => {
                 >
                   <img
                     src={
-                      artist.images?.[0]?.url ||
-                      "https://placehold.co/120x120"
+                      artist.images?.[0]?.url || "https://placehold.co/120x120"
                     }
                     alt={artist.name}
                     className="w-24 h-24 rounded-full object-cover"

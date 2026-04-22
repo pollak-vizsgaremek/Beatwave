@@ -3,13 +3,11 @@ import cors from "cors";
 import config from "./config/config";
 import appRoutes from "./routes/appRoutes";
 import { errorHandler } from "./middlewares/errorHandler";
-import {
-  apiRateLimiter,
-  authRateLimiter,
-} from "./middlewares/rateLimit";
+import { apiRateLimiter, authRateLimiter } from "./middlewares/rateLimit";
 
 const app = express();
 app.disable("x-powered-by");
+app.set("trust proxy", true);
 
 app.use(
   cors({

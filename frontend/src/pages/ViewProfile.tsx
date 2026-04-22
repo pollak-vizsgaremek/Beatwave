@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 import { motion } from "framer-motion";
 
 import ErrorToast from "../components/ErrorToast";
+import { PublicProfileSkeleton } from "../components/LoadingSkeletons";
 import api from "../utils/api";
 import formatRelative from "../utils/DateFormatting";
 import type { DiscussionType } from "../utils/Type";
@@ -27,7 +28,9 @@ const ViewProfile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const response = await api.get(`/user-profile/${id}?includeSpotify=false`);
+        const response = await api.get(
+          `/user-profile/${id}?includeSpotify=false`,
+        );
         setProfile(response.data);
       } catch (err: any) {
         showError(err.response?.data?.error || "Failed to load user profile.");
@@ -61,9 +64,7 @@ const ViewProfile = () => {
         </Link>
 
         {loading ? (
-          <div className="flex justify-center mt-14">
-            <p className="text-white text-lg">Loading profile...</p>
-          </div>
+          <PublicProfileSkeleton />
         ) : !profile ? (
           <div className="flex justify-center mt-14">
             <p className="text-white text-lg">
@@ -124,36 +125,35 @@ const ViewProfile = () => {
                       transition={{ duration: 0.3, delay: i * 0.05 }}
                       whileHover={{ y: -3, scale: 1.01 }}
                     >
-                    <Link
- 
-                      to={`/discussion/view/${post.id}`}
-                      className="block rounded-2xl border border-white/10 bg-black/20 p-4 hover:border-spotify-green/60 hover:bg-black/30 transition-colors"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                        <div>
-                          <h3 className="text-xl font-semibold text-white">
-                            {post.title}
-                          </h3>
-                          <p className="text-sm text-spotify-green italic mt-1">
-                            {post.topic}
+                      <Link
+                        to={`/discussion/view/${post.id}`}
+                        className="block rounded-2xl border border-white/10 bg-black/20 p-4 hover:border-spotify-green/60 hover:bg-black/30 transition-colors"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                          <div>
+                            <h3 className="text-xl font-semibold text-white">
+                              {post.title}
+                            </h3>
+                            <p className="text-sm text-spotify-green italic mt-1">
+                              {post.topic}
+                            </p>
+                          </div>
+                          <p className="text-sm text-gray-400 whitespace-nowrap">
+                            {formatRelative(post.postedAt)}
                           </p>
                         </div>
-                        <p className="text-sm text-gray-400 whitespace-nowrap">
-                          {formatRelative(post.postedAt)}
-                        </p>
-                      </div>
 
-                      <p className="text-gray-200 mt-3 line-clamp-3 whitespace-pre-wrap">
-                        {post.text}
-                      </p>
-
-                      {post.hashtags ? (
-                        <p className="text-sm text-gray-400 mt-3">
-                          {post.hashtags}
+                        <p className="text-gray-200 mt-3 line-clamp-3 whitespace-pre-wrap">
+                          {post.text}
                         </p>
-                      ) : null}
-                    </Link>
-                  </motion.div>
+
+                        {post.hashtags ? (
+                          <p className="text-sm text-gray-400 mt-3">
+                            {post.hashtags}
+                          </p>
+                        ) : null}
+                      </Link>
+                    </motion.div>
                   ))}
                 </div>
               )}

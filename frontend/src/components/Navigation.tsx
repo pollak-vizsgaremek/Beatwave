@@ -4,10 +4,12 @@ import { useLocation, useNavigate } from "react-router";
 
 import ErrorToast from "./ErrorToast";
 import MobileMenu from "./navigation/MobileMenu";
+import DiscussionSearchBar from "./navigation/DiscussionSearchBar.tsx";
 import NavLinks from "./navigation/NavLinks";
 import NotificationsMenu from "./navigation/NotificationsMenu";
 import SearchBar from "./navigation/SearchBar";
 import UserMenu from "./navigation/UserMenu";
+import { useDiscussionToolbar } from "../context/DiscussionToolbarContext.tsx";
 import type {
   SearchAvailability,
   SearchFilterSetters,
@@ -37,6 +39,7 @@ const Navigation = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, setCurrentUser } = useSession();
+  const { topicOptions, authorOptions } = useDiscussionToolbar();
   const isDiscussionRoute = location.pathname.startsWith("/discussion");
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -294,7 +297,10 @@ const Navigation = () => {
       await api.post("/logout");
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.warn("Logout API call failed, clearing local session anyway.", error);
+        console.warn(
+          "Logout API call failed, clearing local session anyway.",
+          error,
+        );
       }
     } finally {
       clearLocalSession();
@@ -425,7 +431,12 @@ const Navigation = () => {
           />
         </div>
       ) : (
-        <div className="flex flex-1 min-w-0 items-center justify-center" />
+        <div className="flex flex-1 min-w-0 items-center justify-center">
+          <DiscussionSearchBar
+            topicOptions={topicOptions}
+            authorOptions={authorOptions}
+          />
+        </div>
       )}
 
       <div className="hidden md:flex flex-1 min-w-0 gap-2 sm:gap-4 md:gap-5 items-center justify-end">

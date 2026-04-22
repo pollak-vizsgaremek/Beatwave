@@ -35,6 +35,7 @@ model User {
   description       String?  @db.Text
   isPrivate         Boolean  @default(false)
   isBlocked         Boolean  @default(false)
+  lastKnownIp       String?
   role              Role     @default(USER)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -50,6 +51,7 @@ model User {
   triggeredNotifications Notification[] @relation("TriggeredNotifications")
   moderationLogs         ModerationLog[] @relation("UserLogs")
   performedModerations   ModerationLog[] @relation("ModeratorLogs")
+  ipBansCreated          IpBan[]         @relation("IpBanCreatedBy")
 }
 
 model ConnectedApp {
@@ -121,9 +123,24 @@ model Notification {
   triggeredById String?
 }
 
+model IpBan {
+  id        String   @id @default(uuid())
+  ipAddress String
+  reason    String   @db.Text
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bannedBy   User?   @relation("IpBanCreatedBy", fields: [bannedById], references: [id], onDelete: SetNull)
+  bannedById String?
+
+  @@index([ipAddress])
+  @@index([expiresAt])
+}
+
 enum ModerationStatus {
   DELETED
-  WARNED
+  NOTIFIED
   REPORTED
   DISMISSED
   BLOCKED
@@ -132,7 +149,7 @@ enum ModerationStatus {
 
 model ModerationLog {
   id        String            @id @default(uuid())
-  status    ModerationStatus  @default(WARNED)
+  status    ModerationStatus  @default(NOTIFIED)
   action    String            // What action was taken (DELETE_POST, DELETE_COMMENT, etc.)
   details   String            // Additional details about the action
   createdAt DateTime          @default(now())

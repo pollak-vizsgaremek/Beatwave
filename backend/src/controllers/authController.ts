@@ -8,6 +8,11 @@ import {
   getTokenFromRequest,
   hashToken,
 } from "../lib/authToken";
+import {
+  buildIpBanErrorMessage,
+  getActiveIpBanForAddress,
+  getClientIp,
+} from "../lib/ipBan";
 import { prisma } from "../lib/prisma";
 
 const AUTH_COOKIE_MAX_AGE_MS =
@@ -20,6 +25,14 @@ export const createUser = async (
 ) => {
   try {
     const { username, email, password } = req.body;
+    const clientIp = getClientIp(req);
+
+    const activeIpBan = await getActiveIpBanForAddress(clientIp);
+    if (activeIpBan) {
+      return res.status(403).json({
+        error: buildIpBanErrorMessage(activeIpBan),
+      });
+    }
 
     const pepper = config.passwordPepper;
     const rounds = config.bcryptRounds;
@@ -73,6 +86,7 @@ export const createUser = async (
         username,
         email,
         passwordHash,
+        lastKnownIp: clientIp,
       },
     });
 
@@ -98,6 +112,14 @@ export const authenticateUser = async (
   try {
     const { login, email, username, password } = req.body;
     const identifier = String(login ?? email ?? username ?? "").trim();
+    const clientIp = getClientIp(req);
+
+    const activeIpBan = await getActiveIpBanForAddress(clientIp);
+    if (activeIpBan) {
+      return res.status(403).json({
+        error: buildIpBanErrorMessage(activeIpBan),
+      });
+    }
 
     if (!identifier || !password) {
       return res.status(400).json({ error: "Missing required fields" });
@@ -120,6 +142,13 @@ export const authenticateUser = async (
 
     if (!isValid) {
       return res.status(401).json({ error: INVALID_CREDENTIALS_ERROR });
+    }
+
+    if (clientIp && user.lastKnownIp !== clientIp) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastKnownIp: clientIp },
+      });
     }
 
     const token = jwt.sign(

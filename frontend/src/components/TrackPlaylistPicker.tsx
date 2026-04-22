@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Plus } from "lucide-react";
 import { motion } from "framer-motion";
+import { PlaylistPickerSkeleton } from "./LoadingSkeletons";
 import { spotifyPlaylistController } from "../controllers/spotifyPlaylistController";
 
 type PlaylistItem = {
@@ -16,7 +17,6 @@ type PlaylistItem = {
   images?: { url?: string }[];
   tracks?: { total?: number };
 };
-
 
 type TrackPlaylistPickerProps = {
   trackUri: string;
@@ -105,11 +105,12 @@ const TrackPlaylistPicker = ({
 
     try {
       setSaving(true);
-      
-      const checkResponse = await spotifyPlaylistController.checkTrackInPlaylists(
-        selectedPlaylistIds,
-        trackUri
-      );
+
+      const checkResponse =
+        await spotifyPlaylistController.checkTrackInPlaylists(
+          selectedPlaylistIds,
+          trackUri,
+        );
 
       const duplicateChecks = (checkResponse.data?.checks || []) as {
         playlistId: string;
@@ -128,7 +129,7 @@ const TrackPlaylistPicker = ({
         onError(
           duplicateNames.length === 1
             ? `"${trackName}" is already in ${duplicateNames[0]}.`
-            : `"${trackName}" is already in ${duplicateNames.length} selected playlists.`
+            : `"${trackName}" is already in ${duplicateNames.length} selected playlists.`,
         );
 
         setSaving(false);
@@ -171,7 +172,10 @@ const TrackPlaylistPicker = ({
   const handleRemove = async (playlistId: string, playlistName: string) => {
     try {
       setRemovingPlaylistId(playlistId);
-      await spotifyPlaylistController.removeTrackFromPlaylist(playlistId, trackUri);
+      await spotifyPlaylistController.removeTrackFromPlaylist(
+        playlistId,
+        trackUri,
+      );
 
       setPlaylists((prev) =>
         prev.map((playlist) => {
@@ -179,7 +183,10 @@ const TrackPlaylistPicker = ({
             return playlist;
           }
 
-          const removedOccurrences = Math.max(1, playlist.trackOccurrences ?? 1);
+          const removedOccurrences = Math.max(
+            1,
+            playlist.trackOccurrences ?? 1,
+          );
 
           return {
             ...playlist,
@@ -226,7 +233,7 @@ const TrackPlaylistPicker = ({
       </div>
 
       {loadingPlaylists ? (
-        <p className="text-sm text-gray-400">Loading your playlists...</p>
+        <PlaylistPickerSkeleton />
       ) : playlists.length > 0 ? (
         <>
           <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1">

@@ -2,6 +2,7 @@ import { EllipsisVertical } from "lucide-react";
 import type { RefObject } from "react";
 import { Link } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
+import { ProfilePostsSkeleton } from "../LoadingSkeletons";
 import formatRelative from "../../utils/DateFormatting";
 import type { DiscussionType } from "../../utils/Type";
 
@@ -38,7 +39,7 @@ const ProfileContent = ({
         </div>
 
         {loadingPosts ? (
-          <p className="text-gray-400">Loading your posts...</p>
+          <ProfilePostsSkeleton />
         ) : userPosts.length === 0 ? (
           <p className="text-gray-400">You have not created any posts yet.</p>
         ) : (

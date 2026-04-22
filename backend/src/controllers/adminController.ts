@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
+import { getActiveIpBanForAddress } from "../lib/ipBan";
 import {
   buildTimeoutLogDetails,
   CLEAR_USER_TIMEOUT_ACTION,
@@ -12,6 +13,11 @@ const VALID_USER_ROLES = ["USER", "MODERATOR", "ADMIN"] as const;
 const MAX_TIMEOUT_MINUTES = 60 * 24 * 30;
 const MAX_TIMEOUT_REASON_LENGTH = 110;
 const MAX_DELETE_REASON_LENGTH = 300;
+const MAX_IP_BAN_MINUTES = 60 * 24 * 365;
+const MAX_IP_BAN_REASON_LENGTH = 200;
+const MAX_ANNOUNCEMENT_TITLE_LENGTH = 200;
+const MAX_ANNOUNCEMENT_TEXT_LENGTH = 10000;
+const ANNOUNCEMENT_TOPIC = "Announcement";
 
 const getValidatedDeleteReason = (reason: unknown) => {
   if (!reason || typeof reason !== "string" || !reason.trim()) {
@@ -27,6 +33,76 @@ const getValidatedDeleteReason = (reason: unknown) => {
   }
 
   return { value: trimmedReason, error: null } as const;
+};
+
+const getValidatedIpBanReason = (reason: unknown) => {
+  if (!reason || typeof reason !== "string" || !reason.trim()) {
+    return { value: null, error: "IP ban reason is required" } as const;
+  }
+
+  const trimmedReason = reason.trim();
+  if (trimmedReason.length > MAX_IP_BAN_REASON_LENGTH) {
+    return {
+      value: null,
+      error: `IP ban reason must be at most ${MAX_IP_BAN_REASON_LENGTH} characters`,
+    } as const;
+  }
+
+  return { value: trimmedReason, error: null } as const;
+};
+
+const getValidatedIpBanDuration = (durationMinutes: unknown) => {
+  if (
+    durationMinutes === null ||
+    durationMinutes === undefined ||
+    durationMinutes === ""
+  ) {
+    return { value: null, error: null } as const;
+  }
+
+  const minutes = Number(durationMinutes);
+  if (
+    !Number.isInteger(minutes) ||
+    minutes < 1 ||
+    minutes > MAX_IP_BAN_MINUTES
+  ) {
+    return {
+      value: null,
+      error: `durationMinutes must be an integer between 1 and ${MAX_IP_BAN_MINUTES}`,
+    } as const;
+  }
+
+  return { value: minutes, error: null } as const;
+};
+
+const getValidatedAnnouncementInput = (title: unknown, text: unknown) => {
+  if (!title || typeof title !== "string" || !title.trim()) {
+    return { error: "Announcement title is required" } as const;
+  }
+
+  if (title.trim().length > MAX_ANNOUNCEMENT_TITLE_LENGTH) {
+    return {
+      error: `Announcement title must be at most ${MAX_ANNOUNCEMENT_TITLE_LENGTH} characters`,
+    } as const;
+  }
+
+  if (!text || typeof text !== "string" || !text.trim()) {
+    return { error: "Announcement text is required" } as const;
+  }
+
+  if (text.trim().length > MAX_ANNOUNCEMENT_TEXT_LENGTH) {
+    return {
+      error: `Announcement text must be at most ${MAX_ANNOUNCEMENT_TEXT_LENGTH} characters`,
+    } as const;
+  }
+
+  return {
+    error: null,
+    value: {
+      title: title.trim(),
+      text: text.trim(),
+    },
+  } as const;
 };
 
 const getPendingReport = async (reportId: string) => {
@@ -73,6 +149,7 @@ export const getAllUsers = async (
   next: NextFunction,
 ) => {
   try {
+    const includeIpData = req.role === "ADMIN";
     const users = await prisma.user.findMany({
       select: {
         id: true,
@@ -80,6 +157,7 @@ export const getAllUsers = async (
         email: true,
         role: true,
         isBlocked: true,
+        lastKnownIp: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -90,13 +168,57 @@ export const getAllUsers = async (
 
     const timeoutMap = await getActiveTimeoutMap(users.map((user) => user.id));
 
+    const activeIpBanMap = new Map<
+      string,
+      Awaited<ReturnType<typeof getActiveIpBanForAddress>>
+    >();
+
+    if (includeIpData) {
+      const knownIps = users
+        .map((user) => user.lastKnownIp)
+        .filter((ip): ip is string => typeof ip === "string" && ip.length > 0);
+
+      if (knownIps.length > 0) {
+        const activeIpBans = await prisma.ipBan.findMany({
+          where: {
+            ipAddress: { in: knownIps },
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
+
+        for (const ban of activeIpBans) {
+          if (!activeIpBanMap.has(ban.ipAddress)) {
+            activeIpBanMap.set(ban.ipAddress, ban);
+          }
+        }
+      }
+    }
+
     res.status(200).json(
       users.map((user) => {
         const timeout = timeoutMap.get(user.id);
+        const activeIpBan = user.lastKnownIp
+          ? (activeIpBanMap.get(user.lastKnownIp) ?? null)
+          : null;
+
         return {
           ...user,
           timeoutUntil: timeout ? timeout.until.toISOString() : null,
           timeoutReason: timeout ? timeout.reason : null,
+          lastKnownIp: includeIpData ? (user.lastKnownIp ?? null) : null,
+          activeIpBanId: includeIpData ? (activeIpBan?.id ?? null) : null,
+          activeIpBanUntil:
+            includeIpData && activeIpBan?.expiresAt
+              ? activeIpBan.expiresAt.toISOString()
+              : includeIpData
+                ? null
+                : null,
+          activeIpBanReason: includeIpData
+            ? (activeIpBan?.reason ?? null)
+            : null,
         };
       }),
     );
@@ -126,7 +248,11 @@ export const setUserTimeout = async (
     }
 
     const minutes = Number(durationMinutes);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES) {
+    if (
+      !Number.isInteger(minutes) ||
+      minutes < 1 ||
+      minutes > MAX_TIMEOUT_MINUTES
+    ) {
       return res.status(400).json({
         error: `durationMinutes must be an integer between 1 and ${MAX_TIMEOUT_MINUTES}`,
       });
@@ -273,7 +399,8 @@ export const clearUserTimeout = async (
       prisma.notification.create({
         data: {
           type: "account_timeout_cleared",
-          message: "Your timeout has been lifted. You can post and comment again.",
+          message:
+            "Your timeout has been lifted. You can post and comment again.",
           userId: targetUser.id,
           triggeredById: req.userId,
         },
@@ -455,6 +582,338 @@ export const setUserBlockedStatus = async (
         ? "User blocked successfully"
         : "User unblocked successfully",
       user: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const setUserIpBan = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    const { durationMinutes, reason } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (id === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot IP ban your own account here" });
+    }
+
+    const validatedReason = getValidatedIpBanReason(reason);
+    if (validatedReason.error || !validatedReason.value) {
+      return res.status(400).json({ error: validatedReason.error });
+    }
+
+    const validatedDuration = getValidatedIpBanDuration(durationMinutes);
+    if (validatedDuration.error) {
+      return res.status(400).json({ error: validatedDuration.error });
+    }
+
+    const [targetUser, moderator] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          lastKnownIp: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, username: true },
+      }),
+    ]);
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    if (!targetUser.lastKnownIp) {
+      return res.status(400).json({
+        error: "This user has no known IP address to ban yet",
+      });
+    }
+
+    const targetIpAddress = targetUser.lastKnownIp;
+
+    const expiresAt = validatedDuration.value
+      ? new Date(Date.now() + validatedDuration.value * 60 * 1000)
+      : null;
+
+    const activeBan = await getActiveIpBanForAddress(targetIpAddress);
+
+    await prisma.$transaction(async (tx) => {
+      if (activeBan) {
+        await tx.ipBan.update({
+          where: { id: activeBan.id },
+          data: {
+            reason: validatedReason.value,
+            expiresAt,
+            bannedById: moderator.id,
+          },
+        });
+      } else {
+        await tx.ipBan.create({
+          data: {
+            ipAddress: targetIpAddress,
+            reason: validatedReason.value,
+            expiresAt,
+            bannedById: moderator.id,
+          },
+        });
+      }
+
+      await tx.moderationLog.create({
+        data: {
+          status: "BLOCKED",
+          action: "IP_BAN_USER",
+          moderatorId: moderator.id,
+          userId: targetUser.id,
+          details: expiresAt
+            ? `IP banned @${targetUser.username} (${targetIpAddress}) until ${expiresAt.toISOString()}. Reason: ${validatedReason.value}`
+            : `IP banned @${targetUser.username} (${targetIpAddress}) permanently. Reason: ${validatedReason.value}`,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          type: "ip_ban",
+          message: expiresAt
+            ? `Your IP address has been banned until ${expiresAt.toISOString()}. Reason: ${validatedReason.value}`
+            : `Your IP address has been banned permanently. Reason: ${validatedReason.value}`,
+          userId: targetUser.id,
+          triggeredById: moderator.id,
+        },
+      });
+    });
+
+    res.status(200).json({
+      message: expiresAt
+        ? "IP ban set successfully"
+        : "Permanent IP ban set successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const clearUserIpBan = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const [targetUser, moderator] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          lastKnownIp: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: req.userId },
+        select: { id: true, username: true },
+      }),
+    ]);
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!moderator) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    if (!targetUser.lastKnownIp) {
+      return res.status(400).json({
+        error: "This user has no known IP address",
+      });
+    }
+
+    const activeBan = await getActiveIpBanForAddress(targetUser.lastKnownIp);
+    if (!activeBan) {
+      return res
+        .status(400)
+        .json({ error: "No active IP ban found for this user" });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.ipBan.delete({
+        where: { id: activeBan.id },
+      });
+
+      await tx.moderationLog.create({
+        data: {
+          status: "WARNED",
+          action: "CLEAR_IP_BAN",
+          moderatorId: moderator.id,
+          userId: targetUser.id,
+          details: `Cleared IP ban for @${targetUser.username} (${targetUser.lastKnownIp}).`,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          type: "ip_ban_cleared",
+          message: "Your IP address ban has been removed.",
+          userId: targetUser.id,
+          triggeredById: moderator.id,
+        },
+      });
+    });
+
+    res.status(200).json({ message: "IP ban cleared successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteUserByAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (id === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot delete your own account here" });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+      },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await prisma.user.delete({
+      where: { id: targetUser.id },
+    });
+
+    res.status(200).json({
+      message: `User @${targetUser.username} deleted successfully`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createAnnouncement = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { title, text } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const validated = getValidatedAnnouncementInput(title, text);
+    if (validated.error || !validated.value) {
+      return res.status(400).json({ error: validated.error });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: {
+        id: true,
+        username: true,
+      },
+    });
+
+    if (!adminUser) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    const allUsers = await prisma.user.findMany({
+      select: { id: true },
+    });
+
+    const announcement = await prisma.$transaction(async (tx) => {
+      const createdPost = await tx.post.create({
+        data: {
+          title: validated.value.title,
+          text: validated.value.text,
+          topic: ANNOUNCEMENT_TOPIC,
+          hashtags: null,
+          userId: adminUser.id,
+        },
+        select: {
+          id: true,
+          title: true,
+          text: true,
+          topic: true,
+          postedAt: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+      });
+
+      await tx.notification.createMany({
+        data: allUsers.map((user) => ({
+          type: "announcement",
+          message: `New announcement from @${adminUser.username}: ${validated.value.title}`,
+          link: `/discussion/view/${createdPost.id}`,
+          userId: user.id,
+          triggeredById: adminUser.id,
+        })),
+      });
+
+      await tx.moderationLog.create({
+        data: {
+          status: "WARNED",
+          action: "CREATE_ANNOUNCEMENT",
+          moderatorId: adminUser.id,
+          userId: adminUser.id,
+          postId: createdPost.id,
+          details: `Created announcement post ${createdPost.id} titled "${validated.value.title}".`,
+        },
+      });
+
+      return createdPost;
+    });
+
+    res.status(201).json({
+      message: "Announcement created successfully",
+      post: announcement,
     });
   } catch (error) {
     next(error);

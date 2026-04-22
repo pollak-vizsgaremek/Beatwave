@@ -20,7 +20,7 @@ const SearchBar = ({
       wrapperClassName="w-full! max-w-[780px] min-w-[120px] sm:min-w-[600px] mx-1 sm:mx-2 md:mx-4 mt-0!"
       inputType="text"
       inputName="search"
-      inputPlaceHolder="Keresés..."
+      inputPlaceHolder="Search..."
       value={searchQuery}
       onChange={(e) => onSearchQueryChange(e.target.value)}
       onKeyDown={onSearchKeyDown}
