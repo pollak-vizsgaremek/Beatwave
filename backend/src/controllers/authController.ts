@@ -112,6 +112,21 @@ export const createUser = async (
       },
     });
 
+    try {
+      await sendTemplatedEmail({
+        template: "welcome",
+        to: newUser.email,
+        context: {
+          username: newUser.username,
+        },
+      });
+    } catch (emailError) {
+      console.error("[Registration] Failed to send welcome email.", {
+        userId: newUser.id,
+        emailError,
+      });
+    }
+
     const { passwordHash: _, ...safeUser } = newUser;
     return res.status(201).json(safeUser);
   } catch (error: any) {

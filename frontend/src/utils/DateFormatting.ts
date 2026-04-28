@@ -1,7 +1,7 @@
 const formatRelative = (date: Date) => {
   const now = new Date();
   const posted = new Date(date);
-  const diff = (posted.getTime() - now.getTime()) / 1000; // seconds
+  const diff = (posted.getTime() - now.getTime()) / 1000;
 
   const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 

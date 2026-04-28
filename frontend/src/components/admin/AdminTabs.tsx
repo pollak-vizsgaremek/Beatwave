@@ -13,7 +13,7 @@ const AdminTabs = ({ activeTab, onChange }: AdminTabsProps) => {
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
-          className={`flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
+          className={`cursor-pointer flex items-center gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base ${
             activeTab === tab.id
               ? "bg-blue-600 text-white"
               : "bg-gray-700 text-gray-300 hover:bg-gray-600"

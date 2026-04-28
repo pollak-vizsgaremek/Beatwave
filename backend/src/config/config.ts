@@ -64,6 +64,8 @@ interface Config {
   smtpUser: string;
   smtpPass: string;
   mailFrom: string;
+  emailFrom: string;
+  resendApiKey: string;
   resetPasswordTtlMinutes: number;
 }
 
@@ -102,7 +104,16 @@ const config: Config = {
   smtpSecure: process.env.SMTP_SECURE === "true",
   smtpUser: process.env.SMTP_USER || "",
   smtpPass: process.env.SMTP_PASS || "",
-  mailFrom: process.env.MAIL_FROM || "Beatwave <no-reply@beatwave.local>",
+  mailFrom:
+    process.env.MAIL_FROM ||
+    process.env.EMAIL_FROM ||
+    "Beatwave <no-reply@beatwave.local>",
+  emailFrom:
+    process.env.EMAIL_FROM ||
+    process.env.MAIL_FROM ||
+    "Beatwave <no-reply@beatwave.local>",
+  // Keep a compatibility fallback for accidental misspelling in existing .env files.
+  resendApiKey: process.env.RESEND_API_KEY || process.env.RESEMD_API_KEY || "",
   resetPasswordTtlMinutes,
 };
 

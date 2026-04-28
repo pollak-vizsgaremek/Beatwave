@@ -46,7 +46,6 @@ const UserProfile = () => {
   const { setCurrentUser } = useSession();
   const [isOnProfile, setIsOnProfile] = useState(true);
   const [spotiHover, setSpotiHover] = useState(false);
-  const [soundHover, setSoundHover] = useState(false);
   const [user, setUser] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<SpotifyTimeRange>("MEDIUM");
@@ -270,7 +269,6 @@ const UserProfile = () => {
       });
 
       setCurrentUser(null);
-      localStorage.removeItem("token");
       showSuccess("Account deleted.");
 
       window.setTimeout(() => {
@@ -283,7 +281,6 @@ const UserProfile = () => {
   };
 
   const connectedToSpotify = user?.spotifyConnected ?? false;
-  const connectedToSoundCloud = user?.soundCloudConnected ?? false;
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -486,9 +483,7 @@ const UserProfile = () => {
                 >
                   <SettingsContent
                     connectedToSpotify={connectedToSpotify}
-                    connectedToSoundCloud={connectedToSoundCloud}
                     spotiHover={spotiHover}
-                    soundHover={soundHover}
                     timeRange={timeRange}
                     isPrivate={user?.isPrivate ?? false}
                     isUpdatingPrivacy={isUpdatingPrivacy}
@@ -499,7 +494,6 @@ const UserProfile = () => {
                     onConnectSpotify={handleConnectSpotify}
                     onDisconnectSpotify={handleDisconnectSpotify}
                     onSpotifyHoverChange={setSpotiHover}
-                    onSoundHoverChange={setSoundHover}
                     onTimeRangeChange={handleTimeRangeChange}
                   />
                 </motion.div>

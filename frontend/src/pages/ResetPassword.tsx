@@ -130,13 +130,6 @@ const ResetPassword = () => {
     uppercase: /[A-Z]/.test(formData.password),
   };
   const strengthScore = Object.values(passwordChecks).filter(Boolean).length;
-  const passwordsMatch =
-    formData.password.length > 0 &&
-    formData.password === formData.confirmPassword;
-  const canSubmit =
-    tokenState === "valid" &&
-    Object.values(passwordChecks).every(Boolean) &&
-    passwordsMatch;
 
   const passwordRequirements = {
     "8+ characters": passwordChecks.length,

@@ -13,6 +13,7 @@ import {
   safeJsonParse,
   spotifyFetch,
 } from "../lib/spotifyUtils";
+import { sendTemplatedEmail } from "../email/service";
 
 const VALID_TIME_RANGES = ["SHORT", "MEDIUM", "LONG"] as const;
 const MAX_USERNAME_LENGTH = 50;
@@ -77,7 +78,9 @@ export const getUserProfile = async (
   next: NextFunction,
 ) => {
   try {
-    const includeSpotify = req.query.includeSpotify === "true";
+    const includeProfileImages =
+      req.query.includeSpotify === "true" ||
+      req.query.includeProfileImages === "true";
 
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
@@ -104,8 +107,9 @@ export const getUserProfile = async (
     const spotifyConnected = user.connectedApps.some(
       (app) => app.platform === "Spotify",
     );
+
     const spotifyProfileImage =
-      includeSpotify && spotifyConnected
+      includeProfileImages && spotifyConnected
         ? await getSpotifyProfileImage(user.id)
         : null;
 
@@ -119,9 +123,7 @@ export const getUserProfile = async (
       spotifyTimeRange: user.spotifyTimeRange,
       spotifyConnected,
       spotifyProfileImage,
-      soundCloudConnected: user.connectedApps.some(
-        (app) => app.platform === "SoundCloud",
-      ),
+      activeProfileImage: spotifyProfileImage,
     };
 
     res.status(200).json(userData);
@@ -136,7 +138,9 @@ export const getPublicUserProfile = async (
   next: NextFunction,
 ) => {
   try {
-    const includeSpotify = req.query.includeSpotify === "true";
+    const includeProfileImages =
+      req.query.includeSpotify === "true" ||
+      req.query.includeProfileImages === "true";
     const { id } = req.params;
 
     const viewerIsOwner = req.userId === id;
@@ -168,9 +172,20 @@ export const getPublicUserProfile = async (
       return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
     }
 
-    const spotifyProfileImage = includeSpotify
-      ? await getSpotifyProfileImage(user.id)
-      : null;
+    const spotifyConnected = await prisma.connectedApp.findFirst({
+      where: {
+        userId: user.id,
+        platform: "Spotify",
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const spotifyProfileImage =
+      includeProfileImages && Boolean(spotifyConnected)
+        ? await getSpotifyProfileImage(user.id)
+        : null;
 
     if (user.isPrivate && !viewerIsOwner) {
       return res.status(200).json({
@@ -180,12 +195,14 @@ export const getPublicUserProfile = async (
         isPrivate: true,
         posts: [],
         spotifyProfileImage,
+        activeProfileImage: spotifyProfileImage,
       });
     }
 
     res.status(200).json({
       ...user,
       spotifyProfileImage,
+      activeProfileImage: spotifyProfileImage,
     });
   } catch (error) {
     next(error);
@@ -368,7 +385,11 @@ export const deleteOwnAccount = async (
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+      },
     });
 
     if (!user) {
@@ -412,6 +433,21 @@ export const deleteOwnAccount = async (
       sameSite: "lax",
       path: "/",
     });
+
+    try {
+      await sendTemplatedEmail({
+        template: "accountDeleted",
+        to: user.email,
+        context: {
+          username: user.username,
+        },
+      });
+    } catch (emailError) {
+      console.error("[DeleteAccount] Failed to send account deletion email.", {
+        userId: user.id,
+        emailError,
+      });
+    }
 
     return res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {

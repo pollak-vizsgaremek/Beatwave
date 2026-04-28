@@ -16,7 +16,7 @@ const AdminPanelHeader = ({
         <button
           type="button"
           onClick={onCreateAnnouncement}
-          className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-500"
+          className="cursor-pointer rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-500"
         >
           Create announcement
         </button>
