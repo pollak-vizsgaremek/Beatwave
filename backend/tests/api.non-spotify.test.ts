@@ -124,7 +124,9 @@ const seedCommonDefaults = () => {
   prismaMock.user.delete.mockResolvedValue({ id: "user-1" });
   prismaMock.notification.create.mockResolvedValue({ id: "notification-1" });
   prismaMock.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
-  prismaMock.passwordResetToken.create.mockResolvedValue({ id: "reset-token-1" });
+  prismaMock.passwordResetToken.create.mockResolvedValue({
+    id: "reset-token-1",
+  });
   prismaMock.passwordResetToken.findUnique.mockResolvedValue(null);
   prismaMock.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
   prismaMock.user.update.mockResolvedValue({ id: "user-1" });
@@ -337,7 +339,9 @@ describe("Non-Spotify backend endpoints", () => {
       .set("Cookie", makeAuthCookie("user-1"));
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe("Something went wrong. Please try again later.");
+    expect(res.body.error).toBe(
+      "Something went wrong. Please try again later.",
+    );
     expect(res.body.error).not.toMatch(/prisma|database|stack/i);
   });
 
@@ -559,14 +563,20 @@ describe("Non-Spotify backend endpoints", () => {
       expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       usedAt: null,
     });
-    prismaMock.passwordResetToken.updateMany.mockResolvedValueOnce({ count: 1 });
-    prismaMock.user.update.mockResolvedValueOnce({ id: "user-1" });
-    prismaMock.passwordResetToken.deleteMany.mockResolvedValueOnce({ count: 0 });
-
-    const confirmRes = await request(app).post("/auth/password-reset/confirm").send({
-      token: "valid-token",
-      password: "Password1!",
+    prismaMock.passwordResetToken.updateMany.mockResolvedValueOnce({
+      count: 1,
     });
+    prismaMock.user.update.mockResolvedValueOnce({ id: "user-1" });
+    prismaMock.passwordResetToken.deleteMany.mockResolvedValueOnce({
+      count: 0,
+    });
+
+    const confirmRes = await request(app)
+      .post("/auth/password-reset/confirm")
+      .send({
+        token: "valid-token",
+        password: "Password1!",
+      });
 
     expect(confirmRes.status).toBe(200);
     expect(confirmRes.body.message).toBe("Password reset successful");

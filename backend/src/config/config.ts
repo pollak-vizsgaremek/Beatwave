@@ -58,20 +58,9 @@ interface Config {
   spotifyClientSecret: string;
   spotifyRedirectUri: string;
   frontendUrl: string;
-  smtpHost: string;
-  smtpPort: number;
-  smtpSecure: boolean;
-  smtpUser: string;
-  smtpPass: string;
-  mailFrom: string;
   emailFrom: string;
   resendApiKey: string;
   resetPasswordTtlMinutes: number;
-}
-
-const smtpPort = Number(process.env.SMTP_PORT || 1025);
-if (!Number.isFinite(smtpPort) || smtpPort <= 0) {
-  throw new Error("[Config] SMTP_PORT must be a positive number.");
 }
 
 const resetPasswordTtlMinutes = Number(
@@ -99,21 +88,9 @@ const config: Config = {
   spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
   spotifyRedirectUri: process.env.SPOTIFY_REDIRECT_URI!,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
-  smtpHost: process.env.SMTP_HOST || "127.0.0.1",
-  smtpPort,
-  smtpSecure: process.env.SMTP_SECURE === "true",
-  smtpUser: process.env.SMTP_USER || "",
-  smtpPass: process.env.SMTP_PASS || "",
-  mailFrom:
-    process.env.MAIL_FROM ||
-    process.env.EMAIL_FROM ||
-    "Beatwave <no-reply@beatwave.local>",
   emailFrom:
-    process.env.EMAIL_FROM ||
-    process.env.MAIL_FROM ||
-    "Beatwave <no-reply@beatwave.local>",
-  // Keep a compatibility fallback for accidental misspelling in existing .env files.
-  resendApiKey: process.env.RESEND_API_KEY || process.env.RESEMD_API_KEY || "",
+    process.env.EMAIL_FROM || "Beatwave <no-reply@beatwave.local>",
+  resendApiKey: process.env.RESEND_API_KEY || "",
   resetPasswordTtlMinutes,
 };
 
