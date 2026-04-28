@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type SyntheticEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router";
 import api from "../utils/api";
 import ErrorToast from "../components/ErrorToast";
+import { SearchResultsSkeleton } from "../components/LoadingSkeletons";
 import { useErrorToast } from "../utils/useErrorToast";
 import TrackPlaylistPicker from "../components/TrackPlaylistPicker";
 
@@ -17,6 +18,8 @@ interface SpotifyArtist {
   name: string;
   images?: SpotifyImage[];
   genres?: string[];
+  followers?: { total?: number };
+  stats?: { trackCount?: number };
 }
 
 interface SpotifyAlbum {
@@ -87,16 +90,32 @@ const SearchResult = () => {
   const navigate = useNavigate();
   const [results, setResults] = useState<SearchResults>({});
   const [loading, setLoading] = useState(true);
-  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({});
+  const [spotifyConnected, setSpotifyConnected] = useState<boolean | null>(
+    null,
+  );
+  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>(
+    {},
+  );
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
   const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({});
   const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
 
   // All errors shown as the bottom toast
   const { error, showError } = useErrorToast();
+  const { error: successMessage, showError: showSuccess } = useErrorToast(2400);
 
   const DEFAULT_VISIBLE = 5;
   const BATCH_SIZE = 10;
+  const fallbackCoverImage = "/Beatwave_logo.png";
+
+  const handleImageFallback = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    if (image.src.endsWith(fallbackCoverImage)) {
+      return;
+    }
+
+    image.src = fallbackCoverImage;
+  };
 
   const getVisible = (key: string) => visibleCounts[key] ?? DEFAULT_VISIBLE;
 
@@ -132,11 +151,12 @@ const SearchResult = () => {
                     ? "episode"
                     : key === "audiobooks"
                       ? "audiobook"
-                      : key;
+                    : key;
       params.offset = String(items.length);
       params.limit = String(BATCH_SIZE);
 
-      const response = await api.get("/auth/spotify/search", { params });
+      const endpoint = "/auth/spotify/search";
+      const response = await api.get(endpoint, { params });
       const newItems =
         response.data.results?.[key]?.items?.filter(Boolean) || [];
 
@@ -187,17 +207,22 @@ const SearchResult = () => {
       setHasMore({});
       setLoadingMore({});
       setExpandedTrackId(null);
+      setSpotifyConnected(null);
 
       try {
-        const response = await api.get("/auth/spotify/search", {
+        const endpoint = "/auth/spotify/search";
+        const response = await api.get(endpoint, {
           params: Object.fromEntries(searchParams.entries()),
         });
 
         if (!isMounted) return;
 
-        if (response.data.error) {
+        if (response.data.connected === false) {
+          setSpotifyConnected(false);
+        } else if (response.data.error) {
           showError(response.data.error);
         } else {
+          setSpotifyConnected(true);
           const data = response.data.results || {};
           setResults(data);
 
@@ -235,11 +260,7 @@ const SearchResult = () => {
   }, [searchParams.toString()]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="text-white text-xl animate-pulse">Searching...</div>
-      </div>
-    );
+    return <SearchResultsSkeleton />;
   }
 
   if (!query) {
@@ -264,13 +285,24 @@ const SearchResult = () => {
   return (
     <div className="w-[95%] xl:w-3/4 mx-auto pb-20">
       <h1 className="text-2xl md:text-3xl font-bold text-white mb-8">
-        Search results for "<span className="text-spotify-green">{query}</span>"
+        Search results for{" "}
+        <span className="text-spotify-green">
+          "{query}"
+        </span>{" "}
+        on Spotify
       </h1>
 
-      {!hasResults && (
+      {spotifyConnected === false ? (
         <p className="text-gray-400 text-lg text-center mt-20">
-          No results found. Try a different search or adjust your filters.
+          Spotify is not connected. Connect your Spotify account to search for
+          music.
         </p>
+      ) : (
+        !hasResults && (
+          <p className="text-gray-400 text-lg text-center mt-20">
+            No results found. Try a different search or adjust your filters.
+          </p>
+        )
       )}
 
       {/* Tracks */}
@@ -328,9 +360,11 @@ const SearchResult = () => {
                   {expandedTrackId === track.id && (
                     <TrackPlaylistPicker
                       trackUri={track.uri}
+                      trackId={track.id}
                       trackName={track.name}
                       expanded={expandedTrackId === track.id}
                       onToggle={() => setExpandedTrackId(null)}
+                      onSuccess={showSuccess}
                       onError={showError}
                     />
                   )}
@@ -359,31 +393,32 @@ const SearchResult = () => {
             {results.artists.items
               .filter(Boolean)
               .slice(0, getVisible("artists"))
-              .map((artist) => (
-                <button
-                  key={artist.id}
-                  type="button"
-                  onClick={() => navigate(`/artist/${artist.id}`)}
-                  className="flex w-full cursor-pointer flex-col items-center gap-3 rounded-xl bg-card p-4 text-left transition-colors hover:bg-accent-dark"
-                >
-                  <img
-                    src={
-                      artist.images?.[0]?.url ||
-                      "https://placehold.co/120x120"
-                    }
-                    alt={artist.name}
-                    className="w-24 h-24 rounded-full object-cover"
-                  />
-                  <p className="text-white font-medium text-center text-sm truncate w-full">
-                    {artist.name}
-                  </p>
-                  {artist.genres && artist.genres.length > 0 && (
-                    <p className="text-gray-400 text-xs text-center truncate w-full">
-                      {artist.genres.slice(0, 2).join(", ")}
+              .map((artist) => {
+                return (
+                  <button
+                    key={artist.id}
+                    type="button"
+                    onClick={() => navigate(`/artist/${artist.id}`)}
+                    className="flex w-full cursor-pointer flex-col items-center gap-3 rounded-xl bg-card p-4 text-left transition-colors hover:bg-accent-dark"
+                  >
+                    <img
+                      src={
+                        artist.images?.[0]?.url || "https://placehold.co/120x120"
+                      }
+                      alt={artist.name}
+                      className="w-24 h-24 rounded-full object-cover"
+                    />
+                    <p className="text-white font-medium text-center text-sm truncate w-full">
+                      {artist.name}
                     </p>
-                  )}
-                </button>
-              ))}
+                    {artist.genres && artist.genres.length > 0 ? (
+                      <p className="text-gray-400 text-xs text-center truncate w-full">
+                        {artist.genres.slice(0, 2).join(", ")}
+                      </p>
+                    ) : null}
+                  </button>
+                );
+              })}
           </div>
           {hasMore["artists"] && (
             <button
@@ -398,7 +433,8 @@ const SearchResult = () => {
       )}
 
       {/* Albums */}
-      {results.albums && results.albums.items.length > 0 && (
+      {results.albums &&
+        results.albums.items.length > 0 && (
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-white mb-4 border-b border-accent-dark pb-2">
             Albums
@@ -466,11 +502,12 @@ const SearchResult = () => {
                 >
                   <img
                     src={
-                      playlist.images?.[0]?.url ||
-                      "https://placehold.co/160x160"
+                      playlist.images?.[0]?.url || fallbackCoverImage
                     }
                     alt={playlist.name}
                     className="w-full aspect-square rounded-lg object-cover"
+                    referrerPolicy="no-referrer"
+                    onError={handleImageFallback}
                   />
                   <p className="text-white font-medium text-sm truncate">
                     {playlist.name}
@@ -497,7 +534,8 @@ const SearchResult = () => {
       )}
 
       {/* Shows */}
-      {results.shows && results.shows.items.length > 0 && (
+      {results.shows &&
+        results.shows.items.length > 0 && (
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-white mb-4 border-b border-accent-dark pb-2">
             Shows
@@ -544,7 +582,8 @@ const SearchResult = () => {
       )}
 
       {/* Episodes */}
-      {results.episodes && results.episodes.items.length > 0 && (
+      {results.episodes &&
+        results.episodes.items.length > 0 && (
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-white mb-4 border-b border-accent-dark pb-2">
             Episodes
@@ -596,7 +635,8 @@ const SearchResult = () => {
       )}
 
       {/* Audiobooks */}
-      {results.audiobooks && results.audiobooks.items.length > 0 && (
+      {results.audiobooks &&
+        results.audiobooks.items.length > 0 && (
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-white mb-4 border-b border-accent-dark pb-2">
             Audiobooks
@@ -645,6 +685,7 @@ const SearchResult = () => {
       )}
 
       <ErrorToast error={error} />
+      <ErrorToast error={successMessage} variant="success" />
     </div>
   );
 };

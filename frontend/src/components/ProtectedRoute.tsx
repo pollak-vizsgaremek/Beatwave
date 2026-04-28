@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import { Outlet } from "react-router";
 
 import Navigation from "./Navigation";
+import { DiscussionToolbarProvider } from "../context/DiscussionToolbarContext.tsx";
 import api from "../utils/api";
 import { createSessionUser, useSession } from "../context/SessionContext";
 
 const ProtectedRoute = () => {
   const { setCurrentUser } = useSession();
-  const [authState, setAuthState] = useState<"checking" | "allowed" | "blocked">(
-    "checking",
-  );
+  const [authState, setAuthState] = useState<
+    "checking" | "allowed" | "blocked"
+  >("checking");
 
   useEffect(() => {
     let mounted = true;
@@ -50,10 +51,12 @@ const ProtectedRoute = () => {
   }
 
   return (
-    <div>
-      <Navigation />
-      <Outlet />
-    </div>
+    <DiscussionToolbarProvider>
+      <div>
+        <Navigation />
+        <Outlet />
+      </div>
+    </DiscussionToolbarProvider>
   );
 };
 

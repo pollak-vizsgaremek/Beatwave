@@ -71,8 +71,6 @@ const fieldFilterOptions: Array<{
 
 const SearchFilterPanel = ({
   isOpen,
-  isActiveSpotify,
-  isActiveSoundCloud,
   showAdvancedFilters,
   searchTypes,
   setSearchTypes,
@@ -80,8 +78,6 @@ const SearchFilterPanel = ({
   setFilters,
   availability,
   onToggleAdvancedFilters,
-  onToggleSpotify,
-  onToggleSoundCloud,
 }: SearchFilterPanelProps) => {
   return (
     <AnimatePresence>
@@ -93,32 +89,7 @@ const SearchFilterPanel = ({
           transition={{ duration: 0.2 }}
           className="absolute top-12 mt-2 -right-4 sm:right-0 bg-accent p-4 md:p-6 rounded-3xl shadow-2xl border border-accent-dark z-50 flex flex-col gap-6 w-[280px] sm:w-[450px] md:w-[500px] max-w-[95vw] max-h-[75vh] overflow-y-auto no-scrollbar cursor-default origin-top-right"
         >
-      <div className="flex flex-row justify-between gap-4">
-        <button
-          type="button"
-          onClick={onToggleSpotify}
-          className={`flex-1 cursor-pointer bg-spotify-green p-2 sm:p-3 rounded-xl text-black transition-all text-sm sm:text-base font-medium ${
-            isActiveSpotify
-              ? "scale-105 shadow-md border-2 border-white/20"
-              : "bg-gray-600! border-2 border-transparent hover:bg-gray-500!"
-          }`}
-        >
-          Spotify
-        </button>
-        <button
-          type="button"
-          onClick={onToggleSoundCloud}
-          className={`flex-1 cursor-pointer bg-soundcloud-orange p-2 sm:p-3 rounded-xl text-white transition-all text-sm sm:text-base font-medium ${
-            isActiveSoundCloud
-              ? "scale-105 shadow-md border-2 border-white/20"
-              : "bg-gray-600! text-gray-300! border-2 border-transparent hover:bg-gray-500! hover:text-white!"
-          }`}
-        >
-          SoundCloud
-        </button>
-      </div>
-
-      <div className="border-t border-accent-dark pt-4">
+      <div>
         <h3 className="text-white text-sm font-semibold mb-2">
           Search For (Result Types){" "}
           <span className="text-red-500 ml-1">*Required</span>
@@ -138,7 +109,7 @@ const SearchFilterPanel = ({
       </div>
 
       <div
-        className="border-t border-accent-dark pt-4 pb-2 cursor-pointer group"
+        className="border-t border-accent-dark pt-4 pb-2 group cursor-pointer"
         onClick={onToggleAdvancedFilters}
       >
         <div className="flex items-center justify-between">

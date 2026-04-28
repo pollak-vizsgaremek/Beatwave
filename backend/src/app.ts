@@ -3,13 +3,11 @@ import cors from "cors";
 import config from "./config/config";
 import appRoutes from "./routes/appRoutes";
 import { errorHandler } from "./middlewares/errorHandler";
-import {
-  apiRateLimiter,
-  authRateLimiter,
-} from "./middlewares/rateLimit";
+import { apiRateLimiter, authRateLimiter } from "./middlewares/rateLimit";
 
 const app = express();
 app.disable("x-powered-by");
+app.set("trust proxy", true);
 
 app.use(
   cors({
@@ -41,6 +39,7 @@ app.use(express.json({ limit: "50kb" }));
 app.use(apiRateLimiter);
 app.use("/login", authRateLimiter);
 app.use("/register", authRateLimiter);
+app.use("/auth/password-reset/request", authRateLimiter);
 
 app.use("/", appRoutes);
 app.use(errorHandler);

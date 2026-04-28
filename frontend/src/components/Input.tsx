@@ -18,6 +18,7 @@ const Input = ({
   disabled,
   onChange,
   onKeyDown,
+  onForgotPasswordClick,
 }: InputProps) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -107,9 +108,13 @@ const Input = ({
         )}
       </div>
       {forgotPwd && (
-        <p className="text-sm hover:underline self-end mt-2 mr-2 hover:cursor-pointer">
+        <button
+          type="button"
+          onClick={onForgotPasswordClick}
+          className="text-sm hover:underline self-end mt-2 mr-2 hover:cursor-pointer"
+        >
           Forgot password?
-        </p>
+        </button>
       )}
     </div>
   );

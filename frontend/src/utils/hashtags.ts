@@ -17,5 +17,5 @@ export const getNormalizedHashtags = (value: string): string[] =>
   value
     .split(HASHTAG_SPLIT_REGEX)
     .filter(Boolean)
-    .map((token) => (token.startsWith("#") ? token : `#${token}`))
-    .map((token) => token.toLowerCase());
+    .map((text) => (text.startsWith("#") ? text : `#${text}`))
+    .map((text) => text.toLowerCase());

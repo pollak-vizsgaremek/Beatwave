@@ -3,12 +3,18 @@ import jwt from "jsonwebtoken";
 
 import config from "../config/config";
 import { getTokenFromRequest, hashToken } from "../lib/authToken";
+import {
+  buildIpBanErrorMessage,
+  getActiveIpBanForAddress,
+  getClientIp,
+} from "../lib/ipBan";
 import { prisma } from "../lib/prisma";
 
 interface TokenPayload {
   id: string;
   username: string;
   role: string;
+  tokenVersion?: number;
 }
 
 const REVOKED_TOKEN_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
@@ -43,6 +49,9 @@ export const verifyToken = async (
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
+    const clientIp = getClientIp(req);
+    const tokenVersion =
+      typeof decoded.tokenVersion === "number" ? decoded.tokenVersion : 0;
 
     await maybeCleanupExpiredRevokedTokens();
 
@@ -55,8 +64,32 @@ export const verifyToken = async (
       return res.status(403).json({ error: "Invalid token" });
     }
 
-    req.userId = decoded.id;
-    req.role = decoded.role;
+    const activeIpBan = await getActiveIpBanForAddress(clientIp);
+    if (activeIpBan) {
+      return res.status(403).json({
+        error: buildIpBanErrorMessage(activeIpBan),
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        role: true,
+        authTokenVersion: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+
+    if (tokenVersion !== user.authTokenVersion) {
+      return res.status(403).json({ error: "Invalid token" });
+    }
+
+    req.userId = user.id;
+    req.role = user.role;
     next();
   } catch {
     return res.status(403).json({ error: "Invalid token" });
@@ -72,21 +105,11 @@ export const isAdmin = async (
     return res.status(401).json({ error: "Not logged in" });
   }
 
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { role: true },
-    });
-
-    if (!user || user.role !== "ADMIN") {
-      return res.status(403).json({ error: "Insufficient permissions" });
-    }
-
-    req.role = user.role;
-    next();
-  } catch {
-    return res.status(500).json({ error: "Internal server error" });
+  if (req.role !== "ADMIN") {
+    return res.status(403).json({ error: "Insufficient permissions" });
   }
+
+  next();
 };
 
 export const isAdminOrModerator = async (
@@ -98,19 +121,9 @@ export const isAdminOrModerator = async (
     return res.status(401).json({ error: "Not logged in" });
   }
 
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { role: true },
-    });
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "MODERATOR")) {
-      return res.status(403).json({ error: "Insufficient permissions" });
-    }
-
-    req.role = user.role;
-    next();
-  } catch {
-    return res.status(500).json({ error: "Internal server error" });
+  if (req.role !== "ADMIN" && req.role !== "MODERATOR") {
+    return res.status(403).json({ error: "Insufficient permissions" });
   }
+
+  next();
 };

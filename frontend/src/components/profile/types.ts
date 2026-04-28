@@ -1,6 +1,7 @@
 export type SpotifyTimeRange = "SHORT" | "MEDIUM" | "LONG";
 
 export interface UserProfileData {
+  id: string;
   username: string;
   email: string;
   role: string;
@@ -9,7 +10,7 @@ export interface UserProfileData {
   spotifyTimeRange?: SpotifyTimeRange;
   spotifyConnected: boolean;
   spotifyProfileImage?: string | null;
-  soundCloudConnected: boolean;
+  activeProfileImage?: string | null;
 }
 
 export interface PostFormData {

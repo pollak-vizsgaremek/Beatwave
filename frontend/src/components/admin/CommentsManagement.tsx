@@ -36,14 +36,14 @@ const CommentsManagement = ({
             <button
               type="button"
               onClick={() => onVisitComment(comment.post.id)}
-              className="inline-flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-white text-xs font-medium"
+              className="cursor-pointer inline-flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-white text-xs font-medium"
             >
               Visit <ArrowUpRight size={14} />
             </button>
             <button
               type="button"
               onClick={() => onDeleteComment(comment.id)}
-              className="bg-red-600 hover:bg-red-700 p-2 rounded text-white"
+              className="cursor-pointer bg-red-600 hover:bg-red-700 p-2 rounded text-white"
             >
               <Trash2 size={16} />
             </button>

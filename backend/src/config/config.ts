@@ -58,6 +58,18 @@ interface Config {
   spotifyClientSecret: string;
   spotifyRedirectUri: string;
   frontendUrl: string;
+  emailFrom: string;
+  resendApiKey: string;
+  resetPasswordTtlMinutes: number;
+}
+
+const resetPasswordTtlMinutes = Number(
+  process.env.RESET_PASSWORD_TTL_MINUTES || 30,
+);
+if (!Number.isFinite(resetPasswordTtlMinutes) || resetPasswordTtlMinutes <= 0) {
+  throw new Error(
+    "[Config] RESET_PASSWORD_TTL_MINUTES must be a positive number.",
+  );
 }
 
 const config: Config = {
@@ -76,6 +88,10 @@ const config: Config = {
   spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
   spotifyRedirectUri: process.env.SPOTIFY_REDIRECT_URI!,
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
+  emailFrom:
+    process.env.EMAIL_FROM || "Beatwave <no-reply@beatwave.local>",
+  resendApiKey: process.env.RESEND_API_KEY || "",
+  resetPasswordTtlMinutes,
 };
 
 export default config;

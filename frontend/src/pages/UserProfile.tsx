@@ -5,6 +5,7 @@ import ErrorToast from "../components/ErrorToast";
 import DeleteAccountModal from "../components/profile/DeleteAccountModal";
 import EditPostModal from "../components/profile/EditPostModal";
 import EditProfileModal from "../components/profile/EditProfileModal";
+import { UserProfileSkeleton } from "../components/LoadingSkeletons";
 import ProfileContent from "../components/profile/ProfileContent";
 import ProfileSummaryCard from "../components/profile/ProfileSummaryCard";
 import SettingsContent from "../components/profile/SettingsContent";
@@ -45,7 +46,6 @@ const UserProfile = () => {
   const { setCurrentUser } = useSession();
   const [isOnProfile, setIsOnProfile] = useState(true);
   const [spotiHover, setSpotiHover] = useState(false);
-  const [soundHover, setSoundHover] = useState(false);
   const [user, setUser] = useState<UserProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<SpotifyTimeRange>("MEDIUM");
@@ -269,7 +269,6 @@ const UserProfile = () => {
       });
 
       setCurrentUser(null);
-      localStorage.removeItem("token");
       showSuccess("Account deleted.");
 
       window.setTimeout(() => {
@@ -282,7 +281,6 @@ const UserProfile = () => {
   };
 
   const connectedToSpotify = user?.spotifyConnected ?? false;
-  const connectedToSoundCloud = user?.soundCloudConnected ?? false;
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -422,11 +420,7 @@ const UserProfile = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex justify-center mt-20">
-        <p className="text-white">Betöltés...</p>
-      </div>
-    );
+    return <UserProfileSkeleton />;
   }
 
   return (
@@ -489,9 +483,7 @@ const UserProfile = () => {
                 >
                   <SettingsContent
                     connectedToSpotify={connectedToSpotify}
-                    connectedToSoundCloud={connectedToSoundCloud}
                     spotiHover={spotiHover}
-                    soundHover={soundHover}
                     timeRange={timeRange}
                     isPrivate={user?.isPrivate ?? false}
                     isUpdatingPrivacy={isUpdatingPrivacy}
@@ -502,7 +494,6 @@ const UserProfile = () => {
                     onConnectSpotify={handleConnectSpotify}
                     onDisconnectSpotify={handleDisconnectSpotify}
                     onSpotifyHoverChange={setSpotiHover}
-                    onSoundHoverChange={setSoundHover}
                     onTimeRangeChange={handleTimeRangeChange}
                   />
                 </motion.div>
