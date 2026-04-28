@@ -164,7 +164,6 @@ const AdminPanel = () => {
         if (status === 403) {
           showError("Your session permissions changed. Please log in again.");
           setTimeout(() => {
-            localStorage.removeItem("token");
             setCurrentUser(null);
             window.location.href = "/login";
           }, 400);

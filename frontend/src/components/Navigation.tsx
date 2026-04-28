@@ -47,8 +47,6 @@ const Navigation = () => {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [isActiveSpotify, setIsActiveSpotify] = useState(true);
-  const [isActiveSoundCloud, setIsActiveSoundCloud] = useState(false);
 
   const [searchAlbums, setSearchAlbums] = useState(false);
   const [searchArtists, setSearchArtists] = useState(false);
@@ -240,17 +238,6 @@ const Navigation = () => {
     setIsMenuOpen(false);
   };
 
-  const clearLocalSession = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("spotifyTimeRange");
-
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("likedPosts:")) {
-        localStorage.removeItem(key);
-      }
-    });
-  };
-
   const markNotificationsAsRead = async () => {
     try {
       await api.patch("/notifications/read");
@@ -298,12 +285,11 @@ const Navigation = () => {
     } catch (error) {
       if (import.meta.env.DEV) {
         console.warn(
-          "Logout API call failed, clearing local session anyway.",
+          "Logout API call failed, redirecting to login anyway.",
           error,
         );
       }
     } finally {
-      clearLocalSession();
       setCurrentUser(null);
       closeAllMenus();
       navigate("/login");
@@ -369,10 +355,7 @@ const Navigation = () => {
       params.set("tag:hipster", "true");
     }
 
-    if (
-      availability.year &&
-      (yearMin !== defaultYearMin || yearMax !== defaultYearMax)
-    ) {
+    if (availability.year && (yearMin !== defaultYearMin || yearMax !== defaultYearMax)) {
       params.set("yearMin", String(yearMin));
       params.set("yearMax", String(yearMax));
     }
@@ -388,13 +371,13 @@ const Navigation = () => {
   };
 
   return (
-    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-3 sm:gap-4 md:gap-8 items-center justify-between px-4 sm:px-4 md:px-8 w-full sm:w-[95%] xl:w-3/4 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30 relative py-5 sm:py-3 min-h-[92px] sm:min-h-[68px] overflow-x-clip">
-      <div className="flex flex-1 min-w-0 items-center justify-start">
+    <div className="bg-linear-to-b from-accent to-accent-dark flex gap-2 sm:gap-4 md:gap-8 items-center justify-between px-3 sm:px-4 md:px-8 w-full sm:w-[95%] xl:w-3/4 mx-auto rounded-b-3xl mb-10 shadow-md shadow-black-100/30 relative py-3 sm:py-3 min-h-[72px] sm:min-h-[68px] overflow-x-clip">
+      <div className="flex min-w-0 items-center justify-start md:flex-1">
         <NavLinks />
       </div>
 
       {!isDiscussionRoute ? (
-        <div className="flex flex-1 min-w-0 items-center justify-center">
+        <div className="flex flex-1 min-w-0 items-center justify-center sm:flex-[1.2] md:flex-[1.7]">
           <SearchBar
             searchQuery={searchQuery}
             isFilterOpen={isFilterOpen}
@@ -405,8 +388,6 @@ const Navigation = () => {
             onToggleFilter={() => setIsFilterOpen((prev) => !prev)}
             filterPanelProps={{
               isOpen: isFilterOpen,
-              isActiveSpotify,
-              isActiveSoundCloud,
               showAdvancedFilters,
               searchTypes,
               setSearchTypes: searchTypeSetters,
@@ -415,18 +396,6 @@ const Navigation = () => {
               availability,
               onToggleAdvancedFilters: () =>
                 setShowAdvancedFilters((prev) => !prev),
-              onToggleSpotify: () => {
-                setIsActiveSpotify((prev) => !prev);
-                if (!isActiveSpotify && isActiveSoundCloud) {
-                  setIsActiveSoundCloud(false);
-                }
-              },
-              onToggleSoundCloud: () => {
-                if (isActiveSpotify && !isActiveSoundCloud) {
-                  setIsActiveSpotify(false);
-                }
-                setIsActiveSoundCloud((prev) => !prev);
-              },
             }}
           />
         </div>

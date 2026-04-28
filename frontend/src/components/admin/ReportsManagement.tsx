@@ -46,7 +46,7 @@ const ReportsManagement = ({
                 type="button"
                 onClick={() => void onRequestReportAction(log.id, "dismiss")}
                 disabled={processingReportId === log.id}
-                className="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 disabled:opacity-50 px-3 py-2 rounded text-sm"
+                className="cursor-pointer inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-500 disabled:cursor-not-allowed disabled:opacity-50 px-3 py-2 rounded text-sm"
               >
                 <CheckCircle2 size={14} />
                 Dismiss report
@@ -55,7 +55,7 @@ const ReportsManagement = ({
                 type="button"
                 onClick={() => void onRequestReportAction(log.id, "block-user")}
                 disabled={processingReportId === log.id}
-                className="inline-flex items-center gap-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 px-3 py-2 rounded text-sm"
+                className="cursor-pointer inline-flex items-center gap-2 bg-red-700 hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50 px-3 py-2 rounded text-sm"
               >
                 <Ban size={14} />
                 Block user

@@ -16,6 +16,7 @@ type PublicProfileData = {
   description?: string | null;
   isPrivate: boolean;
   spotifyProfileImage?: string | null;
+  activeProfileImage?: string | null;
   posts: DiscussionType[];
 };
 
@@ -29,7 +30,7 @@ const ViewProfile = () => {
     const fetchProfile = async () => {
       try {
         const response = await api.get(
-          `/user-profile/${id}?includeSpotify=false`,
+          `/user-profile/${id}?includeSpotify=true`,
         );
         setProfile(response.data);
       } catch (err: any) {
@@ -80,10 +81,10 @@ const ViewProfile = () => {
           >
             <div className="lg:w-1/3 p-2 flex flex-col items-center border-b lg:border-b-0 lg:border-r border-white/10">
               <div className="bg-accent mt-2 w-32 h-32 rounded-full flex justify-center items-center text-black text-3xl font-bold uppercase overflow-hidden">
-                {profile.spotifyProfileImage ? (
+                {profile.activeProfileImage ? (
                   <img
-                    src={profile.spotifyProfileImage}
-                    alt={`${profile.username} Spotify profile`}
+                    src={profile.activeProfileImage}
+                    alt={`${profile.username} profile`}
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
