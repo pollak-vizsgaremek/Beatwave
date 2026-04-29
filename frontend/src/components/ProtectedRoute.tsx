@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router";
+import { Navigate, Outlet } from "react-router";
 
 import Navigation from "./Navigation";
+import { DiscussionToolbarProvider } from "../context/DiscussionToolbarContext.tsx";
 import api from "../utils/api";
 import { createSessionUser, useSession } from "../context/SessionContext";
 
@@ -45,15 +46,16 @@ const ProtectedRoute = () => {
   }
 
   if (authState === "blocked") {
-    window.location.href = "/login";
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   return (
-    <div>
-      <Navigation />
-      <Outlet />
-    </div>
+    <DiscussionToolbarProvider>
+      <div>
+        <Navigation />
+        <Outlet />
+      </div>
+    </DiscussionToolbarProvider>
   );
 };
 

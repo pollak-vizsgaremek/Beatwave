@@ -4,6 +4,7 @@ import { ChevronLeft, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "../utils/api";
 import ErrorToast from "../components/ErrorToast";
+import { ArtistViewSkeleton } from "../components/LoadingSkeletons";
 import { useErrorToast } from "../utils/useErrorToast";
 import TrackPlaylistPicker from "../components/TrackPlaylistPicker";
 
@@ -17,7 +18,7 @@ interface Artist {
   id: string;
   name: string;
   images?: SpotifyImage[];
-  external_urls?: { spotify: string };
+  external_urls?: { spotify?: string };
 }
 
 interface Track {
@@ -54,6 +55,7 @@ const ArtistView = () => {
   const [loading, setLoading] = useState(true);
   const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
   const { error, showError } = useErrorToast();
+  const { error: successMessage, showError: showSuccess } = useErrorToast(2400);
 
   useEffect(() => {
     if (!id) return;
@@ -68,7 +70,8 @@ const ArtistView = () => {
 
     const fetchArtist = async () => {
       try {
-        const res = await api.get(`/auth/spotify/artist/${id}`);
+        const endpoint = `/auth/spotify/artist/${id}`;
+        const res = await api.get(endpoint);
         if (!isMounted) return;
 
         if (res.data.connected === false) {
@@ -108,9 +111,7 @@ const ArtistView = () => {
         </button>
 
         {loading ? (
-          <p className="text-gray-400 text-center animate-pulse mt-20 text-lg">
-            Loading artist...
-          </p>
+          <ArtistViewSkeleton />
         ) : !artist ? (
           <p className="text-gray-400 text-center mt-20 text-lg">
             Artist not found.
@@ -214,9 +215,11 @@ const ArtistView = () => {
                       {expandedTrackId === track.id && (
                         <TrackPlaylistPicker
                           trackUri={track.uri}
+                          trackId={track.id}
                           trackName={track.name}
                           expanded={true}
                           onToggle={() => setExpandedTrackId(null)}
+                          onSuccess={showSuccess}
                           onError={showError}
                         />
                       )}
@@ -308,6 +311,7 @@ const ArtistView = () => {
       </div>
 
       <ErrorToast error={error} />
+      <ErrorToast error={successMessage} variant="success" />
     </div>
   );
 };

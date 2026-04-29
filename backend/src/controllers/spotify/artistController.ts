@@ -213,8 +213,7 @@ async function fetchArtistTopTracksCatalogFallback(
   const params = new URLSearchParams({
     q: artist.name,
     type: "track",
-    limit: "50",
-    market: "US",
+    limit: "10",
   });
 
   const data = await fetchCatalogJsonOrNull(

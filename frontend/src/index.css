@@ -13,21 +13,6 @@
     }
   }
 
-  --animate-float: float 20s infinite ease-in-out;
-  @keyframes float {
-    0%,
-    100% {
-      transform: translate(0, 0) scale(1);
-    }
-    33% {
-      transform: translate(30px, -50px) scale(1.1);
-    }
-    66% {
-      transform: translate(-20px, 20px) scale(0.9);
-    }
-  }
-
-
   /*  Colors */
   --color-card: #39337a;
   --color-accent: #423686;
@@ -36,7 +21,6 @@
   --color-input-bg: #4b9fbe;
   --color-input-hover: #5987aa;
   --color-spotify-green: #1db954;
-  --color-soundcloud-orange: #ff5500;
   --color-card-black: #1a1e23;
 }
 
@@ -64,6 +48,27 @@
   -moz-osx-font-smoothing: grayscale;
 
   background-color: black;
+}
+
+
+::-webkit-scrollbar {
+  width: 13px;
+  height: 12px;
+
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1e23;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b9fbe;
+  border-radius: 999px;
+  border: 2px solid #1a1e23;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #5987aa;
 }
 
 .no-scrollbar::-webkit-scrollbar {

@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { Check, Plus } from "lucide-react";
 import { motion } from "framer-motion";
+import { PlaylistPickerSkeleton } from "./LoadingSkeletons";
 import { spotifyPlaylistController } from "../controllers/spotifyPlaylistController";
 
 type PlaylistItem = {
@@ -17,9 +18,9 @@ type PlaylistItem = {
   tracks?: { total?: number };
 };
 
-
 type TrackPlaylistPickerProps = {
   trackUri: string;
+  trackId?: string | number;
   trackName: string;
   expanded: boolean;
   onToggle: () => void;
@@ -29,6 +30,7 @@ type TrackPlaylistPickerProps = {
 
 const TrackPlaylistPicker = ({
   trackUri,
+  trackId,
   trackName,
   expanded,
   onToggle,
@@ -42,6 +44,17 @@ const TrackPlaylistPicker = ({
   const [removingPlaylistId, setRemovingPlaylistId] = useState<string | null>(
     null,
   );
+  const playlistController = spotifyPlaylistController;
+  const fallbackCoverImage = "/Beatwave_logo.png";
+
+  const handleImageFallback = (event: SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget;
+    if (image.src.endsWith(fallbackCoverImage)) {
+      return;
+    }
+
+    image.src = fallbackCoverImage;
+  };
 
   useEffect(() => {
     if (!expanded) {
@@ -53,7 +66,10 @@ const TrackPlaylistPicker = ({
     const fetchPlaylists = async () => {
       try {
         setLoadingPlaylists(true);
-        const response = await spotifyPlaylistController.getPlaylists(trackUri);
+        const response = await playlistController.getPlaylists(
+          trackUri,
+          trackId,
+        );
 
         if (!isMounted) {
           return;
@@ -73,7 +89,8 @@ const TrackPlaylistPicker = ({
         }
 
         onError(
-          err.response?.data?.error || "Failed to load your Spotify playlists.",
+          err.response?.data?.error ||
+            "Failed to load your Spotify playlists.",
         );
       } finally {
         if (isMounted) {
@@ -83,11 +100,16 @@ const TrackPlaylistPicker = ({
     };
 
     fetchPlaylists();
-
     return () => {
       isMounted = false;
     };
-  }, [expanded, onError, trackUri]);
+  }, [
+    expanded,
+    onError,
+    trackUri,
+    trackId,
+    playlistController,
+  ]);
 
   const togglePlaylist = (playlistId: string) => {
     setSelectedPlaylistIds((prev) =>
@@ -105,10 +127,11 @@ const TrackPlaylistPicker = ({
 
     try {
       setSaving(true);
-      
-      const checkResponse = await spotifyPlaylistController.checkTrackInPlaylists(
+
+      const checkResponse = await playlistController.checkTrackInPlaylists(
         selectedPlaylistIds,
-        trackUri
+        trackUri,
+        trackId,
       );
 
       const duplicateChecks = (checkResponse.data?.checks || []) as {
@@ -128,17 +151,17 @@ const TrackPlaylistPicker = ({
         onError(
           duplicateNames.length === 1
             ? `"${trackName}" is already in ${duplicateNames[0]}.`
-            : `"${trackName}" is already in ${duplicateNames.length} selected playlists.`
+            : `"${trackName}" is already in ${duplicateNames.length} selected playlists.`,
         );
 
         setSaving(false);
         return;
       }
 
-      const response = await spotifyPlaylistController.addTrackToPlaylists(
+      const response = await playlistController.addTrackToPlaylists(
         selectedPlaylistIds,
         trackUri,
-        undefined,
+        trackId,
       );
 
       setPlaylists((prev) =>
@@ -160,8 +183,15 @@ const TrackPlaylistPicker = ({
       setSelectedPlaylistIds([]);
       onToggle();
     } catch (err: any) {
+      const detailedError =
+        err.response?.data?.details?.errors?.[0]?.error_message ||
+        err.response?.data?.details?.error_message ||
+        err.response?.data?.details?.error ||
+        err.response?.data?.details?.message;
       onError(
-        err.response?.data?.error || "Failed to add the track to playlists.",
+        detailedError ||
+          err.response?.data?.error ||
+          "Failed to add the track to Spotify playlists.",
       );
     } finally {
       setSaving(false);
@@ -171,7 +201,11 @@ const TrackPlaylistPicker = ({
   const handleRemove = async (playlistId: string, playlistName: string) => {
     try {
       setRemovingPlaylistId(playlistId);
-      await spotifyPlaylistController.removeTrackFromPlaylist(playlistId, trackUri);
+      await playlistController.removeTrackFromPlaylist(
+        playlistId,
+        trackUri,
+        trackId,
+      );
 
       setPlaylists((prev) =>
         prev.map((playlist) => {
@@ -179,7 +213,10 @@ const TrackPlaylistPicker = ({
             return playlist;
           }
 
-          const removedOccurrences = Math.max(1, playlist.trackOccurrences ?? 1);
+          const removedOccurrences = Math.max(
+            1,
+            playlist.trackOccurrences ?? 1,
+          );
 
           return {
             ...playlist,
@@ -195,7 +232,7 @@ const TrackPlaylistPicker = ({
     } catch (err: any) {
       onError(
         err.response?.data?.error ||
-          "Failed to remove the track from the playlist.",
+          "Failed to remove the track from the Spotify playlist.",
       );
     } finally {
       setRemovingPlaylistId(null);
@@ -226,7 +263,7 @@ const TrackPlaylistPicker = ({
       </div>
 
       {loadingPlaylists ? (
-        <p className="text-sm text-gray-400">Loading your playlists...</p>
+        <PlaylistPickerSkeleton />
       ) : playlists.length > 0 ? (
         <>
           <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto pr-1">
@@ -264,9 +301,11 @@ const TrackPlaylistPicker = ({
                     className={`flex min-w-0 flex-1 items-center gap-3 text-left ${alreadyAdded ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                   >
                     <img
-                      src={playlistImage || "https://placehold.co/56x56"}
+                      src={playlistImage || fallbackCoverImage}
                       alt={playlist.name}
                       className="h-12 w-12 rounded-lg object-cover"
+                      referrerPolicy="no-referrer"
+                      onError={handleImageFallback}
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-white">

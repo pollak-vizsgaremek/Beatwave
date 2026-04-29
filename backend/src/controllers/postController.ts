@@ -7,11 +7,24 @@ const MAX_TITLE_LENGTH = 200;
 const MAX_TEXT_LENGTH = 10000;
 const MAX_TOPIC_LENGTH = 100;
 const MAX_REPORT_REASON_LENGTH = 1000;
+const ANNOUNCEMENT_TOPICS = ["Announcement", "announcement"] as const;
 
 const USER_SELECT = {
   id: true,
   username: true,
 } as const;
+
+const getAnnouncementTopicFilters = () =>
+  ANNOUNCEMENT_TOPICS.map((topic) => ({ topic }));
+
+const mapPostsWithLikeState = <T extends { likes: Array<{ userId: string }> }>(
+  posts: T[],
+  userId?: string,
+) =>
+  posts.map((post) => ({
+    ...post,
+    isLiked: userId ? post.likes.some((like) => like.userId === userId) : false,
+  }));
 
 const validatePostInput = (title: unknown, text: unknown, topic: unknown) => {
   if (!title || typeof title !== "string" || !title.trim()) {
@@ -45,6 +58,11 @@ export const getPosts = async (
 ) => {
   try {
     const getAllPosts = await prisma.post.findMany({
+      where: {
+        NOT: {
+          OR: getAnnouncementTopicFilters(),
+        },
+      },
       include: {
         user: { select: USER_SELECT },
         likes: {
@@ -57,14 +75,37 @@ export const getPosts = async (
       take: 10,
     });
 
-    const mapped = getAllPosts.map((post) => ({
-      ...post,
-      isLiked: req.userId
-        ? post.likes.some((like) => like.userId === req.userId)
-        : false,
-    }));
+    const mapped = mapPostsWithLikeState(getAllPosts, req.userId);
 
     res.status(200).json(mapped);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAnnouncements = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const announcements = await prisma.post.findMany({
+      where: {
+        OR: getAnnouncementTopicFilters(),
+      },
+      include: {
+        user: { select: USER_SELECT },
+        likes: {
+          where: { userId: req.userId },
+        },
+      },
+      orderBy: {
+        postedAt: "desc",
+      },
+      take: 5,
+    });
+
+    res.status(200).json(mapPostsWithLikeState(announcements, req.userId));
   } catch (error) {
     next(error);
   }
@@ -418,7 +459,7 @@ export const likePost = async (
       prisma.post.update({
         where: { id: postId },
         data: { likeAmount: { increment: 1 } },
-        include: { user: { select: USER_SELECT } }, 
+        include: { user: { select: USER_SELECT } },
       }),
     ]);
 

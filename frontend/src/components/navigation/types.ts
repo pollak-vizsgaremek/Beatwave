@@ -62,8 +62,6 @@ export interface SearchAvailability {
 
 export interface SearchFilterPanelProps {
   isOpen: boolean;
-  isActiveSpotify: boolean;
-  isActiveSoundCloud: boolean;
   showAdvancedFilters: boolean;
   searchTypes: SearchTypeState;
   setSearchTypes: SearchTypeSetters;
@@ -71,8 +69,6 @@ export interface SearchFilterPanelProps {
   setFilters: SearchFilterSetters;
   availability: SearchAvailability;
   onToggleAdvancedFilters: () => void;
-  onToggleSpotify: () => void;
-  onToggleSoundCloud: () => void;
 }
 
 export interface SearchBarProps {

@@ -39,7 +39,7 @@ const AdminActionModal = ({
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          className="absolute top-3 right-3 text-gray-300 hover:text-white disabled:opacity-60 cursor-pointer"
+          className="absolute top-3 right-3 text-gray-300 hover:text-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           aria-label="Close action modal"
         >
           <X size={22} />
@@ -55,7 +55,7 @@ const AdminActionModal = ({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white disabled:opacity-60 cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelLabel}
           </button>
@@ -63,7 +63,7 @@ const AdminActionModal = ({
             type="button"
             onClick={onConfirm}
             disabled={isSubmitting || confirmDisabled}
-            className={`px-4 py-2 rounded-lg text-white disabled:opacity-60 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-white cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 ${
               danger
                 ? "bg-red-700 hover:bg-red-600"
                 : "bg-blue-600 hover:bg-blue-500"

@@ -3,6 +3,10 @@ import { Router } from "express";
 import {
   createUser,
   authenticateUser,
+  requestPasswordReset,
+  validatePasswordResetToken,
+  confirmPasswordReset,
+  getSessionStatus,
   logoutUser,
 } from "../controllers/authController";
 import {
@@ -40,6 +44,7 @@ import {
   isAdminOrModerator,
 } from "../middlewares/authMiddleware";
 import {
+  getAnnouncements,
   getPostById,
   getPosts,
   getMyPosts,
@@ -74,6 +79,7 @@ import {
   blockReportedUser,
   updateUserRole,
   setUserBlockedStatus,
+  deleteUserByAdmin,
 } from "../controllers/adminController";
 
 const router = Router();
@@ -81,6 +87,10 @@ const router = Router();
 //Auth
 router.post("/register", createUser);
 router.post("/login", authenticateUser);
+router.post("/auth/password-reset/request", requestPasswordReset);
+router.get("/auth/password-reset/validate", validatePasswordResetToken);
+router.post("/auth/password-reset/confirm", confirmPasswordReset);
+router.get("/auth/session", getSessionStatus);
 router.post("/logout", logoutUser);
 
 //User Profile
@@ -141,6 +151,7 @@ router.get("/auth/spotify/search", verifyToken, searchSpotify);
 router.get("/auth/spotify/artist/:id", verifyToken, getSpotifyArtist);
 
 //Discussion
+router.get("/announcements", verifyToken, getAnnouncements);
 router.get("/posts", verifyToken, getPosts);
 router.get("/post/:id", verifyToken, getPostById);
 router.post("/posts", verifyToken, createPost);
@@ -181,6 +192,7 @@ router.delete(
   isAdminOrModerator,
   clearUserTimeout,
 );
+router.delete("/admin/users/:id", verifyToken, isAdmin, deleteUserByAdmin);
 router.get("/admin/posts", verifyToken, isAdminOrModerator, getAllPosts);
 router.get("/admin/comments", verifyToken, isAdminOrModerator, getAllComments);
 router.get(

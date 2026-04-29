@@ -175,7 +175,7 @@ export const setUserTimeout = async (
     await prisma.$transaction([
       prisma.moderationLog.create({
         data: {
-          status: "WARNED",
+          status: "NOTIFIED",
           action: TIMEOUT_USER_ACTION,
           moderatorId: req.userId,
           userId: targetUser.id,
@@ -263,7 +263,7 @@ export const clearUserTimeout = async (
     await prisma.$transaction([
       prisma.moderationLog.create({
         data: {
-          status: "WARNED",
+          status: "NOTIFIED",
           action: CLEAR_USER_TIMEOUT_ACTION,
           moderatorId: req.userId,
           userId: targetUser.id,
@@ -429,7 +429,7 @@ export const setUserBlockedStatus = async (
 
     await prisma.moderationLog.create({
       data: {
-        status: isBlocked ? "BLOCKED" : "WARNED",
+        status: isBlocked ? "BLOCKED" : "NOTIFIED",
         action: isBlocked ? "BLOCK_USER_MANUAL" : "UNBLOCK_USER",
         moderatorId: req.userId,
         userId: existingUser.id,
@@ -455,6 +455,43 @@ export const setUserBlockedStatus = async (
         ? "User blocked successfully"
         : "User unblocked successfully",
       user: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteUserByAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (id === req.userId) {
+      return res
+        .status(400)
+        .json({ error: "You cannot delete your own account here" });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, username: true },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await prisma.user.delete({ where: { id: targetUser.id } });
+
+    res.status(200).json({
+      message: `User @${targetUser.username} deleted successfully`,
     });
   } catch (error) {
     next(error);

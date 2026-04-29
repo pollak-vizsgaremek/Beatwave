@@ -9,6 +9,7 @@ interface UsersManagementProps {
   onToggleBlock: (userId: string, isBlocked: boolean) => Promise<void>;
   onSetTimeout: (user: AdminUser) => Promise<void>;
   onClearTimeout: (user: AdminUser) => Promise<void>;
+  onDeleteUser: (user: AdminUser) => Promise<void>;
 }
 
 const getRoleBadgeClasses = (role: string) => {
@@ -31,6 +32,7 @@ const UsersManagement = ({
   onToggleBlock,
   onSetTimeout,
   onClearTimeout,
+  onDeleteUser,
 }: UsersManagementProps) => {
   if (users.length === 0) {
     return (
@@ -90,7 +92,7 @@ const UsersManagement = ({
                     onChange={(event) =>
                       void onRoleChange(user.id, event.target.value)
                     }
-                    className="w-full rounded bg-gray-800 border border-gray-600 px-2 py-2 text-sm"
+                    className="w-full rounded bg-gray-800 border border-gray-600 px-2 py-2 text-sm cursor-pointer disabled:cursor-not-allowed"
                   >
                     <option value="USER">User</option>
                     <option value="MODERATOR">Moderator</option>
@@ -104,7 +106,7 @@ const UsersManagement = ({
                       user.isBlocked
                         ? "bg-emerald-600 hover:bg-emerald-500"
                         : "bg-red-700 hover:bg-red-600"
-                    } disabled:opacity-50`}
+                    } cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     {isCurrentUser
                       ? "Current account"
@@ -116,7 +118,7 @@ const UsersManagement = ({
                     type="button"
                     onClick={() => void onSetTimeout(user)}
                     disabled={isProcessing || isCurrentUser}
-                    className="w-full rounded px-3 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-500 disabled:opacity-50"
+                    className="w-full rounded px-3 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isCurrentUser ? "Current account" : "Set timeout"}
                   </button>
@@ -125,11 +127,19 @@ const UsersManagement = ({
                       type="button"
                       onClick={() => void onClearTimeout(user)}
                       disabled={isProcessing || isCurrentUser}
-                      className="w-full rounded px-3 py-2 text-sm font-medium bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
+                      className="w-full rounded px-3 py-2 text-sm font-medium bg-emerald-700 hover:bg-emerald-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Clear timeout
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => void onDeleteUser(user)}
+                    disabled={isProcessing || isCurrentUser}
+                    className="w-full rounded px-3 py-2 text-sm font-medium bg-rose-900 hover:bg-rose-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isCurrentUser ? "Current account" : "Delete user"}
+                  </button>
                 </div>
               )}
             </div>
@@ -179,14 +189,14 @@ const UsersManagement = ({
                   </td>
                   {canManageUsers && (
                     <td className="p-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <select
                           value={user.role}
                           disabled={isProcessing || isCurrentUser}
                           onChange={(event) =>
                             void onRoleChange(user.id, event.target.value)
                           }
-                          className="rounded bg-gray-800 border border-gray-600 px-2 py-1"
+                          className="rounded bg-gray-800 border border-gray-600 px-2 py-1 cursor-pointer disabled:cursor-not-allowed"
                         >
                           <option value="USER">User</option>
                           <option value="MODERATOR">Moderator</option>
@@ -202,7 +212,7 @@ const UsersManagement = ({
                             user.isBlocked
                               ? "bg-emerald-600 hover:bg-emerald-500"
                               : "bg-red-700 hover:bg-red-600"
-                          } disabled:opacity-50`}
+                          } cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}
                         >
                           {isCurrentUser
                             ? "Current account"
@@ -214,7 +224,7 @@ const UsersManagement = ({
                           type="button"
                           onClick={() => void onSetTimeout(user)}
                           disabled={isProcessing || isCurrentUser}
-                          className="rounded px-3 py-1 text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50"
+                          className="rounded px-3 py-1 text-white bg-amber-600 hover:bg-amber-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Timeout
                         </button>
@@ -223,11 +233,19 @@ const UsersManagement = ({
                             type="button"
                             onClick={() => void onClearTimeout(user)}
                             disabled={isProcessing || isCurrentUser}
-                            className="rounded px-3 py-1 text-white bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50"
+                            className="rounded px-3 py-1 text-white bg-emerald-700 hover:bg-emerald-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Clear timeout
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => void onDeleteUser(user)}
+                          disabled={isProcessing || isCurrentUser}
+                          className="rounded px-3 py-1 text-white bg-rose-900 hover:bg-rose-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isCurrentUser ? "Current account" : "Delete"}
+                        </button>
                       </div>
                     </td>
                   )}

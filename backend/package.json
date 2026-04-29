@@ -4,10 +4,11 @@
   "description": "",
   "main": "src/server.ts",
   "scripts": {
-    "dev": "nodemon --exec tsx ./src/server.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:sync": "prisma db push",
+    "dev": "npm run prisma:generate && nodemon --exec tsx ./src/server.ts",
     "test": "vitest run --pool=threads",
-    "test:watch": "vitest --pool=threads",
-    "test:api": "vitest run --pool=threads tests/api.non-spotify.test.ts"
+    "test:watch": "vitest --pool=threads"
   },
   "keywords": [],
   "author": "",

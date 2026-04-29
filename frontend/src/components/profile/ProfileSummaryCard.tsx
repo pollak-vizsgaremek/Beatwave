@@ -38,10 +38,10 @@ const ProfileSummaryCard = ({ user }: ProfileSummaryCardProps) => {
         variants={itemVariants}
         className="bg-accent mt-2 w-32 h-32 rounded-full flex justify-center items-center text-black font-semibold overflow-hidden text-3xl uppercase shadow-lg border-2 border-white/10"
       >
-        {user?.spotifyProfileImage ? (
+        {user?.activeProfileImage ? (
           <img
-            src={user.spotifyProfileImage}
-            alt={`${user.username} Spotify profile`}
+            src={user.activeProfileImage}
+            alt={`${user.username} profile`}
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
           />
@@ -53,7 +53,7 @@ const ProfileSummaryCard = ({ user }: ProfileSummaryCardProps) => {
         variants={itemVariants}
         className="flex justify-center items-center mt-4 text-xl font-semibold text-white text-center"
       >
-        {user?.username || "Felhasználó"}
+        {user?.username || "User"}
       </motion.div>
       <motion.p
         variants={itemVariants}

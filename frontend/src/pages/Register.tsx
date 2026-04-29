@@ -9,7 +9,16 @@ import Button from "../components/Button";
 import ErrorToast from "../components/ErrorToast";
 import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
-import { createSessionUser, useSession } from "../context/SessionContext";
+import {
+  createSessionUser,
+  type SessionUser,
+  useSession,
+} from "../context/SessionContext";
+
+type SessionStatusResponse = {
+  authenticated: boolean;
+  user?: SessionUser;
+};
 
 const Register = () => {
   const navigate = useNavigate();
@@ -22,15 +31,20 @@ const Register = () => {
 
     const checkSession = async () => {
       try {
-        const response = await api.get("/user-profile?includeSpotify=false", {
+        const response = await api.get<SessionStatusResponse>("/auth/session", {
           headers: {
             "X-Skip-Auth-Redirect": "1",
           },
         });
         if (!mounted) return;
 
-        setCurrentUser(createSessionUser(response.data));
-        navigate("/home");
+        if (response.data.authenticated && response.data.user) {
+          setCurrentUser(createSessionUser(response.data.user));
+          navigate("/home");
+          return;
+        }
+
+        setCurrentUser(null);
       } catch {
         if (mounted) {
           setCurrentUser(null);
@@ -150,7 +164,7 @@ const Register = () => {
               labelTitle="Email"
               inputType="email"
               inputName="email"
-              inputPlaceHolder="kisferenc3532@gmail.com"
+              inputPlaceHolder="example@example.com"
               iconLeft={<Mail size={20} />}
               wrapperClassName="mt-0"
               value={formData.email}
@@ -160,7 +174,7 @@ const Register = () => {
               labelTitle="Username"
               inputType="text"
               inputName="username"
-              inputPlaceHolder="kisferenc3532"
+              inputPlaceHolder="ExampleUsername"
               iconLeft={<User size={20} />}
               wrapperClassName="mt-2 sm:mt-4"
               value={formData.username}

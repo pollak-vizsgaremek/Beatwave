@@ -26,7 +26,6 @@ api.interceptors.response.use(
     if (isAuthFailure && !skipAuthRedirect) {
       const url = error.config?.url;
       if (url && !url.includes("/login") && !url.includes("/register")) {
-        localStorage.removeItem("token");
         window.location.href = "/login";
       }
     }

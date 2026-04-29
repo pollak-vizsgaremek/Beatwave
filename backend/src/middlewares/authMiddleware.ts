@@ -9,6 +9,7 @@ interface TokenPayload {
   id: string;
   username: string;
   role: string;
+  tokenVersion?: number;
 }
 
 const REVOKED_TOKEN_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
@@ -72,21 +73,11 @@ export const isAdmin = async (
     return res.status(401).json({ error: "Not logged in" });
   }
 
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { role: true },
-    });
-
-    if (!user || user.role !== "ADMIN") {
-      return res.status(403).json({ error: "Insufficient permissions" });
-    }
-
-    req.role = user.role;
-    next();
-  } catch {
-    return res.status(500).json({ error: "Internal server error" });
+  if (req.role !== "ADMIN") {
+    return res.status(403).json({ error: "Insufficient permissions" });
   }
+
+  next();
 };
 
 export const isAdminOrModerator = async (
@@ -98,19 +89,9 @@ export const isAdminOrModerator = async (
     return res.status(401).json({ error: "Not logged in" });
   }
 
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { role: true },
-    });
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "MODERATOR")) {
-      return res.status(403).json({ error: "Insufficient permissions" });
-    }
-
-    req.role = user.role;
-    next();
-  } catch {
-    return res.status(500).json({ error: "Internal server error" });
+  if (req.role !== "ADMIN" && req.role !== "MODERATOR") {
+    return res.status(403).json({ error: "Insufficient permissions" });
   }
+
+  next();
 };

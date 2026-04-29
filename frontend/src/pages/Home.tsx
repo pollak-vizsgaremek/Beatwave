@@ -4,6 +4,11 @@ import TopList from "../components/TopList";
 import CurrentTrackCard from "../components/CurrentTrackCard";
 import RecommendedTrackCard from "../components/RecommendedTrackCard";
 import ErrorToast from "../components/ErrorToast";
+import {
+  CurrentTrackCardSkeleton,
+  RecommendedTracksSkeleton,
+  TopListSkeleton,
+} from "../components/LoadingSkeletons";
 import { useErrorToast } from "../utils/useErrorToast";
 import { spotifyPlayerController } from "../controllers/homeSpotifyController";
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
@@ -41,7 +46,9 @@ const formatDuration = (durationMs: number) => {
 };
 
 const Home = () => {
-  const [artists, setArtists] = useState<{ name: string; image: string; id?: string }[]>([]);
+  const [artists, setArtists] = useState<
+    { name: string; image: string; id?: string }[]
+  >([]);
   const [loadingArtists, setLoadingArtists] = useState(true);
 
   const [tracks, setTracks] = useState<{ name: string; image: string }[]>([]);
@@ -50,7 +57,8 @@ const Home = () => {
   const [recommendedTracks, setRecommendedTracks] = useState<
     RecommendedTrack[]
   >([]);
-  const [loadingRecommendedTracks, setLoadingRecommendedTracks] = useState(true);
+  const [loadingRecommendedTracks, setLoadingRecommendedTracks] =
+    useState(true);
   const [expandedRecommendedTrackId, setExpandedRecommendedTrackId] = useState<
     string | null
   >(null);
@@ -76,7 +84,7 @@ const Home = () => {
 
     const fetchSpotifyConnection = async () => {
       try {
-        const response = await api.get("/user-profile?includeSpotify=false");
+        const response = await api.get("/user-profile?includeSpotify=true");
         if (!isMounted) return;
         setSpotifyConnected(response.data.spotifyConnected ?? false);
       } catch {
@@ -339,7 +347,9 @@ const Home = () => {
     };
   }, [currentlyPlaying?.name]);
 
-  const handleSpotifyAction = async (action: "previous" | "toggle" | "next") => {
+  const handleSpotifyAction = async (
+    action: "previous" | "toggle" | "next",
+  ) => {
     if (playbackActionLoading || spotifyConnected === false) {
       return;
     }
@@ -404,18 +414,14 @@ const Home = () => {
               </p>
             </div>
           ) : loadingCurrentlyPlaying ? (
-            <p className="text-gray-400 text-center text-sm sm:text-base">
-              Loading your currently playing track...
-            </p>
+            <CurrentTrackCardSkeleton />
           ) : !currentlyPlaying?.name ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[140px] gap-4">
               <span className="text-lg sm:text-xl text-center font-medium">
                 Here is your last played music
               </span>
               {loadingRecentlyPlayed ? (
-                <p className="text-gray-400 text-sm sm:text-base text-center">
-                  Loading your last played track...
-                </p>
+                <CurrentTrackCardSkeleton />
               ) : recentlyPlayed ? (
                 <CurrentTrackCard
                   name={recentlyPlayed.name ?? ""}
@@ -514,67 +520,57 @@ const Home = () => {
 
       <div className="pl-4 md:pl-20 flex flex-col">
         {loadingArtists ? (
-          <p className="text-gray-400">Loading your top artists...</p>
+          <TopListSkeleton />
         ) : artists.length > 0 ? (
           <TopList list={artists} title={"Your top 10 Artists:"} />
-        ) : (
-          <p className="text-gray-400">
-            Connect your Spotify to see your top artists here.
-          </p>
-        )}
+        ) : null}
       </div>
       <div className="pl-4 md:pl-20 flex flex-col">
         {loadingTracks ? (
-          <p className="text-gray-400">Loading your top tracks...</p>
+          <TopListSkeleton />
         ) : tracks.length > 0 ? (
           <TopList list={tracks} title={"Your top 10 Tracks:"} />
-        ) : (
-          <p className="text-gray-400">
-            Connect your Spotify to see your top tracks here.
-          </p>
-        )}
+        ) : null}
       </div>
-      <div className="px-4 md:px-20 flex flex-col gap-6">
-        <h2 className="text-3xl font-semibold">Recommended For You</h2>
-        {loadingRecommendedTracks ? (
-          <p className="text-gray-400">Loading recommended tracks...</p>
-        ) : recommendedTracks.length > 0 ? (
-          <motion.div
-            layout
-            // A szülő elem megkapja az induló és érkező animációs értékeket
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5"
-          >
-            {recommendedTracks.map((track, index) => (
-              <RecommendedTrackCard
-                key={track.id || `${track.name}-${index}`}
-                id={track.id}
-                name={track.name}
-                image={track.image}
-                artist={track.artist}
-                album={track.album}
-                duration={track.duration}
-                releaseYear={track.releaseYear}
-                trackUri={track.uri}
-                expanded={expandedRecommendedTrackId === track.id}
-                onToggle={() =>
-                  setExpandedRecommendedTrackId((prev) =>
-                    prev === track.id ? null : track.id,
-                  )
-                }
-                onSuccess={showSuccess}
-                onError={showError}
-              />
-            ))}
-          </motion.div>
-        ) : (
-          <p className="text-gray-400">
-            No recommendations available right now.
-          </p>
-        )}
-      </div>
+      {(loadingRecommendedTracks || recommendedTracks.length > 0) && (
+        <div className="px-4 md:px-20 flex flex-col gap-6">
+          <h2 className="text-3xl font-semibold">Recommended For You</h2>
+          {loadingRecommendedTracks ? (
+            <RecommendedTracksSkeleton />
+          ) : recommendedTracks.length > 0 ? (
+            <motion.div
+              layout
+              // A szülő elem megkapja az induló és érkező animációs értékeket
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-5"
+            >
+              {recommendedTracks.map((track, index) => (
+                <RecommendedTrackCard
+                  key={track.id || `${track.name}-${index}`}
+                  id={track.id}
+                  name={track.name}
+                  image={track.image}
+                  artist={track.artist}
+                  album={track.album}
+                  duration={track.duration}
+                  releaseYear={track.releaseYear}
+                  trackUri={track.uri}
+                  expanded={expandedRecommendedTrackId === track.id}
+                  onToggle={() =>
+                    setExpandedRecommendedTrackId((prev) =>
+                      prev === track.id ? null : track.id,
+                    )
+                  }
+                  onSuccess={showSuccess}
+                  onError={showError}
+                />
+              ))}
+            </motion.div>
+          ) : null}
+        </div>
+      )}
 
       <ErrorToast error={error} />
       <ErrorToast error={successMessage} variant="success" />
