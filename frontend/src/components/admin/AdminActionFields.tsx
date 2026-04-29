@@ -6,19 +6,14 @@ interface AdminActionFieldsProps {
   timeoutMinutesInput: string;
   timeoutReasonInput: string;
   deleteReasonInput: string;
-  ipBanMinutesInput: string;
-  ipBanReasonInput: string;
   announcementTitleInput: string;
   announcementTextInput: string;
   maxDeleteReasonLength: number;
-  maxIpBanReasonLength: number;
   maxAnnouncementTitleLength: number;
   maxAnnouncementTextLength: number;
   onTimeoutMinutesInputChange: (value: string) => void;
   onTimeoutReasonInputChange: (value: string) => void;
   onDeleteReasonInputChange: (value: string) => void;
-  onIpBanMinutesInputChange: (value: string) => void;
-  onIpBanReasonInputChange: (value: string) => void;
   onAnnouncementTitleInputChange: (value: string) => void;
   onAnnouncementTextInputChange: (value: string) => void;
 }
@@ -32,19 +27,14 @@ const AdminActionFields = ({
   timeoutMinutesInput,
   timeoutReasonInput,
   deleteReasonInput,
-  ipBanMinutesInput,
-  ipBanReasonInput,
   announcementTitleInput,
   announcementTextInput,
   maxDeleteReasonLength,
-  maxIpBanReasonLength,
   maxAnnouncementTitleLength,
   maxAnnouncementTextLength,
   onTimeoutMinutesInputChange,
   onTimeoutReasonInputChange,
   onDeleteReasonInputChange,
-  onIpBanMinutesInputChange,
-  onIpBanReasonInputChange,
   onAnnouncementTitleInputChange,
   onAnnouncementTextInputChange,
 }: AdminActionFieldsProps) => {
@@ -118,57 +108,6 @@ const AdminActionFields = ({
         <p className="text-xs text-gray-400 mt-1 text-right">
           {deleteReasonInput.length}/{maxDeleteReasonLength}
         </p>
-      </div>
-    );
-  }
-
-  if (pendingAction?.type === "set-ip-ban") {
-    return (
-      <div className="space-y-3">
-        <div>
-          <label
-            htmlFor="ip-ban-minutes"
-            className="block text-sm text-gray-300 mb-1"
-          >
-            Duration in minutes
-          </label>
-          <input
-            id="ip-ban-minutes"
-            type="number"
-            min={1}
-            value={ipBanMinutesInput}
-            onChange={(event) =>
-              onIpBanMinutesInputChange(readInputValue(event))
-            }
-            className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white"
-            placeholder="Leave blank for permanent"
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            Leave this empty to make the IP ban permanent.
-          </p>
-        </div>
-        <div>
-          <label
-            htmlFor="ip-ban-reason"
-            className="block text-sm text-gray-300 mb-1"
-          >
-            Reason
-          </label>
-          <textarea
-            id="ip-ban-reason"
-            value={ipBanReasonInput}
-            onChange={(event) =>
-              onIpBanReasonInputChange(readInputValue(event))
-            }
-            maxLength={maxIpBanReasonLength}
-            rows={3}
-            className="w-full rounded-lg bg-gray-800 border border-gray-600 px-3 py-2 text-white resize-none"
-            placeholder="Explain why this IP is being banned."
-          />
-          <p className="text-xs text-gray-400 mt-1 text-right">
-            {ipBanReasonInput.length}/{maxIpBanReasonLength}
-          </p>
-        </div>
       </div>
     );
   }
