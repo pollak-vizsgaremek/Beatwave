@@ -66,9 +66,6 @@ ALTER TABLE `ConnectedApp` DROP COLUMN `appId`,
     MODIFY `accessToken` TEXT NULL;
 
 -- AlterTable
-ALTER TABLE `IpBan` MODIFY `reason` TEXT NOT NULL;
-
--- AlterTable
 ALTER TABLE `ModerationLog` DROP COLUMN `reason`,
     ADD COLUMN `action` VARCHAR(191) NOT NULL,
     ADD COLUMN `details` VARCHAR(191) NOT NULL,

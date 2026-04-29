@@ -213,7 +213,7 @@ export const setUserTimeout = async (
     await prisma.$transaction([
       prisma.moderationLog.create({
         data: {
-          status: "WARNED",
+          status: "NOTIFIED",
           action: TIMEOUT_USER_ACTION,
           moderatorId: req.userId,
           userId: targetUser.id,
@@ -301,7 +301,7 @@ export const clearUserTimeout = async (
     await prisma.$transaction([
       prisma.moderationLog.create({
         data: {
-          status: "WARNED",
+          status: "NOTIFIED",
           action: CLEAR_USER_TIMEOUT_ACTION,
           moderatorId: req.userId,
           userId: targetUser.id,
@@ -468,7 +468,7 @@ export const setUserBlockedStatus = async (
 
     await prisma.moderationLog.create({
       data: {
-        status: isBlocked ? "BLOCKED" : "WARNED",
+        status: isBlocked ? "BLOCKED" : "NOTIFIED",
         action: isBlocked ? "BLOCK_USER_MANUAL" : "UNBLOCK_USER",
         moderatorId: req.userId,
         userId: existingUser.id,
@@ -611,7 +611,7 @@ export const createAnnouncement = async (
 
       await tx.moderationLog.create({
         data: {
-          status: "WARNED",
+          status: "NOTIFIED",
           action: "CREATE_ANNOUNCEMENT",
           moderatorId: adminUser.id,
           userId: adminUser.id,

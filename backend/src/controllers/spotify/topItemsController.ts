@@ -16,11 +16,11 @@ export const getSpotifyTopItems = async (
     const userId = req.userId as string;
     const type = req.params.type;
 
-    // 1. JogosultsĂˇg Ă©s bemeneti paramĂ©terek ellenĹ‘rzĂ©se
+    // Validate incoming request parameters.
 
     if (type !== "artists" && type !== "tracks") {
       return res.status(400).json({
-        error: "Ă‰rvĂ©nytelen paramĂ©ter. Csak 'artists' vagy 'tracks' lehet.",
+        error: "Invalid type parameter. Only 'artists' or 'tracks' are allowed.",
       });
     }
 
@@ -32,7 +32,7 @@ export const getSpotifyTopItems = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const spotifyTimeRangeMap: Record<string, string> = {
@@ -48,7 +48,6 @@ export const getSpotifyTopItems = async (
     const cachedEntry = spotifyCache.get<any>(cacheKey);
 
     if (cachedEntry) {
-      console.log(`Returning cached Spotify top ${type} for user: ${userId}`);
       return res.status(200).json({ items: cachedEntry, cached: true });
     }
 

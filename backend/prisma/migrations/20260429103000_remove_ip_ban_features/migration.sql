@@ -3,4 +3,4 @@ DROP TABLE IF EXISTS `IpBan`;
 
 -- AlterTable
 ALTER TABLE `User`
-    DROP COLUMN `lastKnownIp`;
+    DROP COLUMN IF EXISTS `lastKnownIp`;

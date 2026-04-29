@@ -126,21 +126,35 @@ const UserProfile = () => {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newUsername !== confirmUsername) {
-      showError("A két felhasználónév nem egyezik!");
+    const trimmedNewUsername = newUsername.trim();
+    const trimmedConfirmUsername = confirmUsername.trim();
+    const trimmedEmail = newEmail.trim();
+
+    if (!password) {
+      showError("Please enter your password.");
       return;
     }
 
-    if (!password) {
-      showError("Kérlek add meg a jelszavad!");
+    if (!trimmedNewUsername) {
+      showError("Please enter a new username.");
+      return;
+    }
+
+    if (trimmedNewUsername.length <= 3) {
+      showError("Your new username must be more than 3 characters.");
+      return;
+    }
+
+    if (trimmedNewUsername !== trimmedConfirmUsername) {
+      showError("The confirmed username does not match the new username.");
       return;
     }
 
     setIsUpdating(true);
     try {
       const response = await api.put("/user-profile", {
-        username: newUsername,
-        email: newEmail,
+        username: trimmedNewUsername,
+        email: trimmedEmail,
         description,
         password,
       });
@@ -167,7 +181,7 @@ const UserProfile = () => {
 
       closeEditModal();
     } catch (err: any) {
-      showError(err.response?.data?.error || "Hiba történt a frissítés során");
+      showError(err.response?.data?.error || "Failed to update profile.");
     } finally {
       setIsUpdating(false);
     }
@@ -544,3 +558,4 @@ const UserProfile = () => {
 };
 
 export default UserProfile;
+

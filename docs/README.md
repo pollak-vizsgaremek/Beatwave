@@ -13,3 +13,6 @@
 - [Figma design](https://www.figma.com/design/KXxdwBxpAXvfwqHfWlPWft/beatwave-webpage?node-id=0-1&t=tBSGW5SZpTxKd8fs-1)
 - [Dokumentáció](Beatwave.docx)
 - [EK Diagramm](EK_diagram.drawio.png)
+
+## Demo
+- [Projekt Demo](https://beatwave.almavagyok.xyz)

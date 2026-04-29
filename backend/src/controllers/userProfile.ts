@@ -16,6 +16,7 @@ import {
 import { sendTemplatedEmail } from "../email/service";
 
 const VALID_TIME_RANGES = ["SHORT", "MEDIUM", "LONG"] as const;
+const MIN_USERNAME_LENGTH = 4;
 const MAX_USERNAME_LENGTH = 50;
 const MAX_DESCRIPTION_LENGTH = 300;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -101,7 +102,7 @@ export const getUserProfile = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const spotifyConnected = user.connectedApps.some(
@@ -169,7 +170,7 @@ export const getPublicUserProfile = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const spotifyConnected = await prisma.connectedApp.findFirst({
@@ -249,41 +250,45 @@ export const updateUserProfile = async (
     const { username, email, description, password } = req.body;
 
     if (!password) {
-      return res.status(400).json({ error: "HiĂˇnyzĂł adatok" });
+      return res.status(400).json({ error: "Please enter your password." });
     }
 
     if (username !== undefined) {
       if (typeof username !== "string" || username.trim().length === 0) {
-        return res
-          .status(400)
-          .json({ error: "Ă‰rvĂ©nytelen felhasznĂˇlĂłnĂ©v" });
+        return res.status(400).json({ error: "Please enter a new username." });
+      }
+
+      if (username.trim().length < MIN_USERNAME_LENGTH) {
+        return res.status(400).json({
+          error: "Your new username must be more than 3 characters.",
+        });
       }
 
       if (username.trim().length > MAX_USERNAME_LENGTH) {
         return res.status(400).json({
-          error: `A felhasznĂˇlĂłnĂ©v legfeljebb ${MAX_USERNAME_LENGTH} karakter lehet`,
+          error: `Your new username must be at most ${MAX_USERNAME_LENGTH} characters.`,
         });
       }
     }
 
     if (email !== undefined) {
       if (typeof email !== "string" || email.trim().length === 0) {
-        return res.status(400).json({ error: "Ă‰rvĂ©nytelen email cĂ­m" });
+        return res.status(400).json({ error: "Invalid email address." });
       }
 
       if (!EMAIL_REGEX.test(email.trim())) {
-        return res.status(400).json({ error: "Ă‰rvĂ©nytelen email formĂˇtum" });
+        return res.status(400).json({ error: "Invalid email format." });
       }
     }
 
     if (description !== undefined) {
       if (typeof description !== "string") {
-        return res.status(400).json({ error: "Ă‰rvĂ©nytelen leĂ­rĂˇs" });
+        return res.status(400).json({ error: "Invalid description." });
       }
 
       if (description.trim().length > MAX_DESCRIPTION_LENGTH) {
         return res.status(400).json({
-          error: `A leĂ­rĂˇs legfeljebb ${MAX_DESCRIPTION_LENGTH} karakter lehet`,
+          error: `Description must be at most ${MAX_DESCRIPTION_LENGTH} characters.`,
         });
       }
     }
@@ -293,14 +298,14 @@ export const updateUserProfile = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const pepper = config.passwordPepper;
     const isValid = await bcrypt.compare(password + pepper, user.passwordHash);
 
     if (!isValid) {
-      return res.status(401).json({ error: "HibĂˇs jelszĂł" });
+      return res.status(401).json({ error: "Incorrect password." });
     }
 
     const updatedUser = await prisma.user.update({
@@ -312,7 +317,7 @@ export const updateUserProfile = async (
           ? { description: description.trim() || null }
           : {}),
       },
-      // Only return safe fields â€” never expose passwordHash, role, etc. in the response
+      // Only return safe fields, never expose passwordHash, role, etc. in the response
       select: {
         id: true,
         username: true,
@@ -328,17 +333,16 @@ export const updateUserProfile = async (
       const target = String(error.meta?.target?.[0] ?? "");
 
       if (target.includes("email")) {
-        return res.status(409).json({ error: "Ez az email cĂ­m mĂˇr foglalt" });
+        return res.status(409).json({ error: "This email address is already taken." });
       }
 
-      return res
-        .status(409)
-        .json({ error: "Ez a felhasznĂˇlĂłnĂ©v mĂˇr foglalt" });
+      return res.status(409).json({
+        error: "That username is already taken. Please choose a different one.",
+      });
     }
     next(error);
   }
 };
-
 export const updateSpotifyTimeRange = async (
   req: Request,
   res: Response,
@@ -349,7 +353,7 @@ export const updateSpotifyTimeRange = async (
     const timeRange = req.body.timeRange;
 
     if (!timeRange || !VALID_TIME_RANGES.includes(timeRange)) {
-      return res.status(400).json({ error: "Ă‰rvĂ©nytelen idĹ‘tartomĂˇny" });
+      return res.status(400).json({ error: "Invalid time range" });
     }
 
     const user = await prisma.user.findUnique({
@@ -357,7 +361,7 @@ export const updateSpotifyTimeRange = async (
     });
 
     if (!user) {
-      return res.status(404).json({ error: "FelhasznĂˇlĂł nem talĂˇlhatĂł" });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const updatedUser = await prisma.user.update({
