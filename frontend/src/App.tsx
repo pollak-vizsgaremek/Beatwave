@@ -40,8 +40,8 @@ function App() {
             <Route element={<ViewDiscussion />} path="discussion/view/:id" />
             <Route element={<AdminPanel />} path="admin" />
             <Route element={<ArtistView />} path="artist/:id" />
+            <Route element={<Error404 />} path="*" />
           </Route>
-          <Route element={<Error404 />} path="*" />
         </Routes>
       </AnimatePresence>
     </SessionProvider>
