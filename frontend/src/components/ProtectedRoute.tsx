@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router";
+import { Navigate, Outlet } from "react-router";
 
 import Navigation from "./Navigation";
 import { DiscussionToolbarProvider } from "../context/DiscussionToolbarContext.tsx";
@@ -17,7 +17,11 @@ const ProtectedRoute = () => {
 
     const verifySession = async () => {
       try {
-        const response = await api.get("/user-profile?includeSpotify=false");
+        const response = await api.get("/user-profile?includeSpotify=false", {
+          headers: {
+            "X-Skip-Auth-Redirect": "1",
+          },
+        });
         if (!mounted) {
           return;
         }
@@ -46,8 +50,7 @@ const ProtectedRoute = () => {
   }
 
   if (authState === "blocked") {
-    window.location.href = "/login";
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   return (

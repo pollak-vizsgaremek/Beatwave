@@ -12,14 +12,8 @@ import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 import {
   createSessionUser,
-  type SessionUser,
   useSession,
 } from "../context/SessionContext";
-
-type SessionStatusResponse = {
-  authenticated: boolean;
-  user?: SessionUser;
-};
 
 const Login = () => {
   const location = useLocation();
@@ -43,20 +37,15 @@ const Login = () => {
 
     const checkSession = async () => {
       try {
-        const response = await api.get<SessionStatusResponse>("/auth/session", {
+        const response = await api.get("/user-profile?includeSpotify=false", {
           headers: {
             "X-Skip-Auth-Redirect": "1",
           },
         });
         if (!mounted) return;
 
-        if (response.data.authenticated && response.data.user) {
-          setCurrentUser(createSessionUser(response.data.user));
-          navigate("/home");
-          return;
-        }
-
-        setCurrentUser(null);
+        setCurrentUser(createSessionUser(response.data));
+        navigate("/home", { replace: true });
       } catch {
         if (mounted) {
           setCurrentUser(null);
@@ -87,11 +76,11 @@ const Login = () => {
 
       if (response.data.user) {
         setCurrentUser(createSessionUser(response.data.user));
-        navigate("/home");
+        navigate("/home", { replace: true });
       } else {
         const profileResponse = await api.get("/user-profile?includeSpotify=false");
         setCurrentUser(createSessionUser(profileResponse.data));
-        navigate("/home");
+        navigate("/home", { replace: true });
       }
     } catch (err: any) {
       showError(err.response?.data?.error || "Invalid credentials");
