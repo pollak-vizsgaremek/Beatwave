@@ -30,7 +30,6 @@ import { useErrorToast } from "../utils/useErrorToast";
 
 const ITEMS_PER_PAGE = 8;
 const MAX_DELETE_REASON_LENGTH = 300;
-const MAX_IP_BAN_REASON_LENGTH = 200;
 const MAX_ANNOUNCEMENT_TITLE_LENGTH = 200;
 const MAX_ANNOUNCEMENT_TEXT_LENGTH = 10000;
 const MIN_ADMIN_SKELETON_MS = import.meta.env.DEV ? 1200 : 0;
@@ -75,8 +74,6 @@ const AdminPanel = () => {
   const [deleteReasonInput, setDeleteReasonInput] = useState("");
   const [timeoutMinutesInput, setTimeoutMinutesInput] = useState("60");
   const [timeoutReasonInput, setTimeoutReasonInput] = useState("");
-  const [ipBanMinutesInput, setIpBanMinutesInput] = useState("");
-  const [ipBanReasonInput, setIpBanReasonInput] = useState("");
   const [announcementTitleInput, setAnnouncementTitleInput] = useState("");
   const [announcementTextInput, setAnnouncementTextInput] = useState("");
   const [pageByTab, setPageByTab] = useState<Record<AdminTabId, number>>({
@@ -190,8 +187,6 @@ const AdminPanel = () => {
     setDeleteReasonInput("");
     setTimeoutMinutesInput("60");
     setTimeoutReasonInput("");
-    setIpBanMinutesInput("");
-    setIpBanReasonInput("");
     setAnnouncementTitleInput("");
     setAnnouncementTextInput("");
   };
@@ -256,16 +251,6 @@ const AdminPanel = () => {
     setPendingAction({ type: "clear-timeout", user });
   };
 
-  const requestSetIpBan = async (user: AdminUser) => {
-    setIpBanMinutesInput("");
-    setIpBanReasonInput(user.activeIpBanReason ?? "");
-    setPendingAction({ type: "set-ip-ban", user });
-  };
-
-  const requestClearIpBan = async (user: AdminUser) => {
-    setPendingAction({ type: "clear-ip-ban", user });
-  };
-
   const requestDeleteUser = async (user: AdminUser) => {
     setPendingAction({ type: "delete-user", user });
   };
@@ -307,25 +292,6 @@ const AdminPanel = () => {
     const reasonLength = deleteReasonInput.trim().length;
     return reasonLength === 0 || reasonLength > MAX_DELETE_REASON_LENGTH;
   }, [deleteReasonInput, pendingAction]);
-
-  const ipBanInputInvalid = useMemo(() => {
-    if (!pendingAction || pendingAction.type !== "set-ip-ban") {
-      return false;
-    }
-
-    const trimmedReason = ipBanReasonInput.trim();
-    if (!trimmedReason || trimmedReason.length > MAX_IP_BAN_REASON_LENGTH) {
-      return true;
-    }
-
-    const trimmedMinutes = ipBanMinutesInput.trim();
-    if (!trimmedMinutes) {
-      return false;
-    }
-
-    const parsedMinutes = Number(trimmedMinutes);
-    return !Number.isInteger(parsedMinutes) || parsedMinutes <= 0;
-  }, [ipBanMinutesInput, ipBanReasonInput, pendingAction]);
 
   const announcementInputInvalid = useMemo(() => {
     if (!pendingAction || pendingAction.type !== "create-announcement") {
@@ -534,31 +500,6 @@ const AdminPanel = () => {
           break;
         }
 
-        case "set-ip-ban": {
-          setProcessingUserId(pendingAction.user.id);
-          const trimmedMinutes = ipBanMinutesInput.trim();
-          if (!ipBanReasonInput.trim()) {
-            showError("IP ban reason is required.");
-            return;
-          }
-
-          await api.patch(`/admin/users/${pendingAction.user.id}/ip-ban`, {
-            durationMinutes: trimmedMinutes ? Number(trimmedMinutes) : null,
-            reason: ipBanReasonInput.trim(),
-          });
-          await fetchData("users");
-          setProcessingUserId(null);
-          break;
-        }
-
-        case "clear-ip-ban": {
-          setProcessingUserId(pendingAction.user.id);
-          await api.delete(`/admin/users/${pendingAction.user.id}/ip-ban`);
-          await fetchData("users");
-          setProcessingUserId(null);
-          break;
-        }
-
         case "delete-user": {
           setProcessingUserId(pendingAction.user.id);
           await api.delete(`/admin/users/${pendingAction.user.id}`);
@@ -589,8 +530,6 @@ const AdminPanel = () => {
         pendingAction.type === "toggle-block" ||
         pendingAction.type === "set-timeout" ||
         pendingAction.type === "clear-timeout" ||
-        pendingAction.type === "set-ip-ban" ||
-        pendingAction.type === "clear-ip-ban" ||
         pendingAction.type === "delete-user"
       ) {
         setProcessingUserId(null);
@@ -603,8 +542,6 @@ const AdminPanel = () => {
         pendingAction.type === "toggle-block" ||
         pendingAction.type === "set-timeout" ||
         pendingAction.type === "clear-timeout" ||
-        pendingAction.type === "set-ip-ban" ||
-        pendingAction.type === "clear-ip-ban" ||
         pendingAction.type === "delete-user"
       ) {
         await fetchData("users");
@@ -637,8 +574,6 @@ const AdminPanel = () => {
             onToggleBlock={requestToggleBlock}
             onSetTimeout={requestSetTimeout}
             onClearTimeout={requestClearTimeout}
-            onSetIpBan={requestSetIpBan}
-            onClearIpBan={requestClearIpBan}
             onDeleteUser={requestDeleteUser}
           />
         );
@@ -718,7 +653,6 @@ const AdminPanel = () => {
         confirmDisabled={
           timeoutInputInvalid ||
           deleteReasonInvalid ||
-          ipBanInputInvalid ||
           announcementInputInvalid
         }
         onClose={closeActionModal}
@@ -731,19 +665,14 @@ const AdminPanel = () => {
           timeoutMinutesInput={timeoutMinutesInput}
           timeoutReasonInput={timeoutReasonInput}
           deleteReasonInput={deleteReasonInput}
-          ipBanMinutesInput={ipBanMinutesInput}
-          ipBanReasonInput={ipBanReasonInput}
           announcementTitleInput={announcementTitleInput}
           announcementTextInput={announcementTextInput}
           maxDeleteReasonLength={MAX_DELETE_REASON_LENGTH}
-          maxIpBanReasonLength={MAX_IP_BAN_REASON_LENGTH}
           maxAnnouncementTitleLength={MAX_ANNOUNCEMENT_TITLE_LENGTH}
           maxAnnouncementTextLength={MAX_ANNOUNCEMENT_TEXT_LENGTH}
           onTimeoutMinutesInputChange={setTimeoutMinutesInput}
           onTimeoutReasonInputChange={setTimeoutReasonInput}
           onDeleteReasonInputChange={setDeleteReasonInput}
-          onIpBanMinutesInputChange={setIpBanMinutesInput}
-          onIpBanReasonInputChange={setIpBanReasonInput}
           onAnnouncementTitleInputChange={setAnnouncementTitleInput}
           onAnnouncementTextInputChange={setAnnouncementTextInput}
         />

@@ -36,11 +36,10 @@ model User {
   description       String?  @db.Text
   isPrivate         Boolean  @default(false)
   isBlocked         Boolean  @default(false)
-  lastKnownIp       String?
   role              Role     @default(USER)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  spotifyTimeRange  SpotifyTimeRange @default(SHORT) 
+  spotifyTimeRange  SpotifyTimeRange @default(SHORT)
 
   // Relációk
   connectedApps          ConnectedApp[]
@@ -52,7 +51,6 @@ model User {
   triggeredNotifications Notification[] @relation("TriggeredNotifications")
   moderationLogs         ModerationLog[] @relation("UserLogs")
   performedModerations   ModerationLog[] @relation("ModeratorLogs")
-  ipBansCreated          IpBan[]         @relation("IpBanCreatedBy")
   passwordResetTokens    PasswordResetToken[]
 }
 
@@ -123,21 +121,6 @@ model Notification {
   // Opcionális: melyik user váltotta ki (triggered_by)
   triggeredBy   User? @relation("TriggeredNotifications", fields: [triggeredById], references: [id], onDelete: SetNull)
   triggeredById String?
-}
-
-model IpBan {
-  id        String   @id @default(uuid())
-  ipAddress String
-  reason    String   @db.Text
-  expiresAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  bannedBy   User?   @relation("IpBanCreatedBy", fields: [bannedById], references: [id], onDelete: SetNull)
-  bannedById String?
-
-  @@index([ipAddress])
-  @@index([expiresAt])
 }
 
 enum ModerationStatus {

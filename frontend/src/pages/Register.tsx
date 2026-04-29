@@ -164,7 +164,7 @@ const Register = () => {
               labelTitle="Email"
               inputType="email"
               inputName="email"
-              inputPlaceHolder="kisferenc3532@gmail.com"
+              inputPlaceHolder="example@gmail.com"
               iconLeft={<Mail size={20} />}
               wrapperClassName="mt-0"
               value={formData.email}
@@ -174,7 +174,7 @@ const Register = () => {
               labelTitle="Username"
               inputType="text"
               inputName="username"
-              inputPlaceHolder="kisferenc3532"
+              inputPlaceHolder="exampleUsername"
               iconLeft={<User size={20} />}
               wrapperClassName="mt-2 sm:mt-4"
               value={formData.username}

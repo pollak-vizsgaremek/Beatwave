@@ -9,8 +9,6 @@ interface UsersManagementProps {
   onToggleBlock: (userId: string, isBlocked: boolean) => Promise<void>;
   onSetTimeout: (user: AdminUser) => Promise<void>;
   onClearTimeout: (user: AdminUser) => Promise<void>;
-  onSetIpBan: (user: AdminUser) => Promise<void>;
-  onClearIpBan: (user: AdminUser) => Promise<void>;
   onDeleteUser: (user: AdminUser) => Promise<void>;
 }
 
@@ -34,8 +32,6 @@ const UsersManagement = ({
   onToggleBlock,
   onSetTimeout,
   onClearTimeout,
-  onSetIpBan,
-  onClearIpBan,
   onDeleteUser,
 }: UsersManagementProps) => {
   if (users.length === 0) {
@@ -53,7 +49,6 @@ const UsersManagement = ({
           const hasTimeout =
             !!user.timeoutUntil &&
             new Date(user.timeoutUntil).getTime() > Date.now();
-          const hasActiveIpBan = !!user.activeIpBanId;
 
           return (
             <div key={user.id} className="bg-gray-700 p-3 rounded-lg">
@@ -75,11 +70,6 @@ const UsersManagement = ({
                       TIMEOUT
                     </span>
                   )}
-                  {hasActiveIpBan && (
-                    <span className="text-xs px-2 py-1 rounded bg-fuchsia-700 text-white">
-                      IP BANNED
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -87,23 +77,10 @@ const UsersManagement = ({
               <p className="text-xs text-gray-400">
                 Created {new Date(user.createdAt).toLocaleDateString()}
               </p>
-              {canManageUsers && user.lastKnownIp && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Last known IP: {user.lastKnownIp}
-                </p>
-              )}
               {hasTimeout && (
                 <p className="text-xs text-amber-200 mt-1">
                   Until {new Date(user.timeoutUntil as string).toLocaleString()}
-                  {user.timeoutReason ? ` • ${user.timeoutReason}` : ""}
-                </p>
-              )}
-              {canManageUsers && hasActiveIpBan && (
-                <p className="text-xs text-fuchsia-200 mt-1">
-                  {user.activeIpBanUntil
-                    ? `IP banned until ${new Date(user.activeIpBanUntil).toLocaleString()}`
-                    : "IP permanently banned"}
-                  {user.activeIpBanReason ? ` • ${user.activeIpBanReason}` : ""}
+                  {user.timeoutReason ? ` - ${user.timeoutReason}` : ""}
                 </p>
               )}
 
@@ -157,30 +134,6 @@ const UsersManagement = ({
                   )}
                   <button
                     type="button"
-                    onClick={() => void onSetIpBan(user)}
-                    disabled={
-                      isProcessing || isCurrentUser || !user.lastKnownIp
-                    }
-                    className="w-full rounded px-3 py-2 text-sm font-medium bg-fuchsia-700 hover:bg-fuchsia-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {!user.lastKnownIp
-                      ? "No known IP"
-                      : isCurrentUser
-                        ? "Current account"
-                        : "Set IP ban"}
-                  </button>
-                  {hasActiveIpBan && (
-                    <button
-                      type="button"
-                      onClick={() => void onClearIpBan(user)}
-                      disabled={isProcessing || isCurrentUser}
-                      className="w-full rounded px-3 py-2 text-sm font-medium bg-sky-700 hover:bg-sky-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Clear IP ban
-                    </button>
-                  )}
-                  <button
-                    type="button"
                     onClick={() => void onDeleteUser(user)}
                     disabled={isProcessing || isCurrentUser}
                     className="w-full rounded px-3 py-2 text-sm font-medium bg-rose-800 hover:bg-rose-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
@@ -213,39 +166,20 @@ const UsersManagement = ({
               const hasTimeout =
                 !!user.timeoutUntil &&
                 new Date(user.timeoutUntil).getTime() > Date.now();
-              const hasActiveIpBan = !!user.activeIpBanId;
 
               return (
                 <tr key={user.id} className="border-b border-gray-700">
                   <td className="p-2">{user.username}</td>
                   <td className="p-2">
                     <div>{user.email}</div>
-                    {canManageUsers && user.lastKnownIp && (
-                      <div className="text-xs text-gray-400 mt-1">
-                        IP: {user.lastKnownIp}
-                      </div>
-                    )}
                   </td>
                   <td className="p-2">{user.role}</td>
                   <td className="p-2">
-                    {user.isBlocked
-                      ? "Blocked"
-                      : hasActiveIpBan
-                        ? "IP banned"
-                        : hasTimeout
-                          ? "Timed out"
-                          : "Active"}
+                    {user.isBlocked ? "Blocked" : hasTimeout ? "Timed out" : "Active"}
                     {hasTimeout && (
                       <p className="text-xs text-amber-200 mt-1">
                         Until{" "}
                         {new Date(user.timeoutUntil as string).toLocaleString()}
-                      </p>
-                    )}
-                    {hasActiveIpBan && (
-                      <p className="text-xs text-fuchsia-200 mt-1">
-                        {user.activeIpBanUntil
-                          ? `Until ${new Date(user.activeIpBanUntil).toLocaleString()}`
-                          : "Permanent"}
                       </p>
                     )}
                   </td>
@@ -301,26 +235,6 @@ const UsersManagement = ({
                             className="rounded px-3 py-1 text-white bg-emerald-700 hover:bg-emerald-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Clear timeout
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => void onSetIpBan(user)}
-                          disabled={
-                            isProcessing || isCurrentUser || !user.lastKnownIp
-                          }
-                          className="rounded px-3 py-1 text-white bg-fuchsia-700 hover:bg-fuchsia-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {!user.lastKnownIp ? "No IP" : "IP ban"}
-                        </button>
-                        {hasActiveIpBan && (
-                          <button
-                            type="button"
-                            onClick={() => void onClearIpBan(user)}
-                            disabled={isProcessing || isCurrentUser}
-                            className="rounded px-3 py-1 text-white bg-sky-700 hover:bg-sky-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Clear IP ban
                           </button>
                         )}
                         <button

@@ -3,11 +3,6 @@ import jwt from "jsonwebtoken";
 
 import config from "../config/config";
 import { getTokenFromRequest, hashToken } from "../lib/authToken";
-import {
-  buildIpBanErrorMessage,
-  getActiveIpBanForAddress,
-  getClientIp,
-} from "../lib/ipBan";
 import { prisma } from "../lib/prisma";
 
 interface TokenPayload {
@@ -49,7 +44,6 @@ export const verifyToken = async (
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
-    const clientIp = getClientIp(req);
     const tokenVersion =
       typeof decoded.tokenVersion === "number" ? decoded.tokenVersion : 0;
 
@@ -62,13 +56,6 @@ export const verifyToken = async (
 
     if (revokedToken) {
       return res.status(403).json({ error: "Invalid token" });
-    }
-
-    const activeIpBan = await getActiveIpBanForAddress(clientIp);
-    if (activeIpBan) {
-      return res.status(403).json({
-        error: buildIpBanErrorMessage(activeIpBan),
-      });
     }
 
     const user = await prisma.user.findUnique({

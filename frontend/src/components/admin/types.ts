@@ -16,10 +16,6 @@ export interface AdminUser {
   createdAt: string;
   timeoutUntil?: string | null;
   timeoutReason?: string | null;
-  lastKnownIp?: string | null;
-  activeIpBanId?: string | null;
-  activeIpBanUntil?: string | null;
-  activeIpBanReason?: string | null;
 }
 
 export interface AdminPost {

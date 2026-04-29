@@ -79,8 +79,6 @@ import {
   blockReportedUser,
   updateUserRole,
   setUserBlockedStatus,
-  setUserIpBan,
-  clearUserIpBan,
   deleteUserByAdmin,
   createAnnouncement,
 } from "../controllers/adminController";
@@ -195,8 +193,6 @@ router.delete(
   isAdminOrModerator,
   clearUserTimeout,
 );
-router.patch("/admin/users/:id/ip-ban", verifyToken, isAdmin, setUserIpBan);
-router.delete("/admin/users/:id/ip-ban", verifyToken, isAdmin, clearUserIpBan);
 router.delete("/admin/users/:id", verifyToken, isAdmin, deleteUserByAdmin);
 router.post("/admin/announcements", verifyToken, isAdmin, createAnnouncement);
 router.get("/admin/posts", verifyToken, isAdminOrModerator, getAllPosts);

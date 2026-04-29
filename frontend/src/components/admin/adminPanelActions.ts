@@ -24,8 +24,6 @@ export type PendingAdminAction =
     }
   | { type: "set-timeout"; user: AdminUser }
   | { type: "clear-timeout"; user: AdminUser }
-  | { type: "set-ip-ban"; user: AdminUser }
-  | { type: "clear-ip-ban"; user: AdminUser }
   | { type: "delete-user"; user: AdminUser }
   | { type: "create-announcement" }
   | null;
@@ -109,22 +107,6 @@ export const getActionModalContent = (
         title: "Clear Timeout",
         description: `Remove the active timeout for @${pendingAction.user.username}?`,
         confirmLabel: "Clear timeout",
-        danger: false,
-      };
-    case "set-ip-ban":
-      return {
-        title: "Set IP Ban",
-        description: pendingAction.user.lastKnownIp
-          ? `Ban the last known IP for @${pendingAction.user.username} (${pendingAction.user.lastKnownIp}). Leave duration blank for a permanent ban.`
-          : `No known IP address is available for @${pendingAction.user.username}.`,
-        confirmLabel: "Set IP ban",
-        danger: true,
-      };
-    case "clear-ip-ban":
-      return {
-        title: "Clear IP Ban",
-        description: `Remove the active IP ban for @${pendingAction.user.username}?`,
-        confirmLabel: "Clear IP ban",
         danger: false,
       };
     case "delete-user":

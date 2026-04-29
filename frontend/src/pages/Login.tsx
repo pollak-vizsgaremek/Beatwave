@@ -190,7 +190,7 @@ const Login = () => {
               labelTitle="Password"
               inputType="password"
               inputName="password"
-              inputPlaceHolder="â€˘â€˘â€˘â€˘â€˘â€˘â€˘"
+              inputPlaceHolder="Enter your password"
               forgotPwd={true}
               onForgotPasswordClick={openForgotPasswordModal}
               iconLeft={<Lock size={20} />}

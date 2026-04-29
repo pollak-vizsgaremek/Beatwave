@@ -46,9 +46,6 @@ const prismaMock: any = {
   notification: {
     create: vi.fn(),
   },
-  ipBan: {
-    findFirst: vi.fn(),
-  },
   moderationLog: {
     findFirst: vi.fn(),
   },
@@ -119,7 +116,6 @@ const seedCommonDefaults = () => {
     expiresAt: new Date(Date.now() + 60 * 60 * 1000),
     revokedAt: new Date(),
   });
-  prismaMock.ipBan.findFirst.mockResolvedValue(null);
   prismaMock.user.update.mockResolvedValue({ id: "user-1" });
   prismaMock.user.delete.mockResolvedValue({ id: "user-1" });
   prismaMock.notification.create.mockResolvedValue({ id: "notification-1" });
@@ -129,7 +125,6 @@ const seedCommonDefaults = () => {
   });
   prismaMock.passwordResetToken.findUnique.mockResolvedValue(null);
   prismaMock.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
-  prismaMock.user.update.mockResolvedValue({ id: "user-1" });
   prismaMock.$transaction.mockImplementation(async (callback: any) =>
     callback(prismaMock),
   );
