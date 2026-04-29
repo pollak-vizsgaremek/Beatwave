@@ -37,7 +37,7 @@ const Login = () => {
 
     const checkSession = async () => {
       try {
-        const response = await api.get("/user-profile?includeSpotify=false", {
+        const response = await api.get<SessionStatusResponse>("/auth/session", {
           headers: {
             "X-Skip-Auth-Redirect": "1",
           },

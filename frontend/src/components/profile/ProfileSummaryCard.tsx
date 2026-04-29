@@ -53,7 +53,7 @@ const ProfileSummaryCard = ({ user }: ProfileSummaryCardProps) => {
         variants={itemVariants}
         className="flex justify-center items-center mt-4 text-xl font-semibold text-white text-center"
       >
-        {user?.username || "Felhasználó"}
+        {user?.username || "User"}
       </motion.div>
       <motion.p
         variants={itemVariants}

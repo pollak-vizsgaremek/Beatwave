@@ -181,11 +181,16 @@ const UserProfile = () => {
 
       closeEditModal();
     } catch (err: any) {
-      showError(err.response?.data?.error || "Failed to update profile.");
+      if (err.response?.status === 409 && err.response?.data?.error?.toLowerCase().includes("username")) {
+        showError("That username is already taken.");
+      } else {
+        showError(err.response?.data?.error || "Error updating profile.");
+      }
     } finally {
       setIsUpdating(false);
     }
   };
+
 
   const handlePostFieldChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
