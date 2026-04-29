@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:6969",
+  baseURL: import.meta.env.VITE_API_URL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -18,10 +18,7 @@ api.interceptors.response.use(
       error?.config?.headers?.["x-skip-auth-redirect"] === "1";
     const isAuthFailure =
       status === 401 ||
-      (status === 403 &&
-        (message.includes("invalid token") ||
-          message.includes("ervenytelen token") ||
-          message.includes("érvénytelen token")));
+      (status === 403 && message.includes("invalid token"));
 
     if (isAuthFailure && !skipAuthRedirect) {
       const url = error.config?.url;

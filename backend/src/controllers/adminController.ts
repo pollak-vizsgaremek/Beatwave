@@ -12,6 +12,9 @@ const VALID_USER_ROLES = ["USER", "MODERATOR", "ADMIN"] as const;
 const MAX_TIMEOUT_MINUTES = 60 * 24 * 30;
 const MAX_TIMEOUT_REASON_LENGTH = 110;
 const MAX_DELETE_REASON_LENGTH = 300;
+const MAX_ANNOUNCEMENT_TITLE_LENGTH = 200;
+const MAX_ANNOUNCEMENT_TEXT_LENGTH = 10000;
+const ANNOUNCEMENT_TOPIC = "Announcement";
 
 const getValidatedDeleteReason = (reason: unknown) => {
   if (!reason || typeof reason !== "string" || !reason.trim()) {
@@ -27,6 +30,36 @@ const getValidatedDeleteReason = (reason: unknown) => {
   }
 
   return { value: trimmedReason, error: null } as const;
+};
+
+const getValidatedAnnouncementInput = (title: unknown, text: unknown) => {
+  if (!title || typeof title !== "string" || !title.trim()) {
+    return { error: "Announcement title is required" } as const;
+  }
+
+  if (title.trim().length > MAX_ANNOUNCEMENT_TITLE_LENGTH) {
+    return {
+      error: `Announcement title must be at most ${MAX_ANNOUNCEMENT_TITLE_LENGTH} characters`,
+    } as const;
+  }
+
+  if (!text || typeof text !== "string" || !text.trim()) {
+    return { error: "Announcement text is required" } as const;
+  }
+
+  if (text.trim().length > MAX_ANNOUNCEMENT_TEXT_LENGTH) {
+    return {
+      error: `Announcement text must be at most ${MAX_ANNOUNCEMENT_TEXT_LENGTH} characters`,
+    } as const;
+  }
+
+  return {
+    error: null,
+    value: {
+      title: title.trim(),
+      text: text.trim(),
+    },
+  } as const;
 };
 
 const getPendingReport = async (reportId: string) => {
@@ -93,6 +126,7 @@ export const getAllUsers = async (
     res.status(200).json(
       users.map((user) => {
         const timeout = timeoutMap.get(user.id);
+
         return {
           ...user,
           timeoutUntil: timeout ? timeout.until.toISOString() : null,
@@ -126,7 +160,11 @@ export const setUserTimeout = async (
     }
 
     const minutes = Number(durationMinutes);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_TIMEOUT_MINUTES) {
+    if (
+      !Number.isInteger(minutes) ||
+      minutes < 1 ||
+      minutes > MAX_TIMEOUT_MINUTES
+    ) {
       return res.status(400).json({
         error: `durationMinutes must be an integer between 1 and ${MAX_TIMEOUT_MINUTES}`,
       });
@@ -273,7 +311,8 @@ export const clearUserTimeout = async (
       prisma.notification.create({
         data: {
           type: "account_timeout_cleared",
-          message: "Your timeout has been lifted. You can post and comment again.",
+          message:
+            "Your timeout has been lifted. You can post and comment again.",
           userId: targetUser.id,
           triggeredById: req.userId,
         },
@@ -481,17 +520,112 @@ export const deleteUserByAdmin = async (
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, username: true },
+      select: {
+        id: true,
+        username: true,
+      },
     });
 
     if (!targetUser) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    await prisma.user.delete({ where: { id: targetUser.id } });
+    await prisma.user.delete({
+      where: { id: targetUser.id },
+    });
 
     res.status(200).json({
       message: `User @${targetUser.username} deleted successfully`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createAnnouncement = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { title, text } = req.body;
+
+    if (!req.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const validated = getValidatedAnnouncementInput(title, text);
+    if (validated.error || !validated.value) {
+      return res.status(400).json({ error: validated.error });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: {
+        id: true,
+        username: true,
+      },
+    });
+
+    if (!adminUser) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    const allUsers = await prisma.user.findMany({
+      select: { id: true },
+    });
+
+    const announcement = await prisma.$transaction(async (tx) => {
+      const createdPost = await tx.post.create({
+        data: {
+          title: validated.value.title,
+          text: validated.value.text,
+          topic: ANNOUNCEMENT_TOPIC,
+          hashtags: null,
+          userId: adminUser.id,
+        },
+        select: {
+          id: true,
+          title: true,
+          text: true,
+          topic: true,
+          postedAt: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+            },
+          },
+        },
+      });
+
+      await tx.notification.createMany({
+        data: allUsers.map((user) => ({
+          type: "announcement",
+          message: `New announcement from @${adminUser.username}: ${validated.value.title}`,
+          link: `/discussion/view/${createdPost.id}`,
+          userId: user.id,
+          triggeredById: adminUser.id,
+        })),
+      });
+
+      await tx.moderationLog.create({
+        data: {
+          status: "NOTIFIED",
+          action: "CREATE_ANNOUNCEMENT",
+          moderatorId: adminUser.id,
+          userId: adminUser.id,
+          postId: createdPost.id,
+          details: `Created announcement post ${createdPost.id} titled "${validated.value.title}".`,
+        },
+      });
+
+      return createdPost;
+    });
+
+    res.status(201).json({
+      message: "Announcement created successfully",
+      post: announcement,
     });
   } catch (error) {
     next(error);

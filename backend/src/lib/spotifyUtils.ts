@@ -59,7 +59,6 @@ export const getValidSpotifyToken = async (
       return null;
     }
 
-    console.log(`Refreshing Spotify token for user ${userId}`);
 
     const authHeader = Buffer.from(
       `${config.spotifyClientId}:${config.spotifyClientSecret}`,
@@ -143,7 +142,6 @@ export const spotifyFetch = async (
 
     // Handle 401 Expired Access Token — only attempt one refresh
     if (res.status === 401 && retries > 0) {
-      console.log(`Spotify 401 for user ${userId}, forcing token refresh.`);
       const newToken = await getValidSpotifyToken(userId, true);
 
       if (newToken) {

@@ -44,6 +44,8 @@ export const verifyToken = async (
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as TokenPayload;
+    const tokenVersion =
+      typeof decoded.tokenVersion === "number" ? decoded.tokenVersion : 0;
 
     await maybeCleanupExpiredRevokedTokens();
 
@@ -56,8 +58,25 @@ export const verifyToken = async (
       return res.status(403).json({ error: "Invalid token" });
     }
 
-    req.userId = decoded.id;
-    req.role = decoded.role;
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        role: true,
+        authTokenVersion: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "Not logged in" });
+    }
+
+    if (tokenVersion !== user.authTokenVersion) {
+      return res.status(403).json({ error: "Invalid token" });
+    }
+
+    req.userId = user.id;
+    req.role = user.role;
     next();
   } catch {
     return res.status(403).json({ error: "Invalid token" });

@@ -651,7 +651,9 @@ const AdminPanel = () => {
         danger={actionModalContent.danger}
         isSubmitting={isSubmittingAction}
         confirmDisabled={
-          timeoutInputInvalid || deleteReasonInvalid || announcementInputInvalid
+          timeoutInputInvalid ||
+          deleteReasonInvalid ||
+          announcementInputInvalid
         }
         onClose={closeActionModal}
         onConfirm={() => {

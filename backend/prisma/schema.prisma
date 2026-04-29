@@ -32,6 +32,7 @@ model User {
   email             String   @unique
   username          String   @unique
   passwordHash      String
+  authTokenVersion  Int      @default(0)
   description       String?  @db.Text
   isPrivate         Boolean  @default(false)
   isBlocked         Boolean  @default(false)
@@ -39,7 +40,7 @@ model User {
   role              Role     @default(USER)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  spotifyTimeRange  SpotifyTimeRange @default(SHORT) 
+  spotifyTimeRange  SpotifyTimeRange @default(SHORT)
 
   // Relációk
   connectedApps          ConnectedApp[]

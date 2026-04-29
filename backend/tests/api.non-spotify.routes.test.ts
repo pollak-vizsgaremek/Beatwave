@@ -97,8 +97,6 @@ const mockState = vi.hoisted(() => {
     blockReportedUser: makeHandler("blockReportedUser"),
     updateUserRole: makeHandler("updateUserRole"),
     setUserBlockedStatus: makeHandler("setUserBlockedStatus"),
-    setUserIpBan: makeHandler("setUserIpBan"),
-    clearUserIpBan: makeHandler("clearUserIpBan"),
     deleteUserByAdmin: makeHandler("deleteUserByAdmin"),
     createAnnouncement: makeHandler("createAnnouncement"),
   };
@@ -219,8 +217,6 @@ describe("Non-Spotify route coverage", () => {
     { method: "patch", path: "/admin/users/user-1/block", expectedTrace: ["verifyToken", "isAdmin", "setUserBlockedStatus"], body: {} },
     { method: "patch", path: "/admin/users/user-1/timeout", expectedTrace: ["verifyToken", "isAdminOrModerator", "setUserTimeout"], body: {} },
     { method: "delete", path: "/admin/users/user-1/timeout", expectedTrace: ["verifyToken", "isAdminOrModerator", "clearUserTimeout"] },
-    { method: "patch", path: "/admin/users/user-1/ip-ban", expectedTrace: ["verifyToken", "isAdmin", "setUserIpBan"], body: {} },
-    { method: "delete", path: "/admin/users/user-1/ip-ban", expectedTrace: ["verifyToken", "isAdmin", "clearUserIpBan"] },
     { method: "delete", path: "/admin/users/user-1", expectedTrace: ["verifyToken", "isAdmin", "deleteUserByAdmin"] },
     { method: "post", path: "/admin/announcements", expectedTrace: ["verifyToken", "isAdmin", "createAnnouncement"], body: {} },
     { method: "get", path: "/admin/posts", expectedTrace: ["verifyToken", "isAdminOrModerator", "getAllPosts"] },

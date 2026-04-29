@@ -80,7 +80,7 @@ const UsersManagement = ({
               {hasTimeout && (
                 <p className="text-xs text-amber-200 mt-1">
                   Until {new Date(user.timeoutUntil as string).toLocaleString()}
-                  {user.timeoutReason ? ` • ${user.timeoutReason}` : ""}
+                  {user.timeoutReason ? ` - ${user.timeoutReason}` : ""}
                 </p>
               )}
 
@@ -136,7 +136,7 @@ const UsersManagement = ({
                     type="button"
                     onClick={() => void onDeleteUser(user)}
                     disabled={isProcessing || isCurrentUser}
-                    className="w-full rounded px-3 py-2 text-sm font-medium bg-rose-900 hover:bg-rose-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded px-3 py-2 text-sm font-medium bg-rose-800 hover:bg-rose-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isCurrentUser ? "Current account" : "Delete user"}
                   </button>
@@ -170,17 +170,16 @@ const UsersManagement = ({
               return (
                 <tr key={user.id} className="border-b border-gray-700">
                   <td className="p-2">{user.username}</td>
-                  <td className="p-2">{user.email}</td>
+                  <td className="p-2">
+                    <div>{user.email}</div>
+                  </td>
                   <td className="p-2">{user.role}</td>
                   <td className="p-2">
-                    {user.isBlocked
-                      ? "Blocked"
-                      : hasTimeout
-                        ? "Timed out"
-                        : "Active"}
+                    {user.isBlocked ? "Blocked" : hasTimeout ? "Timed out" : "Active"}
                     {hasTimeout && (
                       <p className="text-xs text-amber-200 mt-1">
-                        Until {new Date(user.timeoutUntil as string).toLocaleString()}
+                        Until{" "}
+                        {new Date(user.timeoutUntil as string).toLocaleString()}
                       </p>
                     )}
                   </td>
@@ -242,9 +241,9 @@ const UsersManagement = ({
                           type="button"
                           onClick={() => void onDeleteUser(user)}
                           disabled={isProcessing || isCurrentUser}
-                          className="rounded px-3 py-1 text-white bg-rose-900 hover:bg-rose-800 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded px-3 py-1 text-white bg-rose-800 hover:bg-rose-700 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {isCurrentUser ? "Current account" : "Delete"}
+                          Delete user
                         </button>
                       </div>
                     </td>

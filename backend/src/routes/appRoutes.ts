@@ -80,6 +80,7 @@ import {
   updateUserRole,
   setUserBlockedStatus,
   deleteUserByAdmin,
+  createAnnouncement,
 } from "../controllers/adminController";
 
 const router = Router();
@@ -193,6 +194,7 @@ router.delete(
   clearUserTimeout,
 );
 router.delete("/admin/users/:id", verifyToken, isAdmin, deleteUserByAdmin);
+router.post("/admin/announcements", verifyToken, isAdmin, createAnnouncement);
 router.get("/admin/posts", verifyToken, isAdminOrModerator, getAllPosts);
 router.get("/admin/comments", verifyToken, isAdminOrModerator, getAllComments);
 router.get(

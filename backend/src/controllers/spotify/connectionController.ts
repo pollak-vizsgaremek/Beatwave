@@ -34,7 +34,6 @@ export const disconnectSpotify = async (
   try {
     const userId = req.userId as string;
 
-
     await prisma.connectedApp.deleteMany({
       where: {
         userId: userId,
@@ -50,8 +49,6 @@ export const disconnectSpotify = async (
         spotifyTimeRange: "SHORT",
       },
     });
-
-    console.log(`Spotify disconnected for user ${userId}`);
 
     const keys = spotifyCache.keys();
     keys.forEach((key) => {

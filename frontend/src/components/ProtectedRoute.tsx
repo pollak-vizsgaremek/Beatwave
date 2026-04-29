@@ -8,16 +8,20 @@ import { createSessionUser, useSession } from "../context/SessionContext";
 
 const ProtectedRoute = () => {
   const { setCurrentUser } = useSession();
-  const [authState, setAuthState] = useState<"checking" | "allowed" | "blocked">(
-    "checking",
-  );
+  const [authState, setAuthState] = useState<
+    "checking" | "allowed" | "blocked"
+  >("checking");
 
   useEffect(() => {
     let mounted = true;
 
     const verifySession = async () => {
       try {
-        const response = await api.get("/user-profile?includeSpotify=false");
+        const response = await api.get("/user-profile?includeSpotify=false", {
+          headers: {
+            "X-Skip-Auth-Redirect": "1",
+          },
+        });
         if (!mounted) {
           return;
         }

@@ -448,8 +448,10 @@ export const likePost = async (
           data: { likeAmount: { decrement: 1 } },
         }),
       ]);
-      
-      return res.status(200).json({ likeAmount: updatedPost.likeAmount, isLiked: false });
+
+      return res
+        .status(200)
+        .json({ likeAmount: updatedPost.likeAmount, isLiked: false });
     }
 
     const [, updatedPost] = await prisma.$transaction([
@@ -482,8 +484,9 @@ export const likePost = async (
       }
     }
 
-    return res.status(200).json({ likeAmount: updatedPost.likeAmount, isLiked: true });
-
+    return res
+      .status(200)
+      .json({ likeAmount: updatedPost.likeAmount, isLiked: true });
   } catch (error) {
     next(error);
   }
