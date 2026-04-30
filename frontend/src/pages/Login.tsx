@@ -12,8 +12,14 @@ import { useErrorToast } from "../utils/useErrorToast";
 import api from "../utils/api";
 import {
   createSessionUser,
+  type SessionUser,
   useSession,
 } from "../context/SessionContext";
+
+type SessionStatusResponse = {
+  authenticated: boolean;
+  user?: SessionUser;
+};
 
 const Login = () => {
   const location = useLocation();
@@ -44,8 +50,13 @@ const Login = () => {
         });
         if (!mounted) return;
 
-        setCurrentUser(createSessionUser(response.data));
-        navigate("/home", { replace: true });
+        if (response.data.authenticated && response.data.user) {
+          setCurrentUser(createSessionUser(response.data.user));
+          navigate("/home", { replace: true });
+          return;
+        }
+
+        setCurrentUser(null);
       } catch {
         if (mounted) {
           setCurrentUser(null);
